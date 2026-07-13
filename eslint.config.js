@@ -31,4 +31,16 @@ module.exports = [
       ...tsPlugin.configs.recommended.rules,
     },
   },
+  {
+    files: ['scripts/gen-sprites/**/*.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: { project: './scripts/gen-sprites/tsconfig.json' },
+      globals: { console: 'readonly' },
+    },
+    plugins: { '@typescript-eslint': tsPlugin },
+    rules: {
+      ...tsPlugin.configs.recommended.rules,
+    },
+  },
 ];

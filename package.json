@@ -10,9 +10,10 @@
   "scripts": {
     "start": "npm run build && electron .",
     "build": "tsc && cp src/renderer/index.html dist/renderer/index.html",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p scripts/gen-sprites/tsconfig.json",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "assets:build": "node scripts/gen-sprites/build.ts"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
