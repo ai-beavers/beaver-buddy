@@ -1,0 +1,25 @@
+{
+  "tile": 48,
+  "fps": 10,
+  "sheetWidth": 192,
+  "sheetHeight": 192,
+  "rows": [
+    {
+      "name": "idle",
+      "frames": 1
+    },
+    {
+      "name": "shake",
+      "frames": 3
+    },
+    {
+      "name": "burst",
+      "frames": 3
+    },
+    {
+      "name": "spark",
+      "frames": 4
+    }
+  ],
+  "note": "spark frames are 8x8 particles drawn centered in the 48x48 tile (rows/cols 20-27)"
+}

@@ -1,0 +1,28 @@
+{
+  "tile": 32,
+  "fps": 10,
+  "sheetWidth": 128,
+  "sheetHeight": 160,
+  "rows": [
+    {
+      "name": "idle",
+      "frames": 2
+    },
+    {
+      "name": "walk",
+      "frames": 4
+    },
+    {
+      "name": "run",
+      "frames": 4
+    },
+    {
+      "name": "sleep",
+      "frames": 2
+    },
+    {
+      "name": "react",
+      "frames": 4
+    }
+  ]
+}
