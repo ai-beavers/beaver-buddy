@@ -48,7 +48,9 @@ underneath; idle CPU < 5%; overlay survives display sleep/wake.
 ### R3: Sprite animation system
 Sprite-sheet renderer (canvas, 8–12 fps pixel timing): idle, walk left/right,
 run, sleep, react/celebrate. The beaver roams the screen (left/right along the
-bottom edge and window tops; up/down along screen edges), with natural pauses.
+bottom edge; up/down along screen edges), with natural pauses. Walking on other
+apps' window tops is OUT of MVP — it would require the Accessibility permission
+to read window geometry; icebox it.
 **Acceptance:** all listed animations play from one sprite-sheet format; roaming
 never jitters or teleports; movement pauses when Paused from tray.
 
@@ -103,8 +105,10 @@ no keys, the mode is hidden; toggling modes never double-counts XP.
 Every UI-visible item (R3–R6, R8) closes with a designer-skill review pass
 (frontend-design / design-review) on real screenshots: palette coherence, pixel
 grid discipline, animation timing, "would a human designer approve this?"
-**Acceptance:** review artifacts (screenshots + verdict notes) committed under
-`docs/design-reviews/`; any FAIL loops back before the item merges.
+**Acceptance:** review artifacts (screenshots on a clean/synthetic desktop — no
+personal windows, notifications, or file names; repo is public — plus verdict
+notes) committed under `docs/design-reviews/`; any FAIL loops back before the
+item merges.
 
 ## Non-functional
 

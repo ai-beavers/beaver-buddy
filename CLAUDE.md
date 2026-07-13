@@ -1,0 +1,119 @@
+# CLAUDE.md — Beaver Buddy
+
+Read first, every session. `PRD.md` is the product source of truth; this file is the
+guardrails. Most work here is executed by autonomous /build items — these rules are
+written to be enforceable without a human in the loop.
+
+## What this is
+
+A pixel-art desktop beaver for macOS: transparent Electron overlay, roams the screen,
+canned quips, evolves on AI-token burn (later: MRR). Public repo.
+
+## Stack (locked)
+
+- **Electron + TypeScript strict.** No UI framework (no React/Vue/etc. — canvas + a
+  little DOM is the app). Test/build tooling is fixed: vitest, electron-builder.
+  Switching away from Electron requires an ADR with measured evidence — never an
+  in-item decision.
+- Pixel art = PNG sprite sheets on canvas. No SVG sprites, no CSS-animation characters.
+- Node and Electron majors pinned in `package.json` (`engines` + exact Electron);
+  installs use `npm ci` (lockfile committed and authoritative).
+- ADR 001 (the R1 reuse research) must be merged before any item that depends on
+  shell or asset-pipeline decisions starts.
+
+## Electron hardening (P1 invariants, checked in review)
+
+- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` for every
+  renderer; preload exposes a minimal typed API only.
+- All filesystem, Keychain, and network access lives in the **main process** behind
+  narrow validated IPC. The renderer never sees raw paths, log contents, or secrets.
+- No remote content: deny navigation, new-window creation, arbitrary protocols,
+  downloads, and permission requests. Electron auto-update and crash reporter stay
+  disabled (no phone-home).
+
+## Security & privacy (public repo — non-negotiable)
+
+- **No secrets in the repo, ever**: no API keys, tokens, or `.env` files. R9 secrets
+  live in the macOS Keychain — the one sanctioned exception to the single
+  state-directory rule below.
+- Usage-log reading (PRD R7) is **read-only and enumerated**: only the specific
+  Claude Code / Codex usage files the parser documents, parsed with bounded reads and
+  schema validation; treat contents as sensitive AND malformed-by-default. Never log,
+  persist, or display raw log content — derived token counts only. Tests use
+  synthetic fixtures, never the operator's real `~/.claude` / `~/.codex`.
+- XP ingestion is idempotent: durable read cursor, no double-counting across
+  restarts, log rotation, or replays.
+- Real prompts, repo paths, usernames, or account identifiers must never appear in
+  app logs, test fixtures, screenshots, or PR descriptions.
+- **The app makes no runtime network calls before the R9 item starts** (R9 is
+  phase 2 — do not pull it forward). Development-time networking (`npm ci`, R1
+  research, gh) is of course fine. When R9 lands: HTTPS to an allowlist of exactly `api.stripe.com` and
+  RevenueCat's documented API host; minimum-scope restricted keys; keys never reach
+  the renderer or error messages.
+- No telemetry. No LLM/OpenAI calls anywhere in the MVP. Quips are static strings.
+
+## Overlay etiquette
+
+- Click-through is a hard invariant: the overlay never steals clicks, keystrokes, or
+  focus. Any regression is a P1.
+- Standard floating window level only; the pet keeps out of the menu-bar strip and
+  Dock area. MVP roaming is the desktop plane (bottom edge + screen edges) — no
+  reading other apps' window geometry, no Accessibility API.
+- No busy loops; timers coalesced; animation pauses on tray Pause and display sleep.
+  Budget: idle CPU ~<5%, movement smooth at display refresh; sprite frames animate at
+  their own 8–12 fps cadence (two separate constants — don't conflate render Hz with
+  sprite fps).
+
+## Code style
+
+- Split files on responsibility; ~300 lines is a smell threshold, not a rule.
+- Tuning values (level curve, XP rates, quip cooldowns, sprite fps, render Hz) live
+  in small domain config modules — no magic numbers in logic, no single dumping-
+  ground constants file.
+- Comments carry invariants and rationale for platform workarounds / parsing quirks —
+  not narration. No PR/plan references in comments.
+- App state persists in ONE app-support directory (secrets excepted → Keychain);
+  deleting it = factory reset.
+
+## Assets
+
+- All sprites follow `assets/STYLE.md` (palette, grid, outline rules) — created by
+  the first asset item, then binding. Off-palette colors or mixed pixel densities
+  fail the design gate.
+- Commit final PNGs + the style guide. STYLE.md records provenance (generator, date,
+  human cleanup); raw image-gen intermediates stay out of the repo.
+
+## Definition of done (every autonomous item)
+
+`npm ci` clean → typecheck → lint → `npm test` → app launches and the item's
+acceptance criteria demonstrably hold → diff contains only the item's scope. Then PR.
+"Compiles" is never "verified".
+
+## Testing & design gate
+
+- Every logic module (level curve, XP accrual, log parser, quip scheduler) ships with
+  a vitest test.
+- The design gate (PRD R10) runs per feature and per materially visible change — not
+  per micro-tweak. Screenshots are taken on a clean/synthetic desktop background
+  (no personal windows, notifications, or file names) and land in
+  `docs/design-reviews/` with verdict notes.
+
+## Git & PRs
+
+- Never commit directly to `main`. One branch/PR per build-loop item
+  (`bl-item/<slug>/BL-<i>`), PR titles `[BL-<i>] …`.
+- Merges are `gh pr merge --merge` — never squash, never rebase. Only the build-loop
+  merges into its integration branch; only a human merges to main.
+- Conventional commit prefixes (`feat:`, `fix:`, `docs:`, `chore:`).
+- New dependencies are justified in the PR body (what it does, why our own ~50 lines
+  can't, license — MIT/Apache/BSD only). Default answer is no.
+
+## Autonomous-run rules (build-loop items)
+
+- An item implements its ledger spec — nothing more. Discoveries go to the loop's
+  icebox/follow-up routing, never into the current diff.
+- Ambiguity about *what* to build → exit `blocked: needs-human`. Ambiguity about
+  *how* → pick the least-expansive interpretation, log it in the plan's
+  Auto-decisions, move on.
+- ADRs (`docs/adr/NNN-title.md`) are for costly or hard-to-reverse cross-cutting
+  decisions (renderer approach, state schema, asset pipeline) — not every choice.
