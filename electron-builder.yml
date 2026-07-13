@@ -4,7 +4,6 @@ directories:
   output: release
 files:
   - dist/**/*
-  - src/renderer/index.html
   - assets/**/*
   - package.json
 mac:

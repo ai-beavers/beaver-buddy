@@ -1,7 +1,7 @@
 // Plain script (no imports/exports) so tsc's commonjs output stays
 // require-free and loadable via a bare <script> tag — no bundler.
 // Draws a static pixel placeholder; the real beaver sprite arrives in
-// BL-3/BL-4. Dims the placeholder while paused so the tray toggle + IPC
+// a later item. Dims the placeholder while paused so the tray toggle + IPC
 // wiring is visibly demonstrable even with no animation yet.
 
 // Global interface merge (declares the preload-exposed API) — the lint rule

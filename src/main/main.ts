@@ -46,7 +46,10 @@ function createWindow(): BrowserWindow {
 
   applyWindowHardening(win);
 
-  void win.loadFile(path.join(app.getAppPath(), 'dist', 'renderer', 'index.html'));
+  win.loadFile(path.join(app.getAppPath(), 'dist', 'renderer', 'index.html')).catch((error: unknown) => {
+    console.error('Failed to load renderer:', error);
+    app.exit(1);
+  });
 
   win.on('closed', () => {
     mainWindow = null;
@@ -61,6 +64,8 @@ function printSmokeResultAndExit(win: BrowserWindow): void {
       windowCreated: !win.isDestroyed(),
       alwaysOnTop: win.isAlwaysOnTop(),
       ignoresMouse: ignoresMouseEvents,
+      // Like ignoreMouseEvents, transparency has no Electron getter — it is
+      // set once at window construction and cannot change afterwards.
       transparent: true,
       paused: isPaused(pauseState),
     };
