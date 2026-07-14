@@ -21,10 +21,6 @@ interface PetChangedPayload {
   evolvingTo?: 'baby' | 'teen' | 'adult';
 }
 
-interface HatchStartPayload {
-  corner: 'bottom-left';
-}
-
 contextBridge.exposeInMainWorld('beaverBuddy', {
   onPausedChanged: (callback: (paused: boolean) => void): void => {
     ipcRenderer.on(PAUSE_CHANGED_CHANNEL, (_event, paused: boolean) => {
@@ -37,9 +33,9 @@ contextBridge.exposeInMainWorld('beaverBuddy', {
     });
   },
   // One-way main -> renderer only; nothing renderer -> main is exposed here.
-  onHatchStart: (callback: (payload: HatchStartPayload) => void): void => {
-    ipcRenderer.on(HATCH_START_CHANNEL, (_event, payload: HatchStartPayload) => {
-      callback(payload);
+  onHatchStart: (callback: () => void): void => {
+    ipcRenderer.on(HATCH_START_CHANNEL, () => {
+      callback();
     });
   },
 });

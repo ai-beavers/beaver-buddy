@@ -50,8 +50,8 @@ export const EVOLUTION_FLASH_BLINK_COUNT = 3;
 export const EVOLUTION_FLASH_BLINK_DURATION_S = 0.2;
 
 // Hatch onboarding sequence tuning (lodge-idle -> shake -> burst ->
-// baby-appear -> done). Only the bottom-left corner is supported (plan
-// Auto-decisions: no requirement for a configurable corner).
+// baby-appear -> done). The hatch always plays in the bottom-left corner;
+// the margin below is its only placement tuning.
 export const HATCH_LODGE_TILE_PX = 48; // assets/STYLE.md: lodge + particles are 48x48 tiles
 export const HATCH_CORNER_MARGIN_PX = 8; // gap from the screen edge the lodge/baby sits at
 

@@ -53,25 +53,23 @@ function totalShakeDurationS(): number {
 }
 
 describe('hatch: phase progression', () => {
-  it('starts in lodge-idle with the given corner', () => {
-    const state = startHatch('bottom-left');
-    expect(state.phase).toBe('lodge-idle');
-    expect(state.corner).toBe('bottom-left');
+  it('starts in lodge-idle', () => {
+    expect(startHatch().phase).toBe('lodge-idle');
   });
 
   it('stays in lodge-idle until the duration elapses', () => {
-    const state = advance(startHatch('bottom-left'), HATCH_LODGE_IDLE_DURATION_S - 0.05, Math.random);
+    const state = advance(startHatch(), HATCH_LODGE_IDLE_DURATION_S - 0.05, Math.random);
     expect(state.phase).toBe('lodge-idle');
   });
 
   it('moves lodge-idle -> shake once the idle duration elapses', () => {
-    const state = advance(startHatch('bottom-left'), HATCH_LODGE_IDLE_DURATION_S + EPSILON_S, Math.random);
+    const state = advance(startHatch(), HATCH_LODGE_IDLE_DURATION_S + EPSILON_S, Math.random);
     expect(state.phase).toBe('shake');
   });
 
   it('moves shake -> burst after all bursts + pauses complete', () => {
     const state = advance(
-      startHatch('bottom-left'),
+      startHatch(),
       HATCH_LODGE_IDLE_DURATION_S + totalShakeDurationS() + EPSILON_S,
       Math.random,
     );
@@ -82,23 +80,22 @@ describe('hatch: phase progression', () => {
 
   it('moves burst -> baby-appear -> done', () => {
     const toBurst = HATCH_LODGE_IDLE_DURATION_S + totalShakeDurationS() + EPSILON_S;
-    const state = advance(startHatch('bottom-left'), toBurst + HATCH_BURST_DURATION_S + EPSILON_S, Math.random);
+    const state = advance(startHatch(), toBurst + HATCH_BURST_DURATION_S + EPSILON_S, Math.random);
     expect(state.phase).toBe('baby-appear');
 
     const done = advance(state, HATCH_BABY_APPEAR_DURATION_S + EPSILON_S, Math.random);
     expect(done.phase).toBe('done');
   });
 
-  it('ends in done with the handoff corner preserved', () => {
+  it('ends in done after the full sequence', () => {
     const total =
       HATCH_LODGE_IDLE_DURATION_S +
       totalShakeDurationS() +
       HATCH_BURST_DURATION_S +
       HATCH_BABY_APPEAR_DURATION_S +
       0.05;
-    const state = advance(startHatch('bottom-left'), total, Math.random);
+    const state = advance(startHatch(), total, Math.random);
     expect(state.phase).toBe('done');
-    expect(state.corner).toBe('bottom-left');
   });
 
   it('a done state is a fixed point (further ticks are no-ops)', () => {
@@ -108,7 +105,7 @@ describe('hatch: phase progression', () => {
       HATCH_BURST_DURATION_S +
       HATCH_BABY_APPEAR_DURATION_S +
       0.05;
-    const done = advance(startHatch('bottom-left'), total, Math.random);
+    const done = advance(startHatch(), total, Math.random);
     expect(tickHatch(done, 5, Math.random)).toEqual(done);
   });
 });
@@ -123,12 +120,12 @@ describe('hatch: escalating shake amplitude', () => {
   });
 
   it('shake offset is zero outside the shake phase', () => {
-    const idle = startHatch('bottom-left');
+    const idle = startHatch();
     expect(hatchShakeOffset(idle, () => 1)).toEqual({ dx: 0, dy: 0 });
   });
 
   it('shake offset is zero during the inter-burst pause', () => {
-    const paused = advance(startHatch('bottom-left'), HATCH_LODGE_IDLE_DURATION_S + HATCH_SHAKE_BURST_ACTIVE_S + EPSILON_S, Math.random);
+    const paused = advance(startHatch(), HATCH_LODGE_IDLE_DURATION_S + HATCH_SHAKE_BURST_ACTIVE_S + EPSILON_S, Math.random);
     expect(paused.phase).toBe('shake');
     expect(paused.inPause).toBe(true);
     expect(hatchShakeOffset(paused, () => 1)).toEqual({ dx: 0, dy: 0 });
@@ -138,7 +135,7 @@ describe('hatch: escalating shake amplitude', () => {
 describe('hatch: deterministic sparks', () => {
   function toBurstPhase(): HatchState {
     return advance(
-      startHatch('bottom-left'),
+      startHatch(),
       HATCH_LODGE_IDLE_DURATION_S + totalShakeDurationS() + EPSILON_S,
       createSeededRng(42),
     );
@@ -171,6 +168,6 @@ describe('hatch: deterministic sparks', () => {
   });
 
   it('sparkOffsets is empty outside the burst phase', () => {
-    expect(sparkOffsets(startHatch('bottom-left'))).toEqual([]);
+    expect(sparkOffsets(startHatch())).toEqual([]);
   });
 });

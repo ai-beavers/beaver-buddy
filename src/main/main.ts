@@ -10,9 +10,6 @@ import { UsageTracker } from './usage/tracker';
 
 const SMOKE_DELAY_MS = 3000;
 const INJECT_XP_FLAG_PREFIX = '--inject-xp=';
-// Only corner supported (plan Auto-decisions: no configurable corner — no
-// requirement for one).
-const HATCH_CORNER = 'bottom-left';
 
 let pauseState: PauseState = createPauseState();
 let mainWindow: BrowserWindow | null = null;
@@ -143,10 +140,13 @@ app.whenReady().then(() => {
   // engine update — including any evolution launch-time accrual already
   // triggered — is (re-)sent once the page is ready to receive it.
   mainWindow.webContents.once('did-finish-load', () => {
-    mainWindow?.webContents.send(PET_CHANGED_CHANNEL, xpEngine.getLastUpdate());
+    // Hatch first: the renderer suppresses the animated evolution for pet
+    // updates that arrive while a hatch is active, which only works if the
+    // hatch message lands before a launch-time evolving update.
     if (shouldHatch) {
-      mainWindow?.webContents.send(HATCH_START_CHANNEL, { corner: HATCH_CORNER });
+      mainWindow?.webContents.send(HATCH_START_CHANNEL);
     }
+    mainWindow?.webContents.send(PET_CHANGED_CHANNEL, xpEngine.getLastUpdate());
   });
 
   powerMonitor.on('suspend', () => {

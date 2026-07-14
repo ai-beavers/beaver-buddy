@@ -21,8 +21,6 @@ import {
 } from './pet-config.js';
 
 export type HatchPhase = 'lodge-idle' | 'shake' | 'burst' | 'baby-appear' | 'done';
-// Only corner supported (plan Auto-decisions: no requirement for one).
-export type Corner = 'bottom-left';
 
 export interface Spark {
   readonly angleRad: number;
@@ -30,15 +28,14 @@ export interface Spark {
 
 export interface HatchState {
   readonly phase: HatchPhase;
-  readonly corner: Corner;
   readonly elapsedS: number; // elapsed within the current phase (or sub-phase, for shake)
   readonly burstsDone: number; // completed shake bursts
   readonly inPause: boolean; // shake phase only: true while between bursts
   readonly sparks: readonly Spark[];
 }
 
-export function startHatch(corner: Corner): HatchState {
-  return { phase: 'lodge-idle', corner, elapsedS: 0, burstsDone: 0, inPause: false, sparks: [] };
+export function startHatch(): HatchState {
+  return { phase: 'lodge-idle', elapsedS: 0, burstsDone: 0, inPause: false, sparks: [] };
 }
 
 // Escalating amplitude: ramps HATCH_SHAKE_JITTER_MIN_PX ->
@@ -129,7 +126,8 @@ export interface SparkOffset {
 }
 
 // Sparks radiate outward from the lodge center at a fixed speed along their
-// deterministic angle — no physics/particle system (plan Auto-decisions).
+// deterministic angle — constant-velocity radial motion is the whole model,
+// no physics/particle system.
 export function sparkOffsets(state: HatchState): readonly SparkOffset[] {
   if (state.phase !== 'burst') {
     return [];

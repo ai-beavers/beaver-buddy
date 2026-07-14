@@ -27,18 +27,14 @@ import {
   type EvolutionState,
   type PetChangedPayload,
 } from './evolution.js';
-import { hatchShakeOffset, sparkOffsets, startHatch, tickHatch, type Corner, type HatchState } from './hatch.js';
-
-interface HatchStartPayload {
-  readonly corner: Corner;
-}
+import { hatchShakeOffset, sparkOffsets, startHatch, tickHatch, type HatchState } from './hatch.js';
 
 declare global {
   interface Window {
     beaverBuddy: {
       onPausedChanged(callback: (paused: boolean) => void): void;
       onPetChanged(callback: (pet: PetChangedPayload) => void): void;
-      onHatchStart(callback: (payload: HatchStartPayload) => void): void;
+      onHatchStart(callback: () => void): void;
     };
     // Read-only diagnostic surface; nothing in the app reads it.
     __debugRoam?: RoamState;
@@ -123,7 +119,7 @@ window.beaverBuddy.onPausedChanged((nextPaused) => {
 
 window.beaverBuddy.onPetChanged((pet) => {
   petLevel = pet.level;
-  if (pet.evolvingTo) {
+  if (pet.evolvingTo && !hatchState) {
     // A fresh page load always starts from the default 'baby' sheet, so a
     // launch that evolves immediately (e.g. persisted state already teen,
     // injected straight past adult) must sync to the pre-evolution stage
@@ -134,6 +130,16 @@ window.beaverBuddy.onPetChanged((pet) => {
     // Renderer-local freeze only (CLAUDE.md: tray Pause must stay a pure
     // user control) — roaming resumes on its own once the sequence ends.
     evolutionState = startEvolution(pet.evolvingTo);
+  } else if (pet.evolvingTo) {
+    // Stage crossing while the hatch owns the screen: an animated evolution
+    // would run invisibly behind the hatch (draw() renders only the hatch),
+    // flip the sheet at an arbitrary mid-hatch moment, and have its
+    // celebrate window swallowed. Skip the animation and sync straight to
+    // the post-evolution stage so the appear phase shows the pet at its
+    // true stage with no mid-sequence sprite flip. main.ts sends
+    // state:hatch before the pet update, so hatchState is already set here
+    // on a hatching launch.
+    setStage(pet.evolvingTo);
   } else if (!evolutionState && pet.stage !== stage) {
     // No transition in flight: sync directly (e.g. a late listener attach
     // catching up to state that already changed).
@@ -142,8 +148,8 @@ window.beaverBuddy.onPetChanged((pet) => {
   needsDraw = true;
 });
 
-window.beaverBuddy.onHatchStart((payload) => {
-  hatchState = startHatch(payload.corner);
+window.beaverBuddy.onHatchStart(() => {
+  hatchState = startHatch();
   loadLodgeSheet()
     .then((loaded) => {
       lodgeSheet = loaded;
@@ -153,7 +159,8 @@ window.beaverBuddy.onHatchStart((payload) => {
   needsDraw = true;
 });
 
-// Bottom-left is the only supported corner (plan Auto-decisions).
+// The hatch always plays in the bottom-left corner; the margin constant is
+// its only placement tuning.
 function hatchPosition(): { x: number; y: number } {
   return { x: HATCH_CORNER_MARGIN_PX, y: bounds().height - HATCH_LODGE_TILE_PX };
 }
@@ -170,7 +177,12 @@ function drawHatch(state: HatchState): void {
 
   if (state.phase === 'baby-appear') {
     if (!sheet) {
-      dirtyRect = null;
+      // Sheet not loaded: nothing drawn, but keep the dirty rect bounded to
+      // the hatch area — a null rect would make every hatch frame clear the
+      // full canvas (hatch redraws every frame), regressing the sprite-sized
+      // damage-rect discipline.
+      const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2);
+      dirtyRect = { x: x - pad, y: y - pad, size: HATCH_LODGE_TILE_PX + 2 * pad };
       return;
     }
     // Bottom-aligned with the (larger) lodge tile so there's no visual jump
@@ -183,7 +195,10 @@ function drawHatch(state: HatchState): void {
   }
 
   if (!lodgeSheet) {
-    dirtyRect = null;
+    // Lodge sheet still loading (or failed): same bounded-rect rule as above
+    // so a load failure can never reintroduce per-frame full-canvas clears.
+    const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2) + HATCH_SHAKE_JITTER_MAX_PX;
+    dirtyRect = { x: x - pad, y: y - pad, size: HATCH_LODGE_TILE_PX + 2 * pad };
     return;
   }
 
