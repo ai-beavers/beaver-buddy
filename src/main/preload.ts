@@ -1,9 +1,17 @@
 // Preload runs with contextIsolation + sandbox on: it can only reach the
 // renderer through contextBridge, and exposes exactly one narrow API —
 // nothing filesystem/network/IPC-generic is reachable from renderer JS.
+//
+// A sandboxed preload's require() only resolves Node/Electron built-ins,
+// not sibling project files (confirmed empirically: requiring
+// `./ipc-channels` here throws "module not found" at preload load time,
+// which previously left `window.beaverBuddy` undefined and crashed the
+// renderer before it could draw anything). So the channel name is inlined
+// here instead of imported — keep it in sync with ipc-channels.ts by hand.
 
 import { contextBridge, ipcRenderer } from 'electron';
-import { PAUSE_CHANGED_CHANNEL } from './ipc-channels';
+
+const PAUSE_CHANGED_CHANNEL = 'state:paused'; // must match src/main/ipc-channels.ts
 
 contextBridge.exposeInMainWorld('beaverBuddy', {
   onPausedChanged: (callback: (paused: boolean) => void): void => {
