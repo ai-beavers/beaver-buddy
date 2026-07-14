@@ -5,11 +5,11 @@
 
 import fs from 'node:fs';
 import os from 'node:os';
-import { discoverPaths, type PathEnv } from './paths.ts';
-import { parseClaudeFile } from './claude-parser.ts';
-import { dedupeCodexEntries, parseCodexFile } from './codex-parser.ts';
-import { aggregate, type UsageEntry, type UsageTotals } from './totals.ts';
-import { USAGE_REFRESH_MS } from './config.ts';
+import { discoverPaths, type PathEnv } from './paths';
+import { parseClaudeFile } from './claude-parser';
+import { dedupeCodexEntries, parseCodexFile } from './codex-parser';
+import { aggregate, type UsageEntry, type UsageTotals } from './totals';
+import { USAGE_REFRESH_MS } from './config';
 
 interface FileCacheEntry {
   readonly mtimeMs: number;

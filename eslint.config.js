@@ -67,16 +67,4 @@ module.exports = [
       ...tsPlugin.configs.recommended.rules,
     },
   },
-  {
-    files: ['scripts/usage-cli.ts'],
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: { project: './scripts/usage-cli.tsconfig.json' },
-      globals: { console: 'readonly', process: 'readonly' },
-    },
-    plugins: { '@typescript-eslint': tsPlugin },
-    rules: {
-      ...tsPlugin.configs.recommended.rules,
-    },
-  },
 ];

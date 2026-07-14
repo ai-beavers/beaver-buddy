@@ -6,7 +6,7 @@
 // the tracker's refresh stays non-overlapping.
 
 import fs from 'node:fs';
-import { MAX_LINE_BYTES } from './config.ts';
+import { MAX_LINE_BYTES } from './config';
 
 const CHUNK_BYTES = 64 * 1024;
 

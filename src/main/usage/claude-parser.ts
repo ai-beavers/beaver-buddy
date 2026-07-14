@@ -4,8 +4,8 @@
 // zero rather than throwing. Only derived token counts leave this module —
 // never raw line content.
 
-import { readBoundedLines } from './read-lines.ts';
-import type { UsageEntry } from './totals.ts';
+import { readBoundedLines } from './read-lines';
+import type { UsageEntry } from './totals';
 
 interface RawClaudeLine {
   readonly timestamp?: string;

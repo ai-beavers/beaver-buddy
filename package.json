@@ -10,11 +10,11 @@
   "scripts": {
     "start": "npm run build && electron .",
     "build": "tsc && tsc -p src/renderer/tsconfig.json && cp src/renderer/index.html dist/renderer/index.html && mkdir -p dist/renderer/assets && cp -R assets/sprites dist/renderer/assets/sprites",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json && tsc --noEmit -p scripts/usage-cli.tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
     "assets:build": "node scripts/gen-sprites/build.ts",
-    "usage:cli": "node scripts/usage-cli.ts"
+    "usage:cli": "npm run build && node scripts/usage-cli.js"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

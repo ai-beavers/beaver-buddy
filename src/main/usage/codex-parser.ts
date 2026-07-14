@@ -10,9 +10,9 @@
 // cache-read are split so `inputTokens + cacheReadTokens` reconstructs the
 // raw total without double-counting the cached portion.
 
-import { CODEX_REPLAY_SNIFF_BYTES } from './config.ts';
-import { readBoundedLines, readPrefix } from './read-lines.ts';
-import type { UsageEntry } from './totals.ts';
+import { CODEX_REPLAY_SNIFF_BYTES } from './config';
+import { readBoundedLines, readPrefix } from './read-lines';
+import type { UsageEntry } from './totals';
 
 interface RawCodexLine {
   readonly timestamp?: string;
