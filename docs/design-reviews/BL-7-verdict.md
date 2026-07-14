@@ -110,6 +110,40 @@ Isolated userData directory, three sequential launches:
    confirms the hidden QA reset flag works and doesn't leave the state
    corrupted or hatch-less.
 
+## Regression: stage crossing during the hatch (review fix, verified live)
+
+Review found that a pet update carrying `evolvingTo` arriving while the
+hatch owns the screen would start the animated evolution invisibly behind
+the hatch: it flipped the sprite sheet at an arbitrary mid-hatch moment (so
+the appear phase could render the wrong sprite) and its celebrate window
+was swallowed. Fixed by (a) sending `state:hatch` before the pet update at
+did-finish-load — required for the gate to see the hatch on a hatching
+launch — and (b) suppressing the animated evolution while a hatch is
+active: the renderer syncs straight to the post-evolution stage instead (no
+shake/flash/celebrate).
+
+Verified live: fresh temp userData + `--inject-xp=1500` (crosses level 16,
+baby -> teen, on the very first launch — the evolving update arrives during
+the hatch's first frames). Polled `__debugHatch` + `__debugPet` together
+(~120ms interval) through the whole sequence:
+
+| t (ms) | hatch phase | pet (level / stage / evolving) |
+|---|---|---|
+| 127 | lodge-idle | 16 / teen / false |
+| 870 | shake | 16 / teen / false |
+| 3575 | burst | 16 / teen / false |
+| 4189 | baby-appear | 16 / teen / false |
+| 5172 | done | 16 / teen / false |
+
+`evolving` was false in **every** sample across the run — no evolution
+animation ran behind the hatch. The stage read `teen` from the first
+post-load sample onward: the sheet synced once, at hatch start, so the
+appear phase rendered the teen sprite consistently. Observed sequence:
+hatch plays fully; the emerging pet appears at its true (already-evolved)
+stage — no wrong-sprite frame, no mid-sequence sheet flip, no evolution
+animation after the hatch. After `done`, `__debugRoam.x` = 8 (the hatch
+corner) — handoff unaffected.
+
 ## Gates
 
 `npm ci` clean, `npm run typecheck` clean (main + renderer + gen-sprites
