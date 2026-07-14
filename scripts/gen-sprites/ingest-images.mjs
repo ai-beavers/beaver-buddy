@@ -307,9 +307,8 @@ export function computeStageScale(bboxes, tile, targetContentHeightPx) {
 
 // Row/frame order is CLAUDE.md-binding (see assets/STYLE.md): right-facing
 // only, idle then walk, no run/sleep/react. The user's left-facing images
-// (baby-idle-left/baby-to-left-* and teen-to-right-1-{1,3,5}, which despite
-// their names are left-facing mirrors) are unused — the renderer mirrors
-// right-facing frames instead (see BL-11 verdict doc).
+// ({stage}-idle-left.png, {stage}-to-left-{1,2}.png) are unused — the
+// renderer mirrors right-facing frames instead (see BL-11 verdict doc).
 export const STAGE_SPECS = [
   {
     name: 'beaver-baby',
@@ -327,23 +326,8 @@ export const STAGE_SPECS = [
     fps: FPS,
     targetContentHeightPx: 92,
     rows: [
-      // BL-12: teen-to-right-1-4 is a feet-together, arms-out standing pose
-      // (verified by pixel-diffing all three right-facing candidates against
-      // each other: -1-4 is the outlier, farthest from both -1 and -1-2,
-      // which are near-twin lean-gait poses) — it belongs here, not in walk.
-      { name: 'idle', files: ['teen-to-right-1-4.png'] },
-      {
-        // Right-facing STEP frames only. Excluded: teen-to-right-1-{1,3,5}
-        // face LEFT (mirrors of -1/-1-2/-1-4 despite their to-right names —
-        // mixing them in made the walking sprite flip sides every couple of
-        // frames). -1 and -1-2 are both lean-gait poses (previously -1 was
-        // used as idle, and -1-4 as a walk frame, but -1-4's standing pose
-        // read as a stutter-step mid-walk — see BL-12 verdict doc). Left-
-        // facing movement comes from the renderer mirroring these
-        // right-facing frames, same as every sprite here.
-        name: 'walk',
-        files: ['teen-to-right-1.png', 'teen-to-right-1-2.png'],
-      },
+      { name: 'idle', files: ['teen-idle-right.png'] },
+      { name: 'walk', files: ['teen-to-right-1.png', 'teen-to-right-2.png'] },
     ],
   },
 ];
