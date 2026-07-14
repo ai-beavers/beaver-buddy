@@ -10,6 +10,12 @@ export interface TrayCallbacks {
   onTogglePause: () => void;
   isPaused: () => boolean;
   getPetLabel: () => string;
+  getGrowthMode: () => 'tokens' | 'mrr';
+  // MRR is hidden from the submenu entirely (not just disabled) until at
+  // least one source is connected, per R9.
+  isMrrAvailable: () => boolean;
+  onSelectGrowthMode: (mode: 'tokens' | 'mrr') => void;
+  onOpenGrowthSettings: () => void;
 }
 
 export function formatPetLabel(state: { readonly level: number; readonly stage: Stage; readonly xp: number }): string {
@@ -20,6 +26,30 @@ export function formatPetLabel(state: { readonly level: number; readonly stage: 
 // Pure menu-shape builder — no Electron Menu/Tray construction, so it is
 // unit-testable without a running Electron process.
 export function buildMenuTemplate(callbacks: TrayCallbacks, rebuild: () => void): MenuItemConstructorOptions[] {
+  const growthSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: 'Source: Tokens',
+      type: 'radio',
+      checked: callbacks.getGrowthMode() === 'tokens',
+      click: () => {
+        callbacks.onSelectGrowthMode('tokens');
+        rebuild();
+      },
+    },
+  ];
+  if (callbacks.isMrrAvailable()) {
+    growthSubmenu.push({
+      label: 'Source: MRR',
+      type: 'radio',
+      checked: callbacks.getGrowthMode() === 'mrr',
+      click: () => {
+        callbacks.onSelectGrowthMode('mrr');
+        rebuild();
+      },
+    });
+  }
+  growthSubmenu.push({ type: 'separator' }, { label: 'Growth settings…', click: () => callbacks.onOpenGrowthSettings() });
+
   return [
     { label: callbacks.getPetLabel(), enabled: false },
     { type: 'separator' },
@@ -30,6 +60,8 @@ export function buildMenuTemplate(callbacks: TrayCallbacks, rebuild: () => void)
         rebuild();
       },
     },
+    { type: 'separator' },
+    { label: 'Growth', submenu: growthSubmenu },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
   ];
@@ -42,7 +74,11 @@ export interface TrayHandle {
   refresh(): void;
 }
 
-export function createTray(callbacks: TrayCallbacks): TrayHandle {
+// QA-only introspection seam (same family as --smoke's stdout JSON): a
+// native Tray context menu has no external readback API, so a live check
+// that the MRR item is hidden/shown has nothing else to poll. Optional and
+// a no-op unless main.ts wires it behind a debug flag.
+export function createTray(callbacks: TrayCallbacks, onMenuBuilt?: (labels: readonly string[]) => void): TrayHandle {
   const iconPath = path.join(app.getAppPath(), 'assets', 'tray-iconTemplate.png');
   const icon = nativeImage.createFromPath(iconPath);
   icon.setTemplateImage(true);
@@ -51,7 +87,13 @@ export function createTray(callbacks: TrayCallbacks): TrayHandle {
   tray.setToolTip('Beaver Buddy');
 
   const rebuildMenu = (): void => {
-    tray.setContextMenu(Menu.buildFromTemplate(buildMenuTemplate(callbacks, rebuildMenu)));
+    const template = buildMenuTemplate(callbacks, rebuildMenu);
+    tray.setContextMenu(Menu.buildFromTemplate(template));
+    if (onMenuBuilt) {
+      const growth = template.find((i) => i.label === 'Growth');
+      const submenuLabels = ((growth?.submenu as MenuItemConstructorOptions[] | undefined) ?? []).map((i) => i.label ?? '');
+      onMenuBuilt(submenuLabels);
+    }
   };
 
   rebuildMenu();
