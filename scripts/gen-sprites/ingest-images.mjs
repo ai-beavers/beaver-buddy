@@ -306,8 +306,9 @@ export function computeStageScale(bboxes, tile, targetContentHeightPx) {
 }
 
 // Row/frame order is CLAUDE.md-binding (see assets/STYLE.md): right-facing
-// only, idle then walk, no run/sleep/react. baby-idle-left/baby-to-left-*
-// are the user's near-mirror pair for these — unused, the renderer mirrors
+// only, idle then walk, no run/sleep/react. The user's left-facing images
+// (baby-idle-left/baby-to-left-* and teen-to-right-1-{1,3,5}, which despite
+// their names are left-facing mirrors) are unused — the renderer mirrors
 // right-facing frames instead (see BL-11 verdict doc).
 export const STAGE_SPECS = [
   {
@@ -328,15 +329,16 @@ export const STAGE_SPECS = [
     rows: [
       { name: 'idle', files: ['teen-to-right-1.png'] },
       {
+        // Right-facing frames ONLY. The user's teen set is three mirror
+        // PAIRS — teen-to-right-1-{1,3,5} face LEFT (mirrors of -1, -1-2,
+        // -1-4; verified visually + identical bbox dims per pair). Putting
+        // them in this row made the sheet itself alternate facing, so the
+        // walking beaver appeared to flip sides every couple of frames on
+        // top of the renderer's own facing mirror. Left-facing movement
+        // comes from the renderer mirroring these right-facing frames,
+        // same as every other sprite here.
         name: 'walk',
-        files: [
-          'teen-to-right-1.png',
-          'teen-to-right-1-1.png',
-          'teen-to-right-1-2.png',
-          'teen-to-right-1-3.png',
-          'teen-to-right-1-4.png',
-          'teen-to-right-1-5.png',
-        ],
+        files: ['teen-to-right-1.png', 'teen-to-right-1-2.png', 'teen-to-right-1-4.png'],
       },
     ],
   },

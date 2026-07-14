@@ -74,16 +74,19 @@ ships with (hard alpha at the background cutout, no re-outlining).
 ## Facing & mirroring
 
 All frames are authored/ingested RIGHT-facing. The renderer mirrors
-horizontally for left-facing movement. The user's `baby-idle-left.png` /
-`baby-to-left-*.png` near-mirror images exist in `assets-src/beaver/` but are
-unused — the right-facing frames plus renderer mirroring cover left-facing
-movement, so there's no separate left-facing ingest path.
+horizontally for left-facing movement. The user's left-facing images —
+`baby-idle-left.png`/`baby-to-left-*.png` and `teen-to-right-1-{1,3,5}.png`
+(despite their names, left-facing mirrors of `-1`/`-1-2`/`-1-4`) — exist in
+`assets-src/beaver/` but are unused: mixing them into a sheet row would make
+the sheet itself alternate facing per frame (a flip-flopping walk), so
+left-facing movement comes only from renderer mirroring, never from
+left-facing source frames.
 
 ## Sheet row order & timing
 
 - **Beaver stages**: `idle(1), walk(N)` — no run/sleep/react (BL-11 slimmed
   the animation set to match `roam.ts`'s idle/walk-only state machine).
-  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×6. fps hint: 8.
+  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×3. fps hint: 8.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
   frames are 8×8 particles centered in the 48×48 tile (rows/cols 20–27, also
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
@@ -105,8 +108,8 @@ generated — the 16-color palette rule above is waived for these sheets by
 owner decision, 2026-07-14. Source images live in the gitignored
 `assets-src/beaver/` (not committed — no raw image-gen intermediates in the
 repo, same rule as everywhere else); only the ingested sheets are committed.
-Right-facing frames only — the user's left-facing pair is unused (see Facing
-& mirroring above). No adult-stage art exists yet.
+Right-facing frames only — the user's left-facing images are unused (see
+Facing & mirroring above). No adult-stage art exists yet.
 
 **Lodge** (`lodge.png`): pixel maps authored by OpenAI Codex (vision-guided
 from a user-supplied reference image), iterated through visual design-review

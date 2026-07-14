@@ -1,7 +1,7 @@
 {
   "tile": 96,
   "fps": 8,
-  "sheetWidth": 576,
+  "sheetWidth": 288,
   "sheetHeight": 192,
   "rows": [
     {
@@ -10,7 +10,7 @@
     },
     {
       "name": "walk",
-      "frames": 6
+      "frames": 3
     }
   ]
 }
