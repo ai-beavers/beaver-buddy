@@ -3,17 +3,18 @@
 // (x, y, anim, facing, rotation, frameHold are read directly by callers —
 // no separate mapping step for a one-field-per-consumer module like this).
 //
-// States: idle, walk, run, sleep (bottom-edge behaviors) and
-// climbUp -> climbPause -> climbDown (side-edge behavior, entered only when
-// idle/sleep ends while standing within EDGE_THRESHOLD_PX of a side edge).
-// `react` is not a roam state — it's a one-shot overlay the renderer applies
-// on top of whatever roam.ts reports (see renderer.ts `celebrate()`).
+// States: idle, walk (bottom-edge behaviors) and climbUp -> climbPause ->
+// climbDown (side-edge behavior, entered only when idle ends while standing
+// within EDGE_THRESHOLD_PX of a side edge). BL-11 removed run and sleep
+// (slimmed animation set — the ingested sheets only ship idle/walk rows) and
+// react (it was never a roam state — it was a one-shot overlay the renderer
+// applied on top of whatever roam.ts reports; BL-11 dropped it too, see
+// renderer.ts's celebrate()).
 //
 // Transition table:
-//   idle/sleep  --timer expires, not at edge-->            walk | run
-//   idle/sleep  --timer expires, at edge, climb roll-->     climbUp
-//   idle/sleep  --timer expires, sleep roll-->               sleep
-//   walk/run    --reaches target-->                          idle
+//   idle        --timer expires, not at edge-->            walk
+//   idle        --timer expires, at edge, climb roll-->     climbUp
+//   walk        --reaches target-->                          idle
 //   climbUp     --reaches climb height-->                     climbPause
 //   climbPause  --timer expires-->                            climbDown
 //   climbDown   --reaches ground-->                            idle
@@ -36,11 +37,6 @@ import {
   PET_SCALE,
   ROTATION_LEFT_CLIMB_DEG,
   ROTATION_RIGHT_CLIMB_DEG,
-  RUN_PROBABILITY,
-  RUN_SPEED_PX_S,
-  SLEEP_PAUSE_MAX_S,
-  SLEEP_PAUSE_MIN_S,
-  SLEEP_PROBABILITY,
   TARGET_EPSILON_PX,
   WALK_SPEED_PX_S,
 } from './pet-config.js';
@@ -50,9 +46,9 @@ export interface Bounds {
   readonly height: number;
 }
 
-export type AnimName = 'idle' | 'walk' | 'run' | 'sleep' | 'react';
+export type AnimName = 'idle' | 'walk';
 export type Facing = 'left' | 'right';
-type Phase = 'idle' | 'walk' | 'run' | 'sleep' | 'climbUp' | 'climbPause' | 'climbDown';
+type Phase = 'idle' | 'walk' | 'climbUp' | 'climbPause' | 'climbDown';
 
 export type Rng = () => number; // uniform [0, 1)
 
@@ -105,10 +101,6 @@ function pickIdlePause(rng: Rng): number {
   return lerp(IDLE_PAUSE_MIN_S, IDLE_PAUSE_MAX_S, rng());
 }
 
-function pickSleepPause(rng: Rng): number {
-  return lerp(SLEEP_PAUSE_MIN_S, SLEEP_PAUSE_MAX_S, rng());
-}
-
 function pickClimbHeight(rng: Rng): number {
   return lerp(CLIMB_HEIGHT_MIN_PX, CLIMB_HEIGHT_MAX_PX, rng());
 }
@@ -129,15 +121,11 @@ function isAtEdge(x: number, bounds: Bounds): boolean {
   return x <= EDGE_THRESHOLD_PX || x >= maxX(bounds) - EDGE_THRESHOLD_PX;
 }
 
-// Called when an idle/sleep pause timer expires: decides the next behavior.
+// Called when the idle pause timer expires: decides the next behavior.
 function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
   const roll = rng();
 
-  if (roll < SLEEP_PROBABILITY) {
-    return { ...state, phase: 'sleep', anim: 'sleep', rotation: 0, timer: pickSleepPause(rng), frameHold: false };
-  }
-
-  if (isAtEdge(state.x, bounds) && roll < SLEEP_PROBABILITY + CLIMB_PROBABILITY) {
+  if (isAtEdge(state.x, bounds) && roll < CLIMB_PROBABILITY) {
     const onLeftEdge = state.x <= EDGE_THRESHOLD_PX;
     return {
       ...state,
@@ -151,11 +139,10 @@ function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
   }
 
   const targetX = pickWalkTargetX(bounds, rng);
-  const phase: Phase = rng() < RUN_PROBABILITY ? 'run' : 'walk';
   return {
     ...state,
-    phase,
-    anim: phase,
+    phase: 'walk',
+    anim: 'walk',
     facing: targetX >= state.x ? 'right' : 'left',
     rotation: 0,
     targetX,
@@ -189,8 +176,7 @@ export function tick(state: RoamState, dtSeconds: number, bounds: Bounds, paused
   const ground = groundY(bounds);
 
   switch (state.phase) {
-    case 'idle':
-    case 'sleep': {
+    case 'idle': {
       const timer = state.timer - dt;
       if (timer > 0) {
         return { ...state, timer, frameHold: false };
@@ -198,11 +184,9 @@ export function tick(state: RoamState, dtSeconds: number, bounds: Bounds, paused
       return decideNext({ ...state, y: ground }, bounds, rng);
     }
 
-    case 'walk':
-    case 'run': {
-      const speed = state.phase === 'run' ? RUN_SPEED_PX_S : WALK_SPEED_PX_S;
+    case 'walk': {
       const remaining = state.targetX - state.x;
-      const step = Math.min(Math.abs(remaining), speed * dt);
+      const step = Math.min(Math.abs(remaining), WALK_SPEED_PX_S * dt);
       const x = clamp(state.x + Math.sign(remaining) * step, 0, maxX(bounds));
       if (Math.abs(state.targetX - x) <= TARGET_EPSILON_PX) {
         return { ...state, x, y: ground, phase: 'idle', anim: 'idle', timer: pickIdlePause(rng), frameHold: false };

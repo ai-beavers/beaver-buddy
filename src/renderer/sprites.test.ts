@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { frameRect, type SheetMeta } from './sprites.js';
 
+// Row names/counts match the app's actual (BL-11-slimmed) sheets — see
+// assets/STYLE.md — but frameRect's row-lookup/wrap math is generic over
+// any row list, so this fixture is just realistic, not load-bearing.
 const meta: SheetMeta = {
   tile: 32,
-  fps: 10,
+  fps: 8,
   sheetWidth: 128,
-  sheetHeight: 160,
+  sheetHeight: 64,
   rows: [
     { name: 'idle', frames: 2 },
     { name: 'walk', frames: 4 },
-    { name: 'run', frames: 4 },
-    { name: 'sleep', frames: 2 },
-    { name: 'react', frames: 4 },
   ],
 };
 
@@ -21,8 +21,8 @@ describe('sprites: frameRect', () => {
   });
 
   it('locates a later row at its row offset', () => {
-    // 'run' is row index 2 -> sy = 2 * 32
-    expect(frameRect(meta, 'run', 1)).toEqual({ sx: 32, sy: 64, size: 32 });
+    // 'walk' is row index 1 -> sy = 1 * 32
+    expect(frameRect(meta, 'walk', 1)).toEqual({ sx: 32, sy: 32, size: 32 });
   });
 
   it('wraps the frame index within the row frame count', () => {
