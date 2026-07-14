@@ -4,8 +4,7 @@
 // zero rather than throwing. Only derived token counts leave this module —
 // never raw line content.
 
-import fs from 'node:fs';
-import { MAX_LINE_BYTES } from './config.ts';
+import { readBoundedLines } from './read-lines.ts';
 import type { UsageEntry } from './totals.ts';
 
 interface RawClaudeLine {
@@ -31,23 +30,15 @@ function toNumber(value: unknown): number {
 // format, so a subagent file is parsed the same way and its usage counted
 // exactly once).
 export function parseClaudeFile(filePath: string): UsageEntry[] {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return [];
-  }
-
   // keep-LAST dedup on (message.id, requestId): Claude Code sometimes logs
   // an intermediate usage snapshot before the final one under the same key
   // (ccusage #888) — keep-first would undercount output tokens, so later
   // lines in file order win.
   const byKey = new Map<string, UsageEntry>();
 
-  for (const line of raw.split('\n')) {
-    if (line.length === 0) continue;
-    if (Buffer.byteLength(line, 'utf8') > MAX_LINE_BYTES) continue;
-
+  // readBoundedLines enforces the MAX_LINE_BYTES bound — oversized lines
+  // never reach this loop.
+  for (const line of readBoundedLines(filePath)) {
     let parsed: RawClaudeLine;
     try {
       parsed = JSON.parse(line) as RawClaudeLine;

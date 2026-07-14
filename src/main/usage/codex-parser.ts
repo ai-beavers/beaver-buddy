@@ -10,8 +10,8 @@
 // cache-read are split so `inputTokens + cacheReadTokens` reconstructs the
 // raw total without double-counting the cached portion.
 
-import fs from 'node:fs';
-import { CODEX_REPLAY_SNIFF_BYTES, MAX_LINE_BYTES } from './config.ts';
+import { CODEX_REPLAY_SNIFF_BYTES } from './config.ts';
+import { readBoundedLines, readPrefix } from './read-lines.ts';
 import type { UsageEntry } from './totals.ts';
 
 interface RawCodexLine {
@@ -63,12 +63,11 @@ interface TokenEvent {
   readonly last: NormalizedUsage | null;
 }
 
-function readTokenEvents(raw: string): TokenEvent[] {
+// readBoundedLines enforces the MAX_LINE_BYTES bound — oversized lines
+// never reach this loop.
+function readTokenEvents(filePath: string): TokenEvent[] {
   const events: TokenEvent[] = [];
-  for (const line of raw.split('\n')) {
-    if (line.length === 0) continue;
-    if (Buffer.byteLength(line, 'utf8') > MAX_LINE_BYTES) continue;
-
+  for (const line of readBoundedLines(filePath)) {
     let parsed: RawCodexLine;
     try {
       parsed = JSON.parse(line) as RawCodexLine;
@@ -99,14 +98,7 @@ function second(timestamp: string): string {
 }
 
 export function parseCodexFile(filePath: string): UsageEntry[] {
-  let raw: string;
-  try {
-    raw = fs.readFileSync(filePath, 'utf8');
-  } catch {
-    return [];
-  }
-
-  const events = readTokenEvents(raw);
+  const events = readTokenEvents(filePath);
 
   // A forked/spawned thread replays its parent's history into its own
   // rollout file: the inherited token_count events land as a burst sharing
@@ -115,7 +107,7 @@ export function parseCodexFile(filePath: string): UsageEntry[] {
   // elided, but their cumulative totals still seed the baseline, and the
   // first event outside the burst permanently ends the elision. A file
   // whose first two events do NOT share a second has no replay prefix.
-  const sniff = raw.slice(0, CODEX_REPLAY_SNIFF_BYTES);
+  const sniff = readPrefix(filePath, CODEX_REPLAY_SNIFF_BYTES);
   const replayPossible = sniff.includes('thread_spawn') || sniff.includes('forked_from_id');
   const replaySecond =
     replayPossible && events.length >= 2 && second(events[0].timestamp) === second(events[1].timestamp)
