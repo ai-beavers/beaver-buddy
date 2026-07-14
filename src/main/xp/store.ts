@@ -4,6 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { atomicWriteFile } from '../atomic-file';
 
 export interface XpState {
   readonly xp: number;
@@ -39,22 +40,6 @@ export function loadState(stateDir: string): XpState {
   }
 }
 
-// tmp+rename so readers (and a crash mid-write) never observe a partial
-// file — rename is atomic on the same filesystem, which app.getPath
-// ('userData') always is relative to its own directory.
 export function saveState(stateDir: string, state: XpState): void {
-  fs.mkdirSync(stateDir, { recursive: true });
-  const filePath = path.join(stateDir, FILE_NAME);
-  const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  try {
-    fs.writeFileSync(tmpPath, JSON.stringify(state));
-    fs.renameSync(tmpPath, filePath);
-  } catch (error) {
-    try {
-      fs.rmSync(tmpPath, { force: true });
-    } catch {
-      // best-effort cleanup only — the write error itself is what matters
-    }
-    throw error;
-  }
+  atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
 }
