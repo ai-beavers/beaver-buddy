@@ -12,11 +12,23 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 const PAUSE_CHANGED_CHANNEL = 'state:paused'; // must match src/main/ipc-channels.ts
+const PET_CHANGED_CHANNEL = 'state:pet'; // must match src/main/ipc-channels.ts
+
+interface PetChangedPayload {
+  level: number;
+  stage: 'baby' | 'teen' | 'adult';
+  evolvingTo?: 'baby' | 'teen' | 'adult';
+}
 
 contextBridge.exposeInMainWorld('beaverBuddy', {
   onPausedChanged: (callback: (paused: boolean) => void): void => {
     ipcRenderer.on(PAUSE_CHANGED_CHANNEL, (_event, paused: boolean) => {
       callback(paused);
+    });
+  },
+  onPetChanged: (callback: (pet: PetChangedPayload) => void): void => {
+    ipcRenderer.on(PET_CHANGED_CHANNEL, (_event, pet: PetChangedPayload) => {
+      callback(pet);
     });
   },
 });

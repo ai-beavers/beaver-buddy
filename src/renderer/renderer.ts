@@ -8,16 +8,26 @@
 // document is hidden.
 
 import { createRoamState, tick, type RoamState, type Bounds } from './roam.js';
-import { MAX_DT_S, SPRITE_FPS } from './pet-config.js';
+import { EVOLUTION_SHAKE_JITTER_PX, MAX_DT_S, SPRITE_FPS } from './pet-config.js';
 import { loadSheet, drawFrame, type Sheet, type Stage } from './sprites.js';
+import {
+  isFlashVisible,
+  shakeOffset,
+  startEvolution,
+  tickEvolution,
+  type EvolutionState,
+  type PetChangedPayload,
+} from './evolution.js';
 
 declare global {
   interface Window {
     beaverBuddy: {
       onPausedChanged(callback: (paused: boolean) => void): void;
+      onPetChanged(callback: (pet: PetChangedPayload) => void): void;
     };
     // Read-only diagnostic surface; nothing in the app reads it.
     __debugRoam?: RoamState;
+    __debugPet?: { level: number; stage: Stage; evolving: boolean };
   }
 }
 
@@ -50,6 +60,8 @@ let frameAccumulatorS = 0;
 let reactUntilMs: number | null = null;
 let lastTimestampMs: number | null = null;
 let needsDraw = true;
+let petLevel = 1;
+let evolutionState: EvolutionState | null = null;
 
 function loadCurrentSheet(): void {
   loadSheet(stage)
@@ -89,6 +101,27 @@ window.beaverBuddy.onPausedChanged((nextPaused) => {
   needsDraw = true;
 });
 
+window.beaverBuddy.onPetChanged((pet) => {
+  petLevel = pet.level;
+  if (pet.evolvingTo) {
+    // A fresh page load always starts from the default 'baby' sheet, so a
+    // launch that evolves immediately (e.g. persisted state already teen,
+    // injected straight past adult) must sync to the pre-evolution stage
+    // first — otherwise the shake/flash plays over the wrong sprite.
+    if (pet.stage !== stage) {
+      setStage(pet.stage);
+    }
+    // Renderer-local freeze only (CLAUDE.md: tray Pause must stay a pure
+    // user control) — roaming resumes on its own once the sequence ends.
+    evolutionState = startEvolution(pet.evolvingTo);
+  } else if (!evolutionState && pet.stage !== stage) {
+    // No transition in flight: sync directly (e.g. a late listener attach
+    // catching up to state that already changed).
+    setStage(pet.stage);
+  }
+  needsDraw = true;
+});
+
 // Last cleared/drawn region. Clearing only this rect (instead of the whole
 // 1728x1016 surface) keeps Chromium's damage rect — and therefore the
 // WindowServer repaint of the transparent window behind it — sprite-sized.
@@ -105,19 +138,32 @@ function draw(): void {
     return;
   }
   const anim = reactUntilMs !== null ? 'react' : roamState.anim;
+  const shake = evolutionState ? shakeOffset(evolutionState, Math.random) : { dx: 0, dy: 0 };
   // Integer pixel positions: pixel art must land on whole pixels, and the
   // rounding also means sub-pixel movement between rAF ticks doesn't count
   // as "moved" (see the moved check in frame()).
-  const drawX = Math.round(roamState.x);
-  const drawY = Math.round(roamState.y);
+  const drawX = Math.round(roamState.x + shake.dx);
+  const drawY = Math.round(roamState.y + shake.dy);
   drawFrame(ctx, sheet, anim, frameIndex, drawX, drawY, {
     mirror: roamState.facing === 'left',
     rotationDeg: roamState.rotation,
   });
   // A tile rotated about its center sweeps sqrt(2)x its size; half-tile
-  // padding on each side covers any rotation.
+  // padding on each side covers any rotation, plus shake jitter so the
+  // dirty rect fully covers the jittered draw position too.
   const tile = sheet.meta.tile;
-  const pad = Math.ceil(tile / 2);
+  const pad = Math.ceil(tile / 2) + EVOLUTION_SHAKE_JITTER_PX;
+  if (evolutionState && isFlashVisible(evolutionState)) {
+    // White-silhouette blink: 'source-in' keeps the fill only where the
+    // sprite we just drew was opaque, and clears everything else within
+    // this call's affected region (which the dirty-rect discipline already
+    // scopes to just-drawn pixels).
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-in';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(drawX - pad, drawY - pad, tile + 2 * pad, tile + 2 * pad);
+    ctx.restore();
+  }
   dirtyRect = { x: drawX - pad, y: drawY - pad, size: tile + 2 * pad };
 }
 
@@ -138,7 +184,10 @@ function frame(timestampMs: number): void {
   lastTimestampMs = timestampMs;
 
   const prev = roamState;
-  roamState = tick(roamState, dtSeconds, bounds(), paused, Math.random);
+  // Roaming freezes locally during an evolution sequence — this never
+  // touches the main-process pause state, so tray Pause stays a pure user
+  // control (see evolution.ts).
+  roamState = tick(roamState, dtSeconds, bounds(), paused || evolutionState !== null, Math.random);
   window.__debugRoam = roamState;
   // Compare rounded positions: the sprite is drawn on whole pixels, so
   // sub-pixel movement between rAF ticks changes nothing on screen — this
@@ -167,7 +216,20 @@ function frame(timestampMs: number): void {
     frameAdvanced = true;
   }
 
-  if (moved || frameAdvanced || needsDraw) {
+  let evolutionActive = false;
+  if (evolutionState) {
+    evolutionState = tickEvolution(evolutionState, dtSeconds);
+    evolutionActive = true; // flash blinking needs a redraw every frame
+    if (evolutionState.phase === 'done') {
+      const targetStage = evolutionState.targetStage;
+      evolutionState = null;
+      setStage(targetStage);
+      celebrate();
+    }
+  }
+  window.__debugPet = { level: petLevel, stage, evolving: evolutionState !== null };
+
+  if (moved || frameAdvanced || needsDraw || evolutionActive) {
     draw();
     needsDraw = false;
   }

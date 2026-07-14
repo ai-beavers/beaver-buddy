@@ -40,3 +40,11 @@ export const TARGET_EPSILON_PX = 1;
 
 export const ROTATION_LEFT_CLIMB_DEG = 90;
 export const ROTATION_RIGHT_CLIMB_DEG = -90;
+
+// Evolution sequence tuning (shake -> flash -> new stage -> celebrate).
+export const EVOLUTION_SHAKE_DURATION_S = 1.2;
+export const EVOLUTION_SHAKE_JITTER_PX = 2;
+export const EVOLUTION_FLASH_BLINK_COUNT = 3;
+// Duration of one full on/off blink cycle; the white silhouette is visible
+// for the first half of each cycle.
+export const EVOLUTION_FLASH_BLINK_DURATION_S = 0.2;
