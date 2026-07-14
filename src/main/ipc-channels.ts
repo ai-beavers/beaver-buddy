@@ -8,3 +8,10 @@ export const HATCH_START_CHANNEL = 'state:hatch';
 // One-way main -> renderer only; carries a canned quip line + how long the
 // renderer should keep it on screen.
 export const QUIP_CHANGED_CHANNEL = 'state:quip';
+
+// Settings-window-only, renderer -> main invoke/response channels (the
+// app's first renderer-originated IPC). Never reachable from the pet
+// overlay window/preload — only settings-preload.ts exposes them.
+export const SETTINGS_SAVE_CHANNEL = 'settings:save';
+export const SETTINGS_READ_STATUS_CHANNEL = 'settings:read-status';
+export const SETTINGS_DISCONNECT_CHANNEL = 'settings:disconnect';

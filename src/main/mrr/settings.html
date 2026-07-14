@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- No external hosts, ever: everything on this page is the inline
+         style/script below, so default-src 'none' plus unsafe-inline for
+         exactly those two is the tightest policy that keeps it working. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+    />
+    <title>Growth settings</title>
+    <style>
+      body {
+        font: 13px -apple-system, sans-serif;
+        margin: 16px;
+        color: #222;
+      }
+      fieldset {
+        margin-bottom: 12px;
+        border: 1px solid #ccc;
+      }
+      label {
+        display: block;
+        margin: 6px 0 2px;
+      }
+      input[type='text'],
+      input[type='password'] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 4px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      #status {
+        margin-top: 10px;
+        min-height: 16px;
+        font-size: 12px;
+      }
+      button {
+        margin-right: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <fieldset>
+      <legend>Stripe</legend>
+      <label for="stripeKey">Secret key</label>
+      <input type="password" id="stripeKey" autocomplete="off" placeholder="rk_... (restricted, read-only)" />
+      <div class="row" style="margin-top: 8px">
+        <button id="saveStripe">Save</button>
+        <button id="disconnectStripe">Disconnect</button>
+        <span id="stripeStatus"></span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>RevenueCat</legend>
+      <label for="revenuecatKey">API key</label>
+      <input type="password" id="revenuecatKey" autocomplete="off" />
+      <label for="revenuecatProjectId">Project id</label>
+      <input type="text" id="revenuecatProjectId" autocomplete="off" />
+      <div class="row" style="margin-top: 8px">
+        <button id="saveRevenuecat">Save</button>
+        <button id="disconnectRevenuecat">Disconnect</button>
+        <span id="revenuecatStatus"></span>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Growth source</legend>
+      <label class="row"><input type="radio" name="mode" id="modeTokens" value="tokens" /> Tokens</label>
+      <label class="row"><input type="radio" name="mode" id="modeMrr" value="mrr" /> MRR</label>
+    </fieldset>
+
+    <div id="status"></div>
+
+    <script>
+      // Plain inline vanilla JS — no build step, no bundler entry, just
+      // window.beaverBuddySettings from the settings window's own preload.
+      // Key fields are NEVER prefilled: refresh() only ever reads booleans.
+      const api = window.beaverBuddySettings;
+
+      function setStatus(text) {
+        document.getElementById('status').textContent = text;
+      }
+
+      async function refresh() {
+        const status = await api.readStatus();
+        if (status && status.error) {
+          setStatus(status.error);
+          return;
+        }
+        document.getElementById('stripeStatus').textContent = status.stripeConnected ? 'connected' : 'not connected';
+        document.getElementById('revenuecatStatus').textContent = status.revenuecatConnected ? 'connected' : 'not connected';
+        const mrrAvailable = status.stripeConnected || status.revenuecatConnected;
+        const mrrRadio = document.getElementById('modeMrr');
+        mrrRadio.disabled = !mrrAvailable;
+        document.getElementById('modeTokens').checked = status.mode === 'tokens';
+        mrrRadio.checked = status.mode === 'mrr';
+      }
+
+      async function save(payload) {
+        const result = await api.save(payload);
+        setStatus(result && result.ok ? 'saved' : `error: ${result && result.error}`);
+        await refresh();
+      }
+
+      document.getElementById('saveStripe').addEventListener('click', () => {
+        const stripeKey = document.getElementById('stripeKey').value;
+        save({ stripeKey }).then(() => {
+          document.getElementById('stripeKey').value = '';
+        });
+      });
+
+      document.getElementById('saveRevenuecat').addEventListener('click', () => {
+        const revenuecatKey = document.getElementById('revenuecatKey').value;
+        const revenuecatProjectId = document.getElementById('revenuecatProjectId').value;
+        save({ revenuecatKey, revenuecatProjectId }).then(() => {
+          document.getElementById('revenuecatKey').value = '';
+          document.getElementById('revenuecatProjectId').value = '';
+        });
+      });
+
+      document.getElementById('disconnectStripe').addEventListener('click', async () => {
+        const result = await api.disconnect('stripe');
+        setStatus(result && result.ok ? 'disconnected' : `error: ${result && result.error}`);
+        await refresh();
+      });
+
+      document.getElementById('disconnectRevenuecat').addEventListener('click', async () => {
+        const result = await api.disconnect('revenuecat');
+        setStatus(result && result.ok ? 'disconnected' : `error: ${result && result.error}`);
+        await refresh();
+      });
+
+      document.getElementById('modeTokens').addEventListener('change', () => save({ mode: 'tokens' }));
+      document.getElementById('modeMrr').addEventListener('change', () => save({ mode: 'mrr' }));
+
+      refresh();
+    </script>
+  </body>
+</html>

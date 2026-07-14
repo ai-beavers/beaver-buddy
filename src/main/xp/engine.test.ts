@@ -113,7 +113,7 @@ describe('XpEngine: evolution', () => {
 
 describe('XpEngine: getLastUpdate (late-listener resend)', () => {
   it('synthesizes a non-evolving snapshot when nothing was emitted', () => {
-    const engine = new XpEngine(stateDir, { xp: xpForLevel(20), lastSeenLifetimeTokens: 0 });
+    const engine = new XpEngine(stateDir, { xp: xpForLevel(20), lastSeenLifetimeTokens: 0, lastMrrAwardDate: null });
     expect(engine.getLastUpdate()).toEqual({ level: 20, stage: 'teen' });
   });
 
@@ -181,5 +181,56 @@ describe('XpEngine: --inject-xp path', () => {
     engine.injectXp(0);
     engine.injectXp(-5);
     expect(engine.getState().xp).toBe(0);
+  });
+});
+
+describe('XpEngine: growth mode gating (setMode/ingestLifetimeTokens/awardMrr)', () => {
+  it('defaults to tokens mode: token ingestion awards XP as before', () => {
+    const engine = new XpEngine(stateDir);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
+    expect(engine.getState().xp).toBe(5);
+  });
+
+  it('mrr mode: token ingestion advances the cursor silently, no XP awarded', () => {
+    const engine = new XpEngine(stateDir);
+    engine.setMode('mrr');
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 100);
+    expect(engine.getState().xp).toBe(0);
+  });
+
+  it('no-double-count switching tokens -> mrr -> tokens: the token history consumed while in mrr mode is never retroactively awarded', () => {
+    const engine = new XpEngine(stateDir);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 3); // tokens mode: 3 xp
+    engine.setMode('mrr');
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10); // mrr mode: cursor advances, no award
+    engine.setMode('tokens');
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10); // same total re-ingested: cursor already there, delta 0
+    expect(engine.getState().xp).toBe(3);
+  });
+
+  it('no-double-count switching mrr -> tokens -> mrr: lastMrrAwardDate persists through the tokens interlude', () => {
+    const engine = new XpEngine(stateDir);
+    engine.setMode('mrr');
+    engine.awardMrr(500, '2026-07-13');
+    engine.setMode('tokens');
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 2); // unrelated token accrual while in tokens mode
+    engine.setMode('mrr');
+    expect(engine.getLastMrrAwardDate()).toBe('2026-07-13'); // survived the round trip
+    expect(engine.getState().xp).toBe(502);
+  });
+
+  it('awardMrr records the date even when the awarded xp rounds to 0', () => {
+    const engine = new XpEngine(stateDir);
+    engine.awardMrr(0, '2026-07-13');
+    expect(engine.getLastMrrAwardDate()).toBe('2026-07-13');
+    expect(engine.getState().xp).toBe(0);
+  });
+
+  it('awardMrr fires an evolution update on a stage crossing, same as other award paths', () => {
+    const engine = new XpEngine(stateDir);
+    const updates: PetUpdate[] = [];
+    engine.onUpdate((u) => updates.push(u));
+    engine.awardMrr(xpForLevel(16), '2026-07-13');
+    expect(updates.some((u) => u.evolvingTo === 'teen')).toBe(true);
   });
 });

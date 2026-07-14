@@ -30,15 +30,30 @@ export interface TrackerLike {
   onChange(callback: (totals: UsageTotals) => void): () => void;
 }
 
+// Growth source, mirrored from settings-store.ts's Mode without importing
+// it — xp/engine.ts stays independent of the mrr layer built on top of it.
+export type GrowthMode = 'tokens' | 'mrr';
+
 export class XpEngine {
   private readonly stateDir: string;
   private state: XpState;
   private lastUpdate: PetUpdate | null = null;
   private readonly listeners = new Set<(update: PetUpdate) => void>();
+  private mode: GrowthMode = 'tokens';
 
   constructor(stateDir: string, initial: XpState = loadState(stateDir)) {
     this.stateDir = stateDir;
     this.state = initial;
+  }
+
+  // Gates ingestLifetimeTokens below — set from the persisted growth
+  // settings at startup and on every settings:save mode change.
+  setMode(mode: GrowthMode): void {
+    this.mode = mode;
+  }
+
+  getLastMrrAwardDate(): string | null {
+    return this.state.lastMrrAwardDate;
   }
 
   getState(): PetState {
@@ -74,6 +89,13 @@ export class XpEngine {
   ingestLifetimeTokens(totalTokens: number): void {
     const delta = Math.max(0, totalTokens - this.state.lastSeenLifetimeTokens);
     if (delta === 0) return; // cursor only moves forward — no double count
+    if (this.mode === 'mrr') {
+      // Cursor keeps advancing silently — no XP award — so switching back
+      // to tokens mode later can never retroactively award this history
+      // (the no-double-count invariant holds in both switch directions).
+      this.applyState({ lastSeenLifetimeTokens: totalTokens });
+      return;
+    }
     this.applyXp(delta / TOKENS_PER_XP, totalTokens);
   }
 
@@ -85,9 +107,21 @@ export class XpEngine {
     this.applyXp(amount, this.state.lastSeenLifetimeTokens);
   }
 
+  // MRR growth-mode award path: applies XP and records the local date it
+  // was awarded for, atomically (one saveState), so a poll that finds
+  // mrr_dollars * rate rounds to 0 XP still records the date and is not
+  // retried later the same day.
+  awardMrr(xpAmount: number, localDate: string): void {
+    this.applyState({ xp: this.state.xp + Math.max(0, xpAmount), lastMrrAwardDate: localDate });
+  }
+
   private applyXp(deltaXp: number, lastSeenLifetimeTokens: number): void {
+    this.applyState({ xp: this.state.xp + deltaXp, lastSeenLifetimeTokens });
+  }
+
+  private applyState(patch: Partial<XpState>): void {
     const before = this.getState();
-    this.state = { xp: this.state.xp + deltaXp, lastSeenLifetimeTokens };
+    this.state = { ...this.state, ...patch };
     saveState(this.stateDir, this.state);
     const after = this.getState();
     const evolvingTo = after.stage !== before.stage ? after.stage : undefined;

@@ -12,10 +12,17 @@ import { QUIP_DISPLAY_DURATION_MS } from './quips/quip-config';
 import { QUIP_POOLS, type QuipTrigger } from './quips/quips';
 import { createSchedulerState, schedule, type SchedulerState } from './quips/scheduler';
 import type { Stage } from './xp/curve';
+import { isValidKeychainService } from './mrr/keychain';
+import { DEFAULT_KEYCHAIN_SERVICE } from './mrr/mrr-config';
+import { MrrEngine } from './mrr/mrr-engine';
+import { loadSettingsState, saveSettingsState, type SettingsState } from './mrr/settings-store';
+import { openSettingsWindow } from './mrr/settings-window';
 
 const SMOKE_DELAY_MS = 3000;
 const INJECT_XP_FLAG_PREFIX = '--inject-xp=';
 const QUIP_FLAG = '--quip';
+const KEYCHAIN_SERVICE_FLAG = '--keychain-service';
+const MRR_POLL_NOW_FLAG = '--mrr-poll-now';
 const QUIP_TRIGGERS = Object.keys(QUIP_POOLS) as readonly QuipTrigger[];
 
 let pauseState: PauseState = createPauseState();
@@ -72,6 +79,16 @@ function parseInjectXp(argv: readonly string[]): number | null {
   if (!arg) return null;
   const value = Number(arg.slice(INJECT_XP_FLAG_PREFIX.length));
   return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+// Dev flag: --keychain-service <name> overrides the Keychain service name
+// (space-separated, like --quip) so QA never touches the real entries.
+// A name failing isValidKeychainService (leading '-', stray charset,
+// oversize) falls back to the default rather than reaching `security` argv.
+function parseKeychainService(argv: readonly string[]): string {
+  const i = argv.indexOf(KEYCHAIN_SERVICE_FLAG);
+  const value = i !== -1 ? argv[i + 1] : undefined;
+  return value && isValidKeychainService(value) ? value : DEFAULT_KEYCHAIN_SERVICE;
 }
 
 function createWindow(): BrowserWindow {
@@ -153,14 +170,61 @@ app.whenReady().then(() => {
 
   const xpEngine = new XpEngine(stateDir);
 
-  const tray = createTray({
-    isPaused: () => isPaused(pauseState),
-    onTogglePause: () => {
-      pauseState = toggleManualPause(pauseState);
-      broadcastPaused();
-    },
-    getPetLabel: () => formatPetLabel(xpEngine.getState()),
+  const keychainService = parseKeychainService(process.argv);
+  const mrrPollNowOnModeSwitch = process.argv.includes(MRR_POLL_NOW_FLAG);
+  let growthSettings: SettingsState = loadSettingsState(stateDir);
+  xpEngine.setMode(growthSettings.mode);
+
+  const mrrEngine = new MrrEngine({
+    xpEngine,
+    getMode: () => growthSettings.mode,
+    getKeychainService: () => keychainService,
+    getConnected: () => ({ stripe: growthSettings.stripeConnected, revenuecat: growthSettings.revenuecatConnected }),
   });
+  mrrEngine.start();
+
+  // Named (not inline) so the QA-only --open-growth-settings flag below can
+  // invoke the exact same code path the tray's "Growth settings…" click
+  // does — a native tray menu item can't be clicked via CDP, so a
+  // scriptable flag is the only way to drive it, same family as --quip.
+  function openGrowthSettings(): void {
+    openSettingsWindow({
+      stateDir,
+      keychainService,
+      getSettings: () => growthSettings,
+      onSettingsChanged: (next) => {
+        growthSettings = next;
+        xpEngine.setMode(growthSettings.mode);
+        tray.refresh();
+        if (growthSettings.mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
+      },
+    });
+  }
+
+  const debugTrayMenu = process.argv.includes('--debug-tray-menu');
+  const tray = createTray(
+    {
+      isPaused: () => isPaused(pauseState),
+      onTogglePause: () => {
+        pauseState = toggleManualPause(pauseState);
+        broadcastPaused();
+      },
+      getPetLabel: () => formatPetLabel(xpEngine.getState()),
+      getGrowthMode: () => growthSettings.mode,
+      isMrrAvailable: () => growthSettings.stripeConnected || growthSettings.revenuecatConnected,
+      onSelectGrowthMode: (mode) => {
+        if (mode === 'mrr' && !(growthSettings.stripeConnected || growthSettings.revenuecatConnected)) return;
+        growthSettings = { ...growthSettings, mode };
+        saveSettingsState(stateDir, growthSettings);
+        xpEngine.setMode(growthSettings.mode);
+        if (mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
+      },
+      onOpenGrowthSettings: openGrowthSettings,
+    },
+    debugTrayMenu ? (labels) => process.stdout.write(`TRAY_MENU: ${JSON.stringify(labels)}\n`) : undefined,
+  );
+
+  if (process.argv.includes('--open-growth-settings')) openGrowthSettings();
 
   // Registered before any accrual (--inject-xp, tracker attach) so every
   // update — including a launch-time stage crossing — flows through here
