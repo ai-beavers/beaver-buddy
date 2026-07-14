@@ -3,58 +3,61 @@
 Binding for every sprite in this repo. Off-palette colors, mixed pixel
 densities, or broken outline rules fail the design gate (PRD R10).
 
-## Palette (≤16 colors, cool-toned — no pure black, no warm saturated hues)
+## Palette (≤16 colors, warm-toned)
 
 Defined once in `scripts/gen-sprites/palette.ts`; pixel maps reference colors
 by the one-char key. `.` is transparent and never a palette entry.
 
-| Key | Hex       | Name                | Used for |
-|-----|-----------|---------------------|----------|
-| `k` | `#2c3138` | cool slate (darkest)| 1px outlines, eye pupils, closed-eye lines |
-| `1` | `#5c4f47` | fur shadow          | dark fur flecks, feet, dark wood sticks |
-| `2` | `#7c6b5e` | fur mid             | main fur, lodge wood fill |
-| `3` | `#a08d7a` | fur highlight       | top-of-head/back highlight, muzzle, light sticks |
-| `5` | `#8fada9` | teal-gray           | belly patch, spark fade dots |
-| `6` | `#333c46` | dark slate          | tail fill, lodge entrance |
-| `7` | `#4b5866` | light slate         | tail scute-texture lines |
-| `8` | `#eef2ee` | cool off-white      | buck teeth |
-| `9` | `#4fb8b0` | cyan/teal accent    | eye shine, sparks |
-| `0` | `#cfe0dd` | pale teal-gray      | spark cores |
+| Key | Hex       | Name                    | Used for |
+|-----|-----------|-------------------------|----------|
+| `k` | `#2b1714` | dark chocolate outline  | 1px outlines, eye pupils |
+| `1` | `#572920` | deepest fur shadow      | dark fur flecks, lodge wood shadow |
+| `2` | `#7a3b27` | dark warm-brown fur     | main fur, lodge wood fill |
+| `3` | `#a6542e` | warm-brown fur midtone  | fur shading, lodge wood highlight |
+| `4` | `#ca7036` | golden-brown fur        | body highlight band |
+| `5` | `#e99545` | honey fur highlight     | top-of-head shine |
+| `b` | `#d19a62` | tan belly shadow        | belly/muzzle shading |
+| `c` | `#f0c785` | cream belly and muzzle  | belly, muzzle fill |
+| `w` | `#fff4dc` | teeth and eye shine     | buck teeth, eye highlight |
+| `e` | `#d97b73` | pink inner ear          | ear interior |
+| `t` | `#45251f` | dark paddle tail        | tail fill, lodge entrance arch |
+| `T` | `#714035` | tail texture highlight  | tail scute lines |
+| `B` | `#0b6896` | pacifier dark blue      | pacifier, spark cores (darkest) |
+| `C` | `#20a9d8` | pacifier blue           | pacifier, spark mid |
+| `D` | `#7adcf5` | pacifier shine          | pacifier highlight, spark tips (palest) |
+| `q` | `#120d0d` | black eye and nose      | pupil, nose |
 
-The fur ramp (`1`/`2`/`3`) doubles as the lodge wood ramp — cool desaturated
-taupe reads as both. 10 colors used of the 16 allowed; extend only when a new
-asset genuinely needs a tone, never pre-allocate.
+16 of 16 colors used; extend only when a new asset genuinely needs a tone,
+never pre-allocate.
 
 ## Grid & tiles
 
 - One pixel density everywhere: 1 art pixel = 1 sheet pixel, nearest-neighbor
   scaling only, never anti-alias, never sub-pixel.
-- Beaver stages: 32×32 transparent tiles. Lodge + particles: 48×48 tiles.
+- Beaver stages: 48×48 transparent tiles. Lodge + particles: 48×48 tiles.
 - Sheets: rows = animations in fixed order, columns = frames, transparent
   padding after short rows. Companion `<sheet>.json` records tile size, fps
   hint, row order/frame counts, and sheet dimensions.
-
-## Sizes per stage (visual height inside the 32px tile)
-
-- Baby: ~16px (round chibi mass ~16×14 + stub feet).
-- Teen: ~22px — chest/shoulders visibly broader than hips, tail 12px.
-- Adult: ~28px — barrel chest (widest ~19px), tail 13×5, 4px feet, heavier
-  dark flank shading.
+- Renderer draws at `PET_SCALE` (2x, see `src/renderer/pet-config.ts`) —
+  every sprite lands on screen at 96×96px, integer nearest-neighbor blit.
 
 ## Character rules (all stages)
 
 - One smooth round mass for body+head; convex back line, no notches/humps.
-- Single small round ear bump; blunt 2–3px muzzle — never pointy.
-- 2×2 off-white buck-teeth block directly under the muzzle, slate-rimmed.
-- Flat horizontal paddle tail low near the ground, dark slate with lighter
-  scute lines — it must read FLAT in every frame, never a ball (enforced by
-  a vitest guard).
-- 2px eye: slate pupil + 1px cyan shine, high on the head.
-- Stubby feet only, no stick legs.
+- Single round ear with a pink (`e`) interior; blunt muzzle patch (`c`/`b`).
+- Two-tooth off-white (`w`) block directly under the muzzle.
+- Flat horizontal paddle tail low near the ground, dark (`t`) with lighter
+  texture lines (`T`) — it must read FLAT in every frame, never a ball
+  (enforced by a vitest guard on the tail's own chars).
+- Black (`q`) eye with an off-white (`w`) shine, high on the head.
+- Cyan-blue pacifier (`B`/`C`/`D`) as a shared accent across stages.
+- Stages scale up together within the fixed 48px tile — teen/adult read
+  visibly larger and heavier (broader shoulders, bigger tail) than baby, but
+  all share the same silhouette rules above.
 
 ## Outline
 
-1px in `k` (darkest cool slate), auto-derived: every silhouette pixel that
+1px in `k` (dark chocolate), auto-derived: every silhouette pixel that
 touches transparency becomes outline. No hand-drawn outline passes, no
 anti-aliasing, no double outlines. One exception: the 8×8 spark particles
 carry no outline — they read as light, not matter.
@@ -75,10 +78,17 @@ left-facing movement. Never author left-facing frames.
 
 ## Provenance
 
-Programmatic pixel art: frames are authored as string pixel-maps in
-`scripts/gen-sprites/pixel-maps/` and rendered to indexed PNGs by
+Pixel maps authored by OpenAI Codex (vision-guided from a user-supplied
+reference image), iterated through visual design-review gates, 2026-07-14;
+converted via `scripts/gen-sprites/import-codex.mjs` from Codex's fenced
+text-grid output into this repo's `pixel-maps/*.ts` string-grid format. The
+lodge/spark sheet was carried over from the prior (cool-palette) generation
+and mechanically recolored — same structure and frames, palette chars
+remapped to the new warm ramp (see `pixel-maps/lodge.ts` header for the
+exact remap).
+
+Sheets are rendered from the committed pixel maps to indexed PNGs by
 `scripts/gen-sprites/` (hand-rolled PNG encoder, node:zlib — no image
 dependencies). Regenerate with `npm run assets:build`; output is
-byte-deterministic. Design was human-directed through the BL-3 design-review
-gates (contact sheets + verdicts in `docs/design-reviews/`), 2026-07-14.
-No image-gen intermediates exist; the pixel maps are the source of truth.
+byte-deterministic. No raw image-gen intermediates exist in this repo; the
+pixel maps are the source of truth.
