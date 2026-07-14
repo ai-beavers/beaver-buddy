@@ -23,8 +23,16 @@ module.exports = [
     files: ['src/renderer/**/*.ts'],
     languageOptions: {
       parser: tsParser,
-      parserOptions: { project: './tsconfig.json' },
-      globals: { window: 'readonly', document: 'readonly', console: 'readonly' },
+      parserOptions: { project: './src/renderer/tsconfig.json' },
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        console: 'readonly',
+        performance: 'readonly',
+        requestAnimationFrame: 'readonly',
+        fetch: 'readonly',
+        Image: 'readonly',
+      },
     },
     plugins: { '@typescript-eslint': tsPlugin },
     rules: {
