@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "npm run build && electron .",
-    "build": "tsc && tsc -p src/renderer/tsconfig.json && cp src/renderer/index.html dist/renderer/index.html && mkdir -p dist/renderer/assets && cp -R assets/sprites dist/renderer/assets/sprites && cp src/main/mrr/settings.html dist/main/mrr/settings.html",
+    "build": "tsc && tsc -p src/renderer/tsconfig.json && cp src/renderer/index.html dist/renderer/index.html && mkdir -p dist/renderer/assets && rm -rf dist/renderer/assets/sprites && cp -R assets/sprites dist/renderer/assets/sprites && cp src/main/mrr/settings.html dist/main/mrr/settings.html",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
