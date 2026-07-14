@@ -16,8 +16,7 @@ declare global {
     beaverBuddy: {
       onPausedChanged(callback: (paused: boolean) => void): void;
     };
-    // Read-only debug/verification hook (design-gate screenshots read it via
-    // CDP); nothing in the app consumes it.
+    // Read-only diagnostic surface; nothing in the app reads it.
     __debugRoam?: RoamState;
   }
 }
@@ -61,8 +60,8 @@ function loadCurrentSheet(): void {
     .catch((error: unknown) => console.error('Failed to load sprite sheet:', error));
 }
 
-// Exported for later items (BL-6 evolution): switches the active sprite
-// sheet. Not wired to any UI yet — this is this module's API surface.
+// Exported for later evolution features: switches the active sprite sheet.
+// Not wired to any UI yet — this is this module's API surface.
 export function setStage(next: Stage): void {
   if (next === stage) {
     return;
@@ -71,7 +70,7 @@ export function setStage(next: Stage): void {
   loadCurrentSheet();
 }
 
-// Exported for later items (BL-6/BL-8): one-shot react animation overlay,
+// Exported for later evolution/quip features: one-shot react animation,
 // not part of the random roam rotation. Overlays the drawn anim only —
 // movement keeps roaming underneath.
 export function celebrate(): void {
