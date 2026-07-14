@@ -16,6 +16,9 @@ declare global {
     beaverBuddy: {
       onPausedChanged(callback: (paused: boolean) => void): void;
     };
+    // Read-only debug/verification hook (design-gate screenshots read it via
+    // CDP); nothing in the app consumes it.
+    __debugRoam?: RoamState;
   }
 }
 
@@ -87,16 +90,36 @@ window.beaverBuddy.onPausedChanged((nextPaused) => {
   needsDraw = true;
 });
 
+// Last cleared/drawn region. Clearing only this rect (instead of the whole
+// 1728x1016 surface) keeps Chromium's damage rect — and therefore the
+// WindowServer repaint of the transparent window behind it — sprite-sized.
+let dirtyRect: { x: number; y: number; size: number } | null = null;
+
 function draw(): void {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (dirtyRect) {
+    ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.size, dirtyRect.size);
+  } else {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
   if (!sheet) {
+    dirtyRect = null;
     return;
   }
   const anim = reactUntilMs !== null ? 'react' : roamState.anim;
-  drawFrame(ctx, sheet, anim, frameIndex, roamState.x, roamState.y, {
+  // Integer pixel positions: pixel art must land on whole pixels, and the
+  // rounding also means sub-pixel movement between rAF ticks doesn't count
+  // as "moved" (see the moved check in frame()).
+  const drawX = Math.round(roamState.x);
+  const drawY = Math.round(roamState.y);
+  drawFrame(ctx, sheet, anim, frameIndex, drawX, drawY, {
     mirror: roamState.facing === 'left',
     rotationDeg: roamState.rotation,
   });
+  // A tile rotated about its center sweeps sqrt(2)x its size; half-tile
+  // padding on each side covers any rotation.
+  const tile = sheet.meta.tile;
+  const pad = Math.ceil(tile / 2);
+  dirtyRect = { x: drawX - pad, y: drawY - pad, size: tile + 2 * pad };
 }
 
 function frame(timestampMs: number): void {
@@ -117,9 +140,14 @@ function frame(timestampMs: number): void {
 
   const prev = roamState;
   roamState = tick(roamState, dtSeconds, bounds(), paused, Math.random);
+  window.__debugRoam = roamState;
+  // Compare rounded positions: the sprite is drawn on whole pixels, so
+  // sub-pixel movement between rAF ticks changes nothing on screen — this
+  // caps movement-driven redraws at (speed px/s) per second instead of one
+  // per display refresh.
   const moved =
-    roamState.x !== prev.x ||
-    roamState.y !== prev.y ||
+    Math.round(roamState.x) !== Math.round(prev.x) ||
+    Math.round(roamState.y) !== Math.round(prev.y) ||
     roamState.anim !== prev.anim ||
     roamState.rotation !== prev.rotation ||
     roamState.facing !== prev.facing;
