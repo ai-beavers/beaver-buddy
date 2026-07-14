@@ -23,6 +23,12 @@ let mainWindow: BrowserWindow | null = null;
 // Electron has no getter for ignoreMouseEvents, so we track what we set.
 let ignoresMouseEvents = false;
 let quipSchedulerState: SchedulerState = createSchedulerState();
+// A quip fired before did-finish-load would be dropped by webContents.send
+// yet still burn the scheduler cooldown, silently suppressing the next
+// visible quip. So fireQuip is a full no-op until the page has loaded;
+// launch-time evolution is replayed inside the did-finish-load handler from
+// the engine's getLastUpdate() — the same resend pattern as PET_CHANGED.
+let rendererReadyForQuips = false;
 
 function broadcastPaused(): void {
   mainWindow?.webContents.send(PAUSE_CHANGED_CHANNEL, isPaused(pauseState));
@@ -31,6 +37,7 @@ function broadcastPaused(): void {
 // Runs every trigger through the real scheduler (cooldown + no-immediate-
 // repeat); only sends IPC when the scheduler actually picks a quip.
 function fireQuip(trigger: QuipTrigger, evolvedStage?: Stage): void {
+  if (!rendererReadyForQuips) return;
   const result = schedule(quipSchedulerState, trigger, Date.now(), Math.random, evolvedStage);
   quipSchedulerState = result.state;
   if (result.text) {
@@ -196,9 +203,23 @@ app.whenReady().then(() => {
     if (shouldHatch) {
       mainWindow?.webContents.send(HATCH_START_CHANNEL);
     }
-    mainWindow?.webContents.send(PET_CHANGED_CHANNEL, xpEngine.getLastUpdate());
+    const lastUpdate = xpEngine.getLastUpdate();
+    mainWindow?.webContents.send(PET_CHANGED_CHANNEL, lastUpdate);
 
-    // Scripted --quip triggers run first so a QA launch can control exactly
+    // From here on quips reach the renderer; earlier fireQuip calls were
+    // no-ops (see rendererReadyForQuips), so nothing has burned the
+    // cooldown yet and each launch-time trigger below fires exactly once.
+    rendererReadyForQuips = true;
+
+    // Launch-time evolution (e.g. --inject-xp crossing a stage) emitted
+    // before the page loaded: replay it here, exactly like the PET_CHANGED
+    // resend above. Live evolutions after this point flow through
+    // xpEngine.onUpdate as normal.
+    if (lastUpdate.evolvingTo) {
+      fireQuip('evolution', lastUpdate.evolvingTo);
+    }
+
+    // Scripted --quip triggers next, so a QA launch can control exactly
     // what fires (and, with two flags, demonstrate cooldown suppression)
     // without racing the automatic appStart trigger below.
     for (const trigger of parseQuipFlags(process.argv)) {
@@ -206,8 +227,8 @@ app.whenReady().then(() => {
     }
 
     // appStart is suppressed on the hatch launch (hatch owns the first
-    // impression) and, incidentally, by the cooldown if a --quip flag above
-    // already fired one this launch — same mechanism, no special-casing.
+    // impression) and, incidentally, by the cooldown if an evolution or
+    // --quip trigger above already fired — same mechanism, no special-casing.
     if (!shouldHatch) {
       fireQuip('appStart');
     }

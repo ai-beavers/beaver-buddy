@@ -60,3 +60,17 @@ describe('scheduler: evolution stage substitution', () => {
     }
   });
 });
+
+describe('scheduler: launch sequence (evolution then appStart in the same tick)', () => {
+  // A launch that crosses a stage (e.g. injected XP) fires evolution and
+  // then appStart from the same did-finish-load handler: the evolution quip
+  // must win and the immediately-following appStart must be suppressed by
+  // the cooldown — one quip on screen, never zero and never two.
+  it('shows the evolution quip and suppresses the same-instant appStart', () => {
+    const evolution = schedule(createSchedulerState(), 'evolution', 1_000, sequenceRng([0]), 'teen');
+    expect(evolution.text).toContain('teen');
+
+    const appStart = schedule(evolution.state, 'appStart', 1_000, sequenceRng([0]));
+    expect(appStart.text).toBeNull();
+  });
+});
