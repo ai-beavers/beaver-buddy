@@ -7,7 +7,12 @@
 export const SPRITE_FPS = 10;
 
 // Matches the tile size fixed by assets/STYLE.md.
-export const BEAVER_TILE_PX = 32;
+export const BEAVER_TILE_PX = 48;
+
+// Integer nearest-neighbor blit scale for every sprite tile (canvas has
+// imageSmoothingEnabled=false) — must stay an integer or pixel art blurs.
+// 48px art x2 -> 96px on screen (product-requested pet size).
+export const PET_SCALE = 2;
 
 export const WALK_SPEED_PX_S = 24;
 export const RUN_SPEED_PX_S = 64;

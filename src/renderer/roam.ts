@@ -33,6 +33,7 @@ import {
   IDLE_PAUSE_MAX_S,
   IDLE_PAUSE_MIN_S,
   MAX_DT_S,
+  PET_SCALE,
   ROTATION_LEFT_CLIMB_DEG,
   ROTATION_RIGHT_CLIMB_DEG,
   RUN_PROBABILITY,
@@ -89,12 +90,15 @@ function lerp(min: number, max: number, t: number): number {
   return min + (max - min) * t;
 }
 
+// Clamps use the on-screen footprint (tile * PET_SCALE), not the raw art
+// tile, so the pet's drawn edges stay inside bounds/on the ground line at
+// the render scale — not just its unscaled logical tile.
 function maxX(bounds: Bounds): number {
-  return Math.max(0, bounds.width - BEAVER_TILE_PX);
+  return Math.max(0, bounds.width - BEAVER_TILE_PX * PET_SCALE);
 }
 
 function groundY(bounds: Bounds): number {
-  return Math.max(0, bounds.height - BEAVER_TILE_PX);
+  return Math.max(0, bounds.height - BEAVER_TILE_PX * PET_SCALE);
 }
 
 function pickIdlePause(rng: Rng): number {

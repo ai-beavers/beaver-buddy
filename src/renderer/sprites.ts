@@ -3,6 +3,8 @@
 // package.json). No sprite library (ADR 001 §Animation/roaming): plain
 // canvas drawImage with a manual frame-rect lookup.
 
+import { PET_SCALE } from './pet-config.js';
+
 export type Stage = 'baby' | 'teen' | 'adult';
 
 export interface SheetRow {
@@ -88,8 +90,11 @@ export function drawFrame(
   opts: DrawOptions,
 ): void {
   const { sx, sy, size } = frameRect(sheet.meta, anim, frameIndex);
-  const cx = x + size / 2;
-  const cy = y + size / 2;
+  // Destination is blown up by PET_SCALE; source sampling stays at the
+  // native tile size — that's what keeps nearest-neighbor scaling crisp.
+  const destSize = size * PET_SCALE;
+  const cx = x + destSize / 2;
+  const cy = y + destSize / 2;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -98,6 +103,6 @@ export function drawFrame(
   } else if (opts.mirror) {
     ctx.scale(-1, 1);
   }
-  ctx.drawImage(sheet.image, sx, sy, size, size, -size / 2, -size / 2, size, size);
+  ctx.drawImage(sheet.image, sx, sy, size, size, -destSize / 2, -destSize / 2, destSize, destSize);
   ctx.restore();
 }

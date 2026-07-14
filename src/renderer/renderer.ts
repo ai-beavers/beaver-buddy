@@ -17,6 +17,7 @@ import {
   HATCH_SPARK_SPEED_PX_S,
   HATCH_BURST_DURATION_S,
   MAX_DT_S,
+  PET_SCALE,
   SPRITE_FPS,
 } from './pet-config.js';
 import { loadSheet, loadLodgeSheet, drawFrame, type Sheet, type Stage } from './sprites.js';
@@ -193,9 +194,11 @@ window.beaverBuddy.onHatchStart(() => {
 });
 
 // The hatch always plays in the bottom-left corner; the margin constant is
-// its only placement tuning.
+// its only placement tuning. Both the margin and the lodge tile are scaled
+// so the lodge's (bigger) drawn footprint still sits flush on the bottom
+// edge instead of floating above it.
 function hatchPosition(): { x: number; y: number } {
-  return { x: HATCH_CORNER_MARGIN_PX, y: bounds().height - HATCH_LODGE_TILE_PX };
+  return { x: HATCH_CORNER_MARGIN_PX * PET_SCALE, y: bounds().height - HATCH_LODGE_TILE_PX * PET_SCALE };
 }
 
 // Last cleared/drawn region. Clearing only this rect (instead of the whole
@@ -215,17 +218,18 @@ function drawHatch(state: HatchState): void {
       // the hatch area — a null rect would make every hatch frame clear the
       // full canvas (hatch redraws every frame), regressing the sprite-sized
       // damage-rect discipline.
-      const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2);
-      const size = HATCH_LODGE_TILE_PX + 2 * pad;
+      const pad = Math.ceil((HATCH_LODGE_TILE_PX * PET_SCALE) / 2);
+      const size = HATCH_LODGE_TILE_PX * PET_SCALE + 2 * pad;
       dirtyRect = { x: x - pad, y: y - pad, width: size, height: size };
       return;
     }
     // Bottom-aligned with the (larger) lodge tile so there's no visual jump
     // between the lodge and the baby appearing at the handoff.
-    const babyY = bounds().height - sheet.meta.tile;
+    const babyTile = sheet.meta.tile * PET_SCALE;
+    const babyY = bounds().height - babyTile;
     drawFrame(ctx, sheet, 'react', hatchFrameIndex, x, babyY, { mirror: false, rotationDeg: 0 });
-    const pad = Math.ceil(sheet.meta.tile / 2);
-    const size = sheet.meta.tile + 2 * pad;
+    const pad = Math.ceil(babyTile / 2);
+    const size = babyTile + 2 * pad;
     dirtyRect = { x: x - pad, y: babyY - pad, width: size, height: size };
     return;
   }
@@ -233,8 +237,8 @@ function drawHatch(state: HatchState): void {
   if (!lodgeSheet) {
     // Lodge sheet still loading (or failed): same bounded-rect rule as above
     // so a load failure can never reintroduce per-frame full-canvas clears.
-    const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2) + HATCH_SHAKE_JITTER_MAX_PX;
-    const size = HATCH_LODGE_TILE_PX + 2 * pad;
+    const pad = Math.ceil((HATCH_LODGE_TILE_PX * PET_SCALE) / 2) + HATCH_SHAKE_JITTER_MAX_PX;
+    const size = HATCH_LODGE_TILE_PX * PET_SCALE + 2 * pad;
     dirtyRect = { x: x - pad, y: y - pad, width: size, height: size };
     return;
   }
@@ -245,18 +249,18 @@ function drawHatch(state: HatchState): void {
   const drawY = Math.round(y + shake.dy);
   drawFrame(ctx, lodgeSheet, anim, hatchFrameIndex, drawX, drawY, { mirror: false, rotationDeg: 0 });
 
-  const tile = lodgeSheet.meta.tile;
+  const tile = lodgeSheet.meta.tile * PET_SCALE;
   let pad = Math.ceil(tile / 2) + HATCH_SHAKE_JITTER_MAX_PX;
 
   if (state.phase === 'burst') {
     for (const offset of sparkOffsets(state)) {
-      const sparkX = Math.round(drawX + offset.dx);
-      const sparkY = Math.round(drawY + offset.dy);
+      const sparkX = Math.round(drawX + offset.dx * PET_SCALE);
+      const sparkY = Math.round(drawY + offset.dy * PET_SCALE);
       drawFrame(ctx, lodgeSheet, 'spark', hatchFrameIndex, sparkX, sparkY, { mirror: false, rotationDeg: 0 });
     }
     // Sparks radiate outward for the whole burst duration — pad the dirty
     // rect to the max travel distance so trailing sparks never smear.
-    pad += HATCH_SPARK_SPEED_PX_S * HATCH_BURST_DURATION_S;
+    pad += HATCH_SPARK_SPEED_PX_S * HATCH_BURST_DURATION_S * PET_SCALE;
   }
 
   const size = tile + 2 * pad;
@@ -290,8 +294,9 @@ function draw(): void {
   });
   // A tile rotated about its center sweeps sqrt(2)x its size; half-tile
   // padding on each side covers any rotation, plus shake jitter so the
-  // dirty rect fully covers the jittered draw position too.
-  const tile = sheet.meta.tile;
+  // dirty rect fully covers the jittered draw position too. Sized off the
+  // drawn (scaled) tile, not the raw art tile.
+  const tile = sheet.meta.tile * PET_SCALE;
   const pad = Math.ceil(tile / 2) + EVOLUTION_SHAKE_JITTER_PX;
   if (evolutionState && isFlashVisible(evolutionState)) {
     // White-silhouette blink: 'source-in' keeps the fill only where the
@@ -405,8 +410,9 @@ function frame(timestampMs: number): void {
       hatchState = null;
       // Hand off to the roam machine: y is already ground (set at
       // createRoamState init and untouched while frozen) — only x needs
-      // repositioning to the hatch corner.
-      roamState = { ...roamState, x: HATCH_CORNER_MARGIN_PX, frameHold: false };
+      // repositioning to the hatch corner (same scaled margin hatchPosition
+      // draws the lodge at, so there's no pop at the handoff).
+      roamState = { ...roamState, x: HATCH_CORNER_MARGIN_PX * PET_SCALE, frameHold: false };
     }
   }
 

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createRoamState, createSeededRng, tick, type Bounds, type RoamState } from './roam.js';
-import { BEAVER_TILE_PX, CLIMB_SPEED_PX_S, MAX_DT_S, RUN_SPEED_PX_S } from './pet-config.js';
+import { BEAVER_TILE_PX, CLIMB_SPEED_PX_S, MAX_DT_S, PET_SCALE, RUN_SPEED_PX_S } from './pet-config.js';
 
 const bounds: Bounds = { width: 800, height: 600 };
+// roam.ts clamps against the on-screen (scaled) footprint, not the raw art
+// tile — tests that hand-compute bounds/ground must use the same size.
+const SCALED_TILE_PX = BEAVER_TILE_PX * PET_SCALE;
 
 // Deterministic sequence-based rng for tests that need to force a specific
 // branch (e.g. land exactly on the climb decision).
@@ -35,7 +38,7 @@ describe('roam: pause freeze', () => {
 describe('roam: no teleports', () => {
   it('bounds per-tick displacement even for a huge dt (walk/run)', () => {
     const rng = createSeededRng(2);
-    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'run', anim: 'run', x: 0, y: bounds.height - BEAVER_TILE_PX, targetX: 799 };
+    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'run', anim: 'run', x: 0, y: bounds.height - SCALED_TILE_PX, targetX: 799 };
     const next = tick(state, 10_000, bounds, false, rng);
     const dx = Math.abs(next.x - state.x);
     expect(dx).toBeLessThanOrEqual(RUN_SPEED_PX_S * MAX_DT_S + 1e-9);
@@ -48,7 +51,7 @@ describe('roam: no teleports', () => {
       phase: 'climbUp',
       anim: 'walk',
       x: 0,
-      y: bounds.height - BEAVER_TILE_PX,
+      y: bounds.height - SCALED_TILE_PX,
       climbTargetY: 0,
     };
     const next = tick(state, 10_000, bounds, false, rng);
@@ -61,8 +64,8 @@ describe('roam: stays in bounds', () => {
   it('keeps x within [0, width-tile] and y within [0, height-tile] over many ticks', () => {
     const rng = createSeededRng(42);
     let state = createRoamState(bounds, rng);
-    const maxX = bounds.width - BEAVER_TILE_PX;
-    const maxY = bounds.height - BEAVER_TILE_PX;
+    const maxX = bounds.width - SCALED_TILE_PX;
+    const maxY = bounds.height - SCALED_TILE_PX;
     for (let i = 0; i < 5000; i += 1) {
       state = tick(state, 0.1, bounds, false, rng);
       expect(state.x).toBeGreaterThanOrEqual(0);
@@ -76,7 +79,7 @@ describe('roam: stays in bounds', () => {
 describe('roam: climb only at edges', () => {
   it('never enters a climb phase while far from both side edges', () => {
     const rng = scriptedRng([0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2]); // would trigger climb if at an edge
-    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'idle', x: 400, y: bounds.height - BEAVER_TILE_PX, timer: 0.01 };
+    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'idle', x: 400, y: bounds.height - SCALED_TILE_PX, timer: 0.01 };
     state = tick(state, 1, bounds, false, rng); // timer expires -> decideNext
     expect(state.phase).not.toBe('climbUp');
   });
@@ -87,7 +90,7 @@ describe('roam: climb only at edges', () => {
     // 3rd call in [SLEEP_PROBABILITY, SLEEP_PROBABILITY + CLIMB_PROBABILITY)
     // = [0.08, 0.43).
     const rng = scriptedRng([0.9, 0.9, 0.2, 0.5, 0.5, 0.5]);
-    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'idle', x: 0, y: bounds.height - BEAVER_TILE_PX, timer: 0.01 };
+    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'idle', x: 0, y: bounds.height - SCALED_TILE_PX, timer: 0.01 };
     state = tick(state, 1, bounds, false, rng);
     expect(state.phase).toBe('climbUp');
     expect(state.rotation).not.toBe(0);
