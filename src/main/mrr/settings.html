@@ -2,6 +2,13 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <!-- No external hosts, ever: everything on this page is the inline
+         style/script below, so default-src 'none' plus unsafe-inline for
+         exactly those two is the tightest policy that keeps it working. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+    />
     <title>Growth settings</title>
     <style>
       body {
@@ -42,7 +49,7 @@
     <fieldset>
       <legend>Stripe</legend>
       <label for="stripeKey">Secret key</label>
-      <input type="password" id="stripeKey" autocomplete="off" placeholder="sk_live_..." />
+      <input type="password" id="stripeKey" autocomplete="off" placeholder="rk_... (restricted, read-only)" />
       <div class="row" style="margin-top: 8px">
         <button id="saveStripe">Save</button>
         <button id="disconnectStripe">Disconnect</button>

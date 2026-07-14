@@ -12,7 +12,7 @@ export interface TrayCallbacks {
   getPetLabel: () => string;
   getGrowthMode: () => 'tokens' | 'mrr';
   // MRR is hidden from the submenu entirely (not just disabled) until at
-  // least one source is connected, per R9.
+  // least one source is connected.
   isMrrAvailable: () => boolean;
   onSelectGrowthMode: (mode: 'tokens' | 'mrr') => void;
   onOpenGrowthSettings: () => void;
