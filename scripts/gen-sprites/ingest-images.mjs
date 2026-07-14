@@ -327,18 +327,22 @@ export const STAGE_SPECS = [
     fps: FPS,
     targetContentHeightPx: 92,
     rows: [
-      { name: 'idle', files: ['teen-to-right-1.png'] },
+      // BL-12: teen-to-right-1-4 is a feet-together, arms-out standing pose
+      // (verified by pixel-diffing all three right-facing candidates against
+      // each other: -1-4 is the outlier, farthest from both -1 and -1-2,
+      // which are near-twin lean-gait poses) — it belongs here, not in walk.
+      { name: 'idle', files: ['teen-to-right-1-4.png'] },
       {
-        // Right-facing STEP frames only. Two exclusions, both owner-
-        // directed: teen-to-right-1-{1,3,5} face LEFT (mirrors of -1/-1-2/
-        // -1-4 despite their to-right names — mixing them in made the
-        // walking sprite flip sides every couple of frames), and
-        // teen-to-right-1 is the standing/idle pose — it belongs to the
-        // idle row only, never the walk cycle (idle-in-the-walk read as a
-        // stutter-step). Left-facing movement comes from the renderer
-        // mirroring these right-facing frames, same as every sprite here.
+        // Right-facing STEP frames only. Excluded: teen-to-right-1-{1,3,5}
+        // face LEFT (mirrors of -1/-1-2/-1-4 despite their to-right names —
+        // mixing them in made the walking sprite flip sides every couple of
+        // frames). -1 and -1-2 are both lean-gait poses (previously -1 was
+        // used as idle, and -1-4 as a walk frame, but -1-4's standing pose
+        // read as a stutter-step mid-walk — see BL-12 verdict doc). Left-
+        // facing movement comes from the renderer mirroring these
+        // right-facing frames, same as every sprite here.
         name: 'walk',
-        files: ['teen-to-right-1-2.png', 'teen-to-right-1-4.png'],
+        files: ['teen-to-right-1.png', 'teen-to-right-1-2.png'],
       },
     ],
   },

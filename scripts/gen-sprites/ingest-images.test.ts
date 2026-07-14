@@ -68,3 +68,24 @@ describe.skipIf(!hasSources)('ingest-images', () => {
     });
   });
 });
+
+// BL-12 regression lock: teen-to-right-1-4 is a feet-together, arms-out
+// standing pose (confirmed by pixel-diffing it against the other two
+// right-facing candidates — it's the outlier, farthest from both), not a
+// walk-cycle frame. It previously sat in the walk row, so every other frame
+// of the walk cycle read as "stand -> step" while the pet was actively
+// moving. Runs unconditionally (no source images needed) so it can't
+// silently regress even on a checkout without assets-src/.
+describe('teen STAGE_SPECS row assignment (BL-12)', () => {
+  const teenSpec = STAGE_SPECS.find((spec) => spec.name === 'beaver-teen');
+
+  it('keeps the standing pose out of the walk row', () => {
+    const walkRow = teenSpec?.rows.find((row) => row.name === 'walk');
+    expect(walkRow?.files).not.toContain('teen-to-right-1-4.png');
+  });
+
+  it('uses the standing pose as idle', () => {
+    const idleRow = teenSpec?.rows.find((row) => row.name === 'idle');
+    expect(idleRow?.files).toEqual(['teen-to-right-1-4.png']);
+  });
+});
