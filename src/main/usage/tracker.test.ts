@@ -73,6 +73,23 @@ describe('UsageTracker', () => {
     expect(tracker.getTotals().lifetime.totalTokens).toBe(0);
   });
 
+  it('fires onTick on every refresh, changed or not, unlike onChange', () => {
+    const tracker = new UsageTracker({}, home);
+    tracker.refresh();
+
+    const ticks: number[] = [];
+    const changes: number[] = [];
+    tracker.onTick((totals) => ticks.push(totals.lifetime.totalTokens));
+    tracker.onChange((totals) => changes.push(totals.lifetime.totalTokens));
+
+    tracker.refresh(); // nothing changed
+    writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });
+    tracker.refresh(); // changed
+
+    expect(ticks).toEqual([0, 15]);
+    expect(changes).toEqual([15]);
+  });
+
   it('coalesces refreshes onto a single timer interval (fake timers)', () => {
     vi.useFakeTimers();
     const tracker = new UsageTracker({}, home);

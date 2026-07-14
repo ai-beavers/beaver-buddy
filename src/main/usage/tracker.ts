@@ -2,6 +2,11 @@
 // files whose mtime changed since the last scan, and exposes a plain
 // getTotals()/onChange() API for later items (BL-6/BL-8) to consume — no
 // IPC/renderer wiring here (renderer never sees paths or log content).
+//
+// onChange fires only when a file actually changed; onTick fires on every
+// refresh regardless. The quip idle detector needs a snapshot even when
+// nothing changed (that's the definition of idle), so it rides onTick
+// instead of a second polling loop.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -21,6 +26,7 @@ export class UsageTracker {
   private readonly home: string;
   private readonly fileCache = new Map<string, FileCacheEntry>();
   private readonly listeners = new Set<(totals: UsageTotals) => void>();
+  private readonly tickListeners = new Set<(totals: UsageTotals) => void>();
   private totals: UsageTotals = aggregate([]);
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -38,6 +44,15 @@ export class UsageTracker {
     this.listeners.add(callback);
     return () => {
       this.listeners.delete(callback);
+    };
+  }
+
+  // Fires on every refresh tick, whether totals changed or not. Returns an
+  // unsubscribe function.
+  onTick(callback: (totals: UsageTotals) => void): () => void {
+    this.tickListeners.add(callback);
+    return () => {
+      this.tickListeners.delete(callback);
     };
   }
 
@@ -97,11 +112,13 @@ export class UsageTracker {
       }
     }
 
-    if (!changed) return;
+    if (changed) {
+      // Codex event dedup is cross-file, so it runs over the combined set
+      // here rather than inside the per-file parser.
+      this.totals = aggregate([...claudeEntries, ...dedupeCodexEntries(codexEntries)]);
+      for (const listener of this.listeners) listener(this.totals);
+    }
 
-    // Codex event dedup is cross-file, so it runs over the combined set here
-    // rather than inside the per-file parser.
-    this.totals = aggregate([...claudeEntries, ...dedupeCodexEntries(codexEntries)]);
-    for (const listener of this.listeners) listener(this.totals);
+    for (const listener of this.tickListeners) listener(this.totals);
   }
 }

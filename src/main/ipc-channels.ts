@@ -5,3 +5,6 @@ export const PAUSE_CHANGED_CHANNEL = 'state:paused';
 export const PET_CHANGED_CHANNEL = 'state:pet';
 // One-way main -> renderer only; no renderer -> main channel exists.
 export const HATCH_START_CHANNEL = 'state:hatch';
+// One-way main -> renderer only; carries a canned quip line + how long the
+// renderer should keep it on screen.
+export const QUIP_CHANGED_CHANNEL = 'state:quip';

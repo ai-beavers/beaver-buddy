@@ -9,6 +9,7 @@
 
 import { createRoamState, tick, type RoamState, type Bounds } from './roam.js';
 import {
+  BUBBLE_TAIL_SIZE_PX,
   EVOLUTION_SHAKE_JITTER_PX,
   HATCH_CORNER_MARGIN_PX,
   HATCH_LODGE_TILE_PX,
@@ -28,6 +29,12 @@ import {
   type PetChangedPayload,
 } from './evolution.js';
 import { hatchShakeOffset, sparkOffsets, startHatch, tickHatch, type HatchState } from './hatch.js';
+import { drawBubble, layoutBubble } from './bubble.js';
+
+interface QuipChangedPayload {
+  readonly text: string;
+  readonly durationMs: number;
+}
 
 declare global {
   interface Window {
@@ -35,12 +42,32 @@ declare global {
       onPausedChanged(callback: (paused: boolean) => void): void;
       onPetChanged(callback: (pet: PetChangedPayload) => void): void;
       onHatchStart(callback: () => void): void;
+      onQuip(callback: (quip: QuipChangedPayload) => void): void;
     };
     // Read-only diagnostic surface; nothing in the app reads it.
     __debugRoam?: RoamState;
     __debugPet?: { level: number; stage: Stage; evolving: boolean };
     __debugHatch?: { phase: HatchState['phase'] };
+    __debugQuip?: string | null;
   }
+}
+
+// x/y/width/height rather than a square (roam/evolution/hatch draws) since
+// the quip bubble is wider than it is tall and needs to union with the pet's
+// square dirty rect.
+interface DirtyRect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+function unionRect(a: DirtyRect, b: DirtyRect): DirtyRect {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  const right = Math.max(a.x + a.width, b.x + b.width);
+  const bottom = Math.max(a.y + a.height, b.y + b.height);
+  return { x, y, width: right - x, height: bottom - y };
 }
 
 const canvasEl = document.getElementById('stage');
@@ -78,6 +105,7 @@ let hatchState: HatchState | null = null;
 let lodgeSheet: Sheet | null = null;
 let hatchFrameIndex = 0;
 let hatchFrameAccumulatorS = 0;
+let quipState: { text: string; showUntilMs: number } | null = null;
 
 function loadCurrentSheet(): void {
   loadSheet(stage)
@@ -148,6 +176,11 @@ window.beaverBuddy.onPetChanged((pet) => {
   needsDraw = true;
 });
 
+window.beaverBuddy.onQuip((quip) => {
+  quipState = { text: quip.text, showUntilMs: performance.now() + quip.durationMs };
+  needsDraw = true;
+});
+
 window.beaverBuddy.onHatchStart(() => {
   hatchState = startHatch();
   loadLodgeSheet()
@@ -167,8 +200,9 @@ function hatchPosition(): { x: number; y: number } {
 
 // Last cleared/drawn region. Clearing only this rect (instead of the whole
 // 1728x1016 surface) keeps Chromium's damage rect — and therefore the
-// WindowServer repaint of the transparent window behind it — sprite-sized.
-let dirtyRect: { x: number; y: number; size: number } | null = null;
+// WindowServer repaint of the transparent window behind it — sprite-sized
+// (or sprite-plus-bubble-sized, when a quip is showing).
+let dirtyRect: DirtyRect | null = null;
 
 // Renders the lodge-idle/shake/burst/spark/baby-appear visuals in place of
 // the normal roam draw while a hatch sequence is active.
@@ -182,7 +216,8 @@ function drawHatch(state: HatchState): void {
       // full canvas (hatch redraws every frame), regressing the sprite-sized
       // damage-rect discipline.
       const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2);
-      dirtyRect = { x: x - pad, y: y - pad, size: HATCH_LODGE_TILE_PX + 2 * pad };
+      const size = HATCH_LODGE_TILE_PX + 2 * pad;
+      dirtyRect = { x: x - pad, y: y - pad, width: size, height: size };
       return;
     }
     // Bottom-aligned with the (larger) lodge tile so there's no visual jump
@@ -190,7 +225,8 @@ function drawHatch(state: HatchState): void {
     const babyY = bounds().height - sheet.meta.tile;
     drawFrame(ctx, sheet, 'react', hatchFrameIndex, x, babyY, { mirror: false, rotationDeg: 0 });
     const pad = Math.ceil(sheet.meta.tile / 2);
-    dirtyRect = { x: x - pad, y: babyY - pad, size: sheet.meta.tile + 2 * pad };
+    const size = sheet.meta.tile + 2 * pad;
+    dirtyRect = { x: x - pad, y: babyY - pad, width: size, height: size };
     return;
   }
 
@@ -198,7 +234,8 @@ function drawHatch(state: HatchState): void {
     // Lodge sheet still loading (or failed): same bounded-rect rule as above
     // so a load failure can never reintroduce per-frame full-canvas clears.
     const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2) + HATCH_SHAKE_JITTER_MAX_PX;
-    dirtyRect = { x: x - pad, y: y - pad, size: HATCH_LODGE_TILE_PX + 2 * pad };
+    const size = HATCH_LODGE_TILE_PX + 2 * pad;
+    dirtyRect = { x: x - pad, y: y - pad, width: size, height: size };
     return;
   }
 
@@ -222,12 +259,13 @@ function drawHatch(state: HatchState): void {
     pad += HATCH_SPARK_SPEED_PX_S * HATCH_BURST_DURATION_S;
   }
 
-  dirtyRect = { x: drawX - pad, y: drawY - pad, size: tile + 2 * pad };
+  const size = tile + 2 * pad;
+  dirtyRect = { x: drawX - pad, y: drawY - pad, width: size, height: size };
 }
 
 function draw(): void {
   if (dirtyRect) {
-    ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.size, dirtyRect.size);
+    ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.width, dirtyRect.height);
   } else {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
@@ -266,7 +304,25 @@ function draw(): void {
     ctx.fillRect(drawX - pad, drawY - pad, tile + 2 * pad, tile + 2 * pad);
     ctx.restore();
   }
-  dirtyRect = { x: drawX - pad, y: drawY - pad, size: tile + 2 * pad };
+
+  const petSize = tile + 2 * pad;
+  let unionedRect: DirtyRect = { x: drawX - pad, y: drawY - pad, width: petSize, height: petSize };
+
+  if (quipState) {
+    const layout = layoutBubble(quipState.text, drawX, drawY, tile, bounds());
+    drawBubble(ctx, layout);
+    unionedRect = unionRect(unionedRect, {
+      x: layout.x,
+      y: layout.y,
+      width: layout.width,
+      // + tail + 1: the tail triangle draws BUBBLE_TAIL_SIZE_PX below the
+      // bubble's bottom edge, and its 1px outline stroke (drawn on the +0.5
+      // pixel center) bleeds one more pixel past the fill — without the +1
+      // the clear pass leaves a stroke-residue line behind.
+      height: layout.height + BUBBLE_TAIL_SIZE_PX + 1,
+    });
+  }
+  dirtyRect = unionedRect;
 }
 
 function frame(timestampMs: number): void {
@@ -354,7 +410,14 @@ function frame(timestampMs: number): void {
     }
   }
 
-  if (moved || frameAdvanced || needsDraw || evolutionActive || hatchActive) {
+  let quipExpired = false;
+  if (quipState && timestampMs >= quipState.showUntilMs) {
+    quipState = null;
+    quipExpired = true;
+  }
+  window.__debugQuip = quipState ? quipState.text : null;
+
+  if (moved || frameAdvanced || needsDraw || evolutionActive || hatchActive || quipExpired) {
     draw();
     needsDraw = false;
   }
