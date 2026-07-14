@@ -329,16 +329,16 @@ export const STAGE_SPECS = [
     rows: [
       { name: 'idle', files: ['teen-to-right-1.png'] },
       {
-        // Right-facing frames ONLY. The user's teen set is three mirror
-        // PAIRS — teen-to-right-1-{1,3,5} face LEFT (mirrors of -1, -1-2,
-        // -1-4; verified visually + identical bbox dims per pair). Putting
-        // them in this row made the sheet itself alternate facing, so the
-        // walking beaver appeared to flip sides every couple of frames on
-        // top of the renderer's own facing mirror. Left-facing movement
-        // comes from the renderer mirroring these right-facing frames,
-        // same as every other sprite here.
+        // Right-facing STEP frames only. Two exclusions, both owner-
+        // directed: teen-to-right-1-{1,3,5} face LEFT (mirrors of -1/-1-2/
+        // -1-4 despite their to-right names — mixing them in made the
+        // walking sprite flip sides every couple of frames), and
+        // teen-to-right-1 is the standing/idle pose — it belongs to the
+        // idle row only, never the walk cycle (idle-in-the-walk read as a
+        // stutter-step). Left-facing movement comes from the renderer
+        // mirroring these right-facing frames, same as every sprite here.
         name: 'walk',
-        files: ['teen-to-right-1.png', 'teen-to-right-1-2.png', 'teen-to-right-1-4.png'],
+        files: ['teen-to-right-1-2.png', 'teen-to-right-1-4.png'],
       },
     ],
   },

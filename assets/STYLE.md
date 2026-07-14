@@ -86,7 +86,8 @@ left-facing source frames.
 
 - **Beaver stages**: `idle(1), walk(N)` — no run/sleep/react (BL-11 slimmed
   the animation set to match `roam.ts`'s idle/walk-only state machine).
-  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×3. fps hint: 8.
+  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×2. fps hint: 8. The
+  idle pose never appears in a walk row — walk cycles are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
   frames are 8×8 particles centered in the 48×48 tile (rows/cols 20–27, also
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
