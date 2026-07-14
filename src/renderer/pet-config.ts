@@ -3,19 +3,32 @@
 // logic). Two clocks, two constants: SPRITE_FPS drives the sprite-frame
 // accumulator; movement uses real elapsed time via rAF, not a fixed Hz.
 
-// Matches the "fps" hint recorded in every assets/sprites/*.json sheet.
-export const SPRITE_FPS = 10;
+// Matches the "fps" hint recorded in assets/sprites/beaver-{baby,teen}.json
+// (BL-11: ingested from the user's own images). The lodge sheet still
+// records its own fps:10 in lodge.json (untouched, BL-11 didn't touch the
+// lodge pipeline) — SPRITE_FPS drives both sheets' frame-advance cadence in
+// the renderer regardless (see renderer.ts), so lodge frames run a hair
+// slower than lodge.json's hint implies. Both values are inside CLAUDE.md's
+// 8-12fps sprite-cadence budget, so this is cosmetic, not a bug.
+export const SPRITE_FPS = 8;
 
 // Matches the tile size fixed by assets/STYLE.md.
-export const BEAVER_TILE_PX = 48;
+export const BEAVER_TILE_PX = 96;
 
 // Integer nearest-neighbor blit scale for every sprite tile (canvas has
 // imageSmoothingEnabled=false) — must stay an integer or pixel art blurs.
-// 48px art x2 -> 96px on screen (product-requested pet size).
-export const PET_SCALE = 2;
+// BL-11: ingested art ships at a 96px native tile (vs. the old 48px
+// programmatic art), so PET_SCALE drops to 1x — same 96px on-screen size as
+// before (48 * 2).
+export const PET_SCALE = 1;
+
+// The lodge/hatch-particle sheet is untouched by BL-11 and stayed at its
+// original 48px native tile — this keeps its on-screen size matching the
+// beaver's 96px despite PET_SCALE dropping to 1 (see sprites.ts's drawFrame,
+// which takes scale as a parameter rather than assuming PET_SCALE).
+export const LODGE_SCALE = 2;
 
 export const WALK_SPEED_PX_S = 24;
-export const RUN_SPEED_PX_S = 64;
 export const CLIMB_SPEED_PX_S = 20;
 
 // Per-tick dt is clamped to this before any movement/timer math runs, so a
@@ -25,12 +38,6 @@ export const MAX_DT_S = 0.25;
 
 export const IDLE_PAUSE_MIN_S = 2;
 export const IDLE_PAUSE_MAX_S = 6;
-
-export const SLEEP_PAUSE_MIN_S = 8;
-export const SLEEP_PAUSE_MAX_S = 20;
-export const SLEEP_PROBABILITY = 0.08;
-
-export const RUN_PROBABILITY = 0.25;
 
 export const EDGE_THRESHOLD_PX = 4;
 export const EDGE_TARGET_PROBABILITY = 0.3;
@@ -46,7 +53,8 @@ export const TARGET_EPSILON_PX = 1;
 export const ROTATION_LEFT_CLIMB_DEG = 90;
 export const ROTATION_RIGHT_CLIMB_DEG = -90;
 
-// Evolution sequence tuning (shake -> flash -> new stage -> celebrate).
+// Evolution sequence tuning (shake -> flash -> new stage; BL-11 dropped the
+// trailing celebrate — no react row in the ingested sheets).
 export const EVOLUTION_SHAKE_DURATION_S = 1.2;
 export const EVOLUTION_SHAKE_JITTER_PX = 2;
 export const EVOLUTION_FLASH_BLINK_COUNT = 3;

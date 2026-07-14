@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRoamState, createSeededRng, tick, type Bounds, type RoamState } from './roam.js';
-import { BEAVER_TILE_PX, CLIMB_SPEED_PX_S, MAX_DT_S, PET_SCALE, RUN_SPEED_PX_S } from './pet-config.js';
+import { BEAVER_TILE_PX, CLIMB_SPEED_PX_S, MAX_DT_S, PET_SCALE, WALK_SPEED_PX_S } from './pet-config.js';
 
 const bounds: Bounds = { width: 800, height: 600 };
 // roam.ts clamps against the on-screen (scaled) footprint, not the raw art
@@ -36,12 +36,12 @@ describe('roam: pause freeze', () => {
 });
 
 describe('roam: no teleports', () => {
-  it('bounds per-tick displacement even for a huge dt (walk/run)', () => {
+  it('bounds per-tick displacement even for a huge dt (walk)', () => {
     const rng = createSeededRng(2);
-    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'run', anim: 'run', x: 0, y: bounds.height - SCALED_TILE_PX, targetX: 799 };
+    let state: RoamState = { ...createRoamState(bounds, rng), phase: 'walk', anim: 'walk', x: 0, y: bounds.height - SCALED_TILE_PX, targetX: 799 };
     const next = tick(state, 10_000, bounds, false, rng);
     const dx = Math.abs(next.x - state.x);
-    expect(dx).toBeLessThanOrEqual(RUN_SPEED_PX_S * MAX_DT_S + 1e-9);
+    expect(dx).toBeLessThanOrEqual(WALK_SPEED_PX_S * MAX_DT_S + 1e-9);
   });
 
   it('bounds per-tick displacement even for a huge dt (climb)', () => {
@@ -84,11 +84,10 @@ describe('roam: climb only at edges', () => {
     expect(state.phase).not.toBe('climbUp');
   });
 
-  it('does climb when the idle/sleep timer expires at a side edge with a climb-range roll', () => {
+  it('does climb when the idle timer expires at a side edge with a climb-range roll', () => {
     // createRoamState consumes 2 rng() calls (initial x, initial idle pause)
-    // before decideNext's own first call (the sleep/climb roll) — land that
-    // 3rd call in [SLEEP_PROBABILITY, SLEEP_PROBABILITY + CLIMB_PROBABILITY)
-    // = [0.08, 0.43).
+    // before decideNext's own first call (the climb roll) — land that 3rd
+    // call below CLIMB_PROBABILITY (0.35).
     const rng = scriptedRng([0.9, 0.9, 0.2, 0.5, 0.5, 0.5]);
     let state: RoamState = { ...createRoamState(bounds, rng), phase: 'idle', x: 0, y: bounds.height - SCALED_TILE_PX, timer: 0.01 };
     state = tick(state, 1, bounds, false, rng);
@@ -111,12 +110,6 @@ describe('roam: anim matches motion', () => {
         case 'climbUp':
         case 'climbDown':
           expect(state.anim).toBe('walk');
-          break;
-        case 'run':
-          expect(state.anim).toBe('run');
-          break;
-        case 'sleep':
-          expect(state.anim).toBe('sleep');
           break;
         case 'climbPause':
           expect(state.anim).toBe('idle');

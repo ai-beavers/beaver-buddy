@@ -2,7 +2,8 @@
 // renderer.ts drives it with the same per-frame dt as roam.tick and owns
 // the actual drawing (shake offset applied to draw position, flash drawn
 // via a composite-operation fill). Sequence: shake -> flash -> done, at
-// which point renderer.ts calls setStage(targetStage) then celebrate().
+// which point renderer.ts calls setStage(targetStage) (no trailing
+// celebrate — BL-11 dropped the react row from the ingested sheets).
 
 import {
   EVOLUTION_FLASH_BLINK_COUNT,

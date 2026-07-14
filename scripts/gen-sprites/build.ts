@@ -3,14 +3,16 @@
 // this file is never imported by anything else, so it's safe for it to
 // have side effects (writing PNGs/JSON) at module scope.
 
+// Beaver stages are no longer generated here (BL-11): they're ingested from
+// the user's own images by ingest-images.mjs. This script now only builds
+// the hand-authored lodge sheet, which stays on the programmatic
+// pixel-map pipeline.
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { encodeIndexedPng } from './png.ts';
-import { buildSheet, BEAVER_ANIMATION_ORDER, type Frame } from './sheet.ts';
+import { buildSheet, type Frame } from './sheet.ts';
 import { buildContactSheet } from './contact-sheet.ts';
-import { ANIMATIONS as BABY } from './pixel-maps/baby.ts';
-import { ANIMATIONS as TEEN } from './pixel-maps/teen.ts';
-import { ANIMATIONS as ADULT } from './pixel-maps/adult.ts';
 import { LODGE_ANIMATIONS, LODGE_ANIMATION_ORDER } from './pixel-maps/lodge.ts';
 
 const FPS = 10;
@@ -34,9 +36,6 @@ interface SheetSpec {
 }
 
 const SHEETS: readonly SheetSpec[] = [
-  { name: 'beaver-baby', animations: BABY, order: BEAVER_ANIMATION_ORDER, tile: 48 },
-  { name: 'beaver-teen', animations: TEEN, order: BEAVER_ANIMATION_ORDER, tile: 48 },
-  { name: 'beaver-adult', animations: ADULT, order: BEAVER_ANIMATION_ORDER, tile: 48 },
   { name: 'lodge', animations: LODGE_ANIMATIONS, order: LODGE_ANIMATION_ORDER, tile: 48, note: LODGE_NOTE },
 ];
 

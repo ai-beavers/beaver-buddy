@@ -16,6 +16,7 @@ import {
   HATCH_SHAKE_JITTER_MAX_PX,
   HATCH_SPARK_SPEED_PX_S,
   HATCH_BURST_DURATION_S,
+  LODGE_SCALE,
   MAX_DT_S,
   PET_SCALE,
   SPRITE_FPS,
@@ -97,7 +98,6 @@ let sheet: Sheet | null = null;
 let roamState: RoamState = createRoamState(bounds(), Math.random);
 let frameIndex = 0;
 let frameAccumulatorS = 0;
-let reactUntilMs: number | null = null;
 let lastTimestampMs: number | null = null;
 let needsDraw = true;
 let petLevel = 1;
@@ -127,18 +127,11 @@ export function setStage(next: Stage): void {
   loadCurrentSheet();
 }
 
-// Exported for later evolution/quip features: one-shot react animation,
-// not part of the random roam rotation. Overlays the drawn anim only —
-// movement keeps roaming underneath.
+// Exported for later quip/evolution UI hooks. No-op for now: BL-11 slimmed
+// the ingested sprite sheets to idle/walk only (no react row to play), and
+// the evolution sequence no longer calls this (shake -> flash -> setStage).
 export function celebrate(): void {
-  if (!sheet) {
-    return;
-  }
-  const reactRow = sheet.meta.rows.find((row) => row.name === 'react');
-  const frames = reactRow ? reactRow.frames : 0;
-  const durationMs = (frames / sheet.meta.fps) * 1000;
-  reactUntilMs = performance.now() + durationMs;
-  needsDraw = true;
+  // no-op
 }
 
 window.beaverBuddy.onPausedChanged((nextPaused) => {
@@ -161,13 +154,12 @@ window.beaverBuddy.onPetChanged((pet) => {
     evolutionState = startEvolution(pet.evolvingTo);
   } else if (pet.evolvingTo) {
     // Stage crossing while the hatch owns the screen: an animated evolution
-    // would run invisibly behind the hatch (draw() renders only the hatch),
-    // flip the sheet at an arbitrary mid-hatch moment, and have its
-    // celebrate window swallowed. Skip the animation and sync straight to
-    // the post-evolution stage so the appear phase shows the pet at its
-    // true stage with no mid-sequence sprite flip. main.ts sends
-    // state:hatch before the pet update, so hatchState is already set here
-    // on a hatching launch.
+    // would run invisibly behind the hatch (draw() renders only the hatch)
+    // and flip the sheet at an arbitrary mid-hatch moment. Skip the
+    // animation and sync straight to the post-evolution stage so the appear
+    // phase shows the pet at its true stage with no mid-sequence sprite
+    // flip. main.ts sends state:hatch before the pet update, so hatchState
+    // is already set here on a hatching launch.
     setStage(pet.evolvingTo);
   } else if (!evolutionState && pet.stage !== stage) {
     // No transition in flight: sync directly (e.g. a late listener attach
@@ -195,10 +187,11 @@ window.beaverBuddy.onHatchStart(() => {
 
 // The hatch always plays in the bottom-left corner; the margin constant is
 // its only placement tuning. Both the margin and the lodge tile are scaled
-// so the lodge's (bigger) drawn footprint still sits flush on the bottom
-// edge instead of floating above it.
+// by LODGE_SCALE (not PET_SCALE — the lodge sheet kept its 48px native tile,
+// see pet-config.ts) so the lodge's drawn footprint still sits flush on the
+// bottom edge instead of floating above it.
 function hatchPosition(): { x: number; y: number } {
-  return { x: HATCH_CORNER_MARGIN_PX * PET_SCALE, y: bounds().height - HATCH_LODGE_TILE_PX * PET_SCALE };
+  return { x: HATCH_CORNER_MARGIN_PX * LODGE_SCALE, y: bounds().height - HATCH_LODGE_TILE_PX * LODGE_SCALE };
 }
 
 // Last cleared/drawn region. Clearing only this rect (instead of the whole
@@ -218,16 +211,17 @@ function drawHatch(state: HatchState): void {
       // the hatch area — a null rect would make every hatch frame clear the
       // full canvas (hatch redraws every frame), regressing the sprite-sized
       // damage-rect discipline.
-      const pad = Math.ceil((HATCH_LODGE_TILE_PX * PET_SCALE) / 2);
-      const size = HATCH_LODGE_TILE_PX * PET_SCALE + 2 * pad;
+      const pad = Math.ceil((HATCH_LODGE_TILE_PX * LODGE_SCALE) / 2);
+      const size = HATCH_LODGE_TILE_PX * LODGE_SCALE + 2 * pad;
       dirtyRect = { x: x - pad, y: y - pad, width: size, height: size };
       return;
     }
     // Bottom-aligned with the (larger) lodge tile so there's no visual jump
-    // between the lodge and the baby appearing at the handoff.
+    // between the lodge and the baby appearing at the handoff. Uses the
+    // idle frame (BL-11: no react row in the ingested sheets).
     const babyTile = sheet.meta.tile * PET_SCALE;
     const babyY = bounds().height - babyTile;
-    drawFrame(ctx, sheet, 'react', hatchFrameIndex, x, babyY, { mirror: false, rotationDeg: 0 });
+    drawFrame(ctx, sheet, 'idle', hatchFrameIndex, x, babyY, { mirror: false, rotationDeg: 0, scale: PET_SCALE });
     const pad = Math.ceil(babyTile / 2);
     const size = babyTile + 2 * pad;
     dirtyRect = { x: x - pad, y: babyY - pad, width: size, height: size };
@@ -237,8 +231,8 @@ function drawHatch(state: HatchState): void {
   if (!lodgeSheet) {
     // Lodge sheet still loading (or failed): same bounded-rect rule as above
     // so a load failure can never reintroduce per-frame full-canvas clears.
-    const pad = Math.ceil((HATCH_LODGE_TILE_PX * PET_SCALE) / 2) + HATCH_SHAKE_JITTER_MAX_PX;
-    const size = HATCH_LODGE_TILE_PX * PET_SCALE + 2 * pad;
+    const pad = Math.ceil((HATCH_LODGE_TILE_PX * LODGE_SCALE) / 2) + HATCH_SHAKE_JITTER_MAX_PX;
+    const size = HATCH_LODGE_TILE_PX * LODGE_SCALE + 2 * pad;
     dirtyRect = { x: x - pad, y: y - pad, width: size, height: size };
     return;
   }
@@ -247,20 +241,20 @@ function drawHatch(state: HatchState): void {
   const shake = state.phase === 'shake' ? hatchShakeOffset(state, Math.random) : { dx: 0, dy: 0 };
   const drawX = Math.round(x + shake.dx);
   const drawY = Math.round(y + shake.dy);
-  drawFrame(ctx, lodgeSheet, anim, hatchFrameIndex, drawX, drawY, { mirror: false, rotationDeg: 0 });
+  drawFrame(ctx, lodgeSheet, anim, hatchFrameIndex, drawX, drawY, { mirror: false, rotationDeg: 0, scale: LODGE_SCALE });
 
-  const tile = lodgeSheet.meta.tile * PET_SCALE;
+  const tile = lodgeSheet.meta.tile * LODGE_SCALE;
   let pad = Math.ceil(tile / 2) + HATCH_SHAKE_JITTER_MAX_PX;
 
   if (state.phase === 'burst') {
     for (const offset of sparkOffsets(state)) {
-      const sparkX = Math.round(drawX + offset.dx * PET_SCALE);
-      const sparkY = Math.round(drawY + offset.dy * PET_SCALE);
-      drawFrame(ctx, lodgeSheet, 'spark', hatchFrameIndex, sparkX, sparkY, { mirror: false, rotationDeg: 0 });
+      const sparkX = Math.round(drawX + offset.dx * LODGE_SCALE);
+      const sparkY = Math.round(drawY + offset.dy * LODGE_SCALE);
+      drawFrame(ctx, lodgeSheet, 'spark', hatchFrameIndex, sparkX, sparkY, { mirror: false, rotationDeg: 0, scale: LODGE_SCALE });
     }
     // Sparks radiate outward for the whole burst duration — pad the dirty
     // rect to the max travel distance so trailing sparks never smear.
-    pad += HATCH_SPARK_SPEED_PX_S * HATCH_BURST_DURATION_S * PET_SCALE;
+    pad += HATCH_SPARK_SPEED_PX_S * HATCH_BURST_DURATION_S * LODGE_SCALE;
   }
 
   const size = tile + 2 * pad;
@@ -281,7 +275,7 @@ function draw(): void {
     dirtyRect = null;
     return;
   }
-  const anim = reactUntilMs !== null ? 'react' : roamState.anim;
+  const anim = roamState.anim;
   const shake = evolutionState ? shakeOffset(evolutionState, Math.random) : { dx: 0, dy: 0 };
   // Integer pixel positions: pixel art must land on whole pixels, and the
   // rounding also means sub-pixel movement between rAF ticks doesn't count
@@ -291,6 +285,7 @@ function draw(): void {
   drawFrame(ctx, sheet, anim, frameIndex, drawX, drawY, {
     mirror: roamState.facing === 'left',
     rotationDeg: roamState.rotation,
+    scale: PET_SCALE,
   });
   // A tile rotated about its center sweeps sqrt(2)x its size; half-tile
   // padding on each side covers any rotation, plus shake jitter so the
@@ -374,11 +369,6 @@ function frame(timestampMs: number): void {
     }
   }
 
-  if (reactUntilMs !== null && timestampMs >= reactUntilMs) {
-    reactUntilMs = null;
-    frameAdvanced = true;
-  }
-
   let evolutionActive = false;
   if (evolutionState) {
     evolutionState = tickEvolution(evolutionState, dtSeconds);
@@ -386,8 +376,9 @@ function frame(timestampMs: number): void {
     if (evolutionState.phase === 'done') {
       const targetStage = evolutionState.targetStage;
       evolutionState = null;
+      // No celebrate() — BL-11 dropped the react row from the ingested
+      // sheets, so the sequence just ends on the new stage.
       setStage(targetStage);
-      celebrate();
     }
   }
   window.__debugPet = { level: petLevel, stage, evolving: evolutionState !== null };
@@ -410,9 +401,9 @@ function frame(timestampMs: number): void {
       hatchState = null;
       // Hand off to the roam machine: y is already ground (set at
       // createRoamState init and untouched while frozen) — only x needs
-      // repositioning to the hatch corner (same scaled margin hatchPosition
-      // draws the lodge at, so there's no pop at the handoff).
-      roamState = { ...roamState, x: HATCH_CORNER_MARGIN_PX * PET_SCALE, frameHold: false };
+      // repositioning to the hatch corner (same LODGE_SCALE-scaled margin
+      // hatchPosition draws the lodge at, so there's no pop at the handoff).
+      roamState = { ...roamState, x: HATCH_CORNER_MARGIN_PX * LODGE_SCALE, frameHold: false };
     }
   }
 

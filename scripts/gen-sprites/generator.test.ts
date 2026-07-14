@@ -1,34 +1,29 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { encodeIndexedPng } from './png.ts';
-import { buildSheet, BEAVER_ANIMATION_ORDER, type Frame } from './sheet.ts';
+import { buildSheet, type Frame } from './sheet.ts';
 import { buildContactSheet } from './contact-sheet.ts';
-import { ANIMATIONS as BABY } from './pixel-maps/baby.ts';
-import { ANIMATIONS as TEEN } from './pixel-maps/teen.ts';
-import { ANIMATIONS as ADULT } from './pixel-maps/adult.ts';
 import { LODGE_ANIMATIONS, LODGE_ANIMATION_ORDER } from './pixel-maps/lodge.ts';
+
+// Beaver stages (baby/teen) are ingested from the user's own images (BL-11,
+// see ingest-images.test.ts) — this file now only covers the lodge sheet,
+// the one sprite sheet still on the programmatic pixel-map pipeline.
 
 const FPS = 10;
 
 interface SheetCase {
   readonly name: string;
-  /** Committed sheet basename under assets/sprites/. */
   readonly file: string;
   readonly animations: Readonly<Record<string, readonly Frame[]>>;
   readonly order: readonly string[];
   readonly tile: number;
-  /** Beaver stages only: enforce the flat tail-paddle silhouette per frame. */
-  readonly tailGuard: boolean;
 }
 
 const CASES: readonly SheetCase[] = [
-  { name: 'baby', file: 'beaver-baby', animations: BABY, order: BEAVER_ANIMATION_ORDER, tile: 48, tailGuard: true },
-  { name: 'teen', file: 'beaver-teen', animations: TEEN, order: BEAVER_ANIMATION_ORDER, tile: 48, tailGuard: true },
-  { name: 'adult', file: 'beaver-adult', animations: ADULT, order: BEAVER_ANIMATION_ORDER, tile: 48, tailGuard: true },
-  { name: 'lodge', file: 'lodge', animations: LODGE_ANIMATIONS, order: LODGE_ANIMATION_ORDER, tile: 48, tailGuard: false },
+  { name: 'lodge', file: 'lodge', animations: LODGE_ANIMATIONS, order: LODGE_ANIMATION_ORDER, tile: 48 },
 ];
 
-describe.each(CASES)('sprite generator: $name', ({ name, file, animations, order, tile, tailGuard }) => {
+describe.each(CASES)('sprite generator: $name', ({ file, animations, order, tile }) => {
   it('is deterministic: two runs produce byte-identical PNGs', () => {
     const a = buildSheet(animations, order, tile, FPS);
     const b = buildSheet(animations, order, tile, FPS);
@@ -72,60 +67,16 @@ describe.each(CASES)('sprite generator: $name', ({ name, file, animations, order
     const inRange = contact.pixels.every((v) => v < contact.palette.length);
     expect(inRange).toBe(true);
   });
-
-  // The flat paddle tail is the beaver's signature silhouette — it must
-  // never degrade into a ball or vanish in any frame. BL-10 (48px codex
-  // art): checked directly against the tail's own two chars (`t`/`T`, never
-  // used elsewhere) rather than "any color in a corner zone" — the 48px
-  // react pose's raised arms can reach into the old 32px-art's left-edge
-  // zone, so a color-agnostic guard would false-positive on non-tail
-  // pixels. Bounds below are measured across every frame of every stage
-  // (min contiguous t/T run = 9px; observed bbox x:[1,27] y:[22,43]),
-  // widened with a small margin — re-measure if the art changes.
-  const TAIL_CHARS = new Set(['t', 'T']);
-  const TAIL_MIN_RUN = 8;
-  const TAIL_MAX_X = 30;
-  const TAIL_MIN_Y = 18;
-  const TAIL_MAX_Y = 45;
-  it.skipIf(!tailGuard)('every frame keeps the flat tail-paddle silhouette', () => {
-    for (const [anim, frames] of Object.entries(animations)) {
-      frames.forEach((frame, i) => {
-        let bestRun = 0;
-        frame.forEach((row, y) => {
-          let run = 0;
-          [...row].forEach((ch, x) => {
-            if (TAIL_CHARS.has(ch)) {
-              run += 1;
-              bestRun = Math.max(bestRun, run);
-              expect(x, `${name}.${anim}[${i}] tail pixel (${x},${y}) past x<=${TAIL_MAX_X}`).toBeLessThanOrEqual(
-                TAIL_MAX_X,
-              );
-              expect(y, `${name}.${anim}[${i}] tail pixel (${x},${y}) outside y[${TAIL_MIN_Y},${TAIL_MAX_Y}]`).toBeGreaterThanOrEqual(
-                TAIL_MIN_Y,
-              );
-              expect(y).toBeLessThanOrEqual(TAIL_MAX_Y);
-            } else {
-              run = 0;
-            }
-          });
-        });
-        expect(bestRun, `${name}.${anim}[${i}] lost the tail paddle (best run ${bestRun}px)`).toBeGreaterThanOrEqual(
-          TAIL_MIN_RUN,
-        );
-      });
-    }
-  });
 });
 
 describe('sheet validation', () => {
   it('rejects a frame with an off-palette character', () => {
     const bad = {
-      ...BABY,
+      ...LODGE_ANIMATIONS,
       idle: [
-        [...BABY.idle[0]].map((row, i) => (i === 0 ? row.slice(0, -1) + 'Z' : row)),
-        BABY.idle[1],
+        [...LODGE_ANIMATIONS.idle[0]].map((row, i) => (i === 0 ? row.slice(0, -1) + 'Z' : row)),
       ],
     };
-    expect(() => buildSheet(bad, BEAVER_ANIMATION_ORDER, 48, FPS)).toThrow();
+    expect(() => buildSheet(bad, LODGE_ANIMATION_ORDER, 48, FPS)).toThrow();
   });
 });

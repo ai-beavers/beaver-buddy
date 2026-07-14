@@ -3,3 +3,8 @@ dist/
 release/
 *.log
 .DS_Store
+
+# User-supplied source images for scripts/gen-sprites/ingest-images.mjs.
+# Originals live outside the repo; only the ingested sheets under
+# assets/sprites/ are committed (CLAUDE.md: no raw image-gen intermediates).
+assets-src/

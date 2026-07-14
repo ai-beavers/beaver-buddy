@@ -10,10 +10,6 @@ import type { IndexedImage } from './png.ts';
 /** One tile: `tile` strings of length `tile`, one palette char (or '.') per pixel. */
 export type Frame = readonly string[];
 
-/** Fixed sheet row order for all beaver stages (binding, pinned in assets/STYLE.md). */
-export const BEAVER_ANIMATION_ORDER = ['idle', 'walk', 'run', 'sleep', 'react'] as const;
-export type BeaverAnimation = (typeof BEAVER_ANIMATION_ORDER)[number];
-
 export interface SheetMeta {
   readonly tile: number;
   readonly fps: number;

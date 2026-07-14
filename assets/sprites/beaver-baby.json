@@ -1,28 +1,16 @@
 {
-  "tile": 48,
-  "fps": 10,
+  "tile": 96,
+  "fps": 8,
   "sheetWidth": 192,
-  "sheetHeight": 240,
+  "sheetHeight": 192,
   "rows": [
     {
       "name": "idle",
-      "frames": 2
+      "frames": 1
     },
     {
       "name": "walk",
-      "frames": 4
-    },
-    {
-      "name": "run",
-      "frames": 4
-    },
-    {
-      "name": "sleep",
       "frames": 2
-    },
-    {
-      "name": "react",
-      "frames": 4
     }
   ]
 }

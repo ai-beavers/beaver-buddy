@@ -3,8 +3,6 @@
 // package.json). No sprite library (ADR 001 §Animation/roaming): plain
 // canvas drawImage with a manual frame-rect lookup.
 
-import { PET_SCALE } from './pet-config.js';
-
 export type Stage = 'baby' | 'teen' | 'adult';
 
 export interface SheetRow {
@@ -43,7 +41,11 @@ async function loadMeta(src: string): Promise<SheetMeta> {
 }
 
 export async function loadSheet(stage: Stage): Promise<Sheet> {
-  const base = `assets/sprites/beaver-${stage}`;
+  // Adult sprite art doesn't exist yet — BL-11 ingested the user's baby/teen
+  // images only (see assets/STYLE.md provenance). Falls back to the teen
+  // sheet until a real adult sheet ships; swap this mapping out then.
+  const spriteStage: 'baby' | 'teen' = stage === 'adult' ? 'teen' : stage;
+  const base = `assets/sprites/beaver-${spriteStage}`;
   const [image, meta] = await Promise.all([loadImage(`${base}.png`), loadMeta(`${base}.json`)]);
   return { image, meta };
 }
@@ -78,6 +80,13 @@ export function frameRect(meta: SheetMeta, anim: string, frameIndex: number): Fr
 export interface DrawOptions {
   readonly mirror: boolean;
   readonly rotationDeg: number;
+  // Integer nearest-neighbor blit scale for this draw call. A parameter
+  // rather than a hardcoded PET_SCALE import: the lodge sheet kept its
+  // original 48px native tile while the beaver sheets moved to 96px
+  // (BL-11), so different sheets need different scale factors to land at
+  // the same on-screen size — callers pass pet-config's PET_SCALE or
+  // LODGE_SCALE accordingly (see renderer.ts).
+  readonly scale: number;
 }
 
 export function drawFrame(
@@ -90,9 +99,9 @@ export function drawFrame(
   opts: DrawOptions,
 ): void {
   const { sx, sy, size } = frameRect(sheet.meta, anim, frameIndex);
-  // Destination is blown up by PET_SCALE; source sampling stays at the
+  // Destination is blown up by opts.scale; source sampling stays at the
   // native tile size — that's what keeps nearest-neighbor scaling crisp.
-  const destSize = size * PET_SCALE;
+  const destSize = size * opts.scale;
   const cx = x + destSize / 2;
   const cy = y + destSize / 2;
 
