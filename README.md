@@ -7,7 +7,12 @@ a Tamagotchi for people who live in Claude Code and Codex.
 > Built by **[AI Beavers](https://github.com/ai-beavers)** — a global community of
 > builders. Contributors welcome (see [Contributing](#contributing) below).
 
-![Beaver Buddy roaming the desktop](docs/design-reviews/BL-10-live-teen.png)
+<p align="center">
+  <img src="assets/sprites/beaver-baby.png" alt="Baby beaver sprite sheet" width="200">
+  &nbsp;&nbsp;
+  <img src="assets/sprites/beaver-teen.png" alt="Teen beaver sprite sheet" width="200">
+</p>
+<p align="center"><em>baby → teen — the beaver evolves as you burn tokens</em></p>
 
 ## What it does
 
