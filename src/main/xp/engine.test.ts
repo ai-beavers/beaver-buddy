@@ -111,6 +111,29 @@ describe('XpEngine: evolution', () => {
   });
 });
 
+describe('XpEngine: getLastUpdate (late-listener resend)', () => {
+  it('synthesizes a non-evolving snapshot when nothing was emitted', () => {
+    const engine = new XpEngine(stateDir, { xp: xpForLevel(20), lastSeenLifetimeTokens: 0 });
+    expect(engine.getLastUpdate()).toEqual({ level: 20, stage: 'teen' });
+  });
+
+  it('preserves an evolution emitted before any listener attached', () => {
+    // Launch-crossing scenario: accrual (with a stage crossing) happens
+    // before the renderer page is ready — the resend must still carry the
+    // evolvingTo, not a stale reconstruction.
+    const engine = new XpEngine(stateDir);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17));
+    expect(engine.getLastUpdate()).toEqual({ level: 17, stage: 'baby', evolvingTo: 'teen' });
+  });
+
+  it('tracks the latest emission', () => {
+    const engine = new XpEngine(stateDir);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // crossing
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(18)); // plain accrual
+    expect(engine.getLastUpdate()).toEqual({ level: 18, stage: 'teen', evolvingTo: undefined });
+  });
+});
+
 describe('XpEngine: attachTracker', () => {
   it('ingests the tracker current totals once, then subsequent onChange totals', () => {
     const tracker = new FakeTracker();

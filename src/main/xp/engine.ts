@@ -1,4 +1,4 @@
-// XP accrual + evolution detection. Subscribes to the BL-5 usage tracker's
+// XP accrual + evolution detection. Subscribes to the usage tracker's
 // lifetime token total through a durable, forward-only cursor
 // (lastSeenLifetimeTokens) so restarts, log rotation, and re-scans can never
 // double-count XP: delta is always max(0, total - lastSeen), and the cursor
@@ -33,6 +33,7 @@ export interface TrackerLike {
 export class XpEngine {
   private readonly stateDir: string;
   private state: XpState;
+  private lastUpdate: PetUpdate | null = null;
   private readonly listeners = new Set<(update: PetUpdate) => void>();
 
   constructor(stateDir: string, initial: XpState = loadState(stateDir)) {
@@ -45,13 +46,24 @@ export class XpEngine {
     return { xp: this.state.xp, level, stage: stageForLevel(level) };
   }
 
+  // The most recent emitted update, or a synthesized non-evolving snapshot
+  // when nothing has been emitted yet. Lets a receiver that starts
+  // listening late (a renderer page that finishes loading after launch-time
+  // accrual already fired) catch up without losing an in-flight evolution —
+  // the engine stays the single source of evolvingTo.
+  getLastUpdate(): PetUpdate {
+    if (this.lastUpdate) return this.lastUpdate;
+    const { level, stage } = this.getState();
+    return { level, stage };
+  }
+
   // Returns an unsubscribe function.
   onUpdate(callback: (update: PetUpdate) => void): () => void {
     this.listeners.add(callback);
     return () => this.listeners.delete(callback);
   }
 
-  // Wires the BL-5 tracker: applies whatever it has already scanned once,
+  // Wires the usage tracker: applies whatever it has already scanned once,
   // then every subsequent change. Returns an unsubscribe function.
   attachTracker(tracker: TrackerLike): () => void {
     const unsubscribe = tracker.onChange((totals) => this.ingestLifetimeTokens(totals.lifetime.totalTokens));
@@ -80,6 +92,7 @@ export class XpEngine {
     const after = this.getState();
     const evolvingTo = after.stage !== before.stage ? after.stage : undefined;
     const update: PetUpdate = { level: after.level, stage: evolvingTo ? before.stage : after.stage, evolvingTo };
+    this.lastUpdate = update;
     for (const listener of this.listeners) listener(update);
   }
 }
