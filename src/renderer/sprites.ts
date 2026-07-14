@@ -46,6 +46,15 @@ export async function loadSheet(stage: Stage): Promise<Sheet> {
   return { image, meta };
 }
 
+// The hatch lodge sheet (assets/sprites/lodge.png/.json): 48px tiles, rows
+// idle/shake/burst/spark — same loader shape as loadSheet, not stage-keyed
+// since there's exactly one lodge sheet.
+export async function loadLodgeSheet(): Promise<Sheet> {
+  const base = 'assets/sprites/lodge';
+  const [image, meta] = await Promise.all([loadImage(`${base}.png`), loadMeta(`${base}.json`)]);
+  return { image, meta };
+}
+
 export interface FrameRect {
   readonly sx: number;
   readonly sy: number;

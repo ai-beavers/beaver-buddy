@@ -8,8 +8,17 @@
 // document is hidden.
 
 import { createRoamState, tick, type RoamState, type Bounds } from './roam.js';
-import { EVOLUTION_SHAKE_JITTER_PX, MAX_DT_S, SPRITE_FPS } from './pet-config.js';
-import { loadSheet, drawFrame, type Sheet, type Stage } from './sprites.js';
+import {
+  EVOLUTION_SHAKE_JITTER_PX,
+  HATCH_CORNER_MARGIN_PX,
+  HATCH_LODGE_TILE_PX,
+  HATCH_SHAKE_JITTER_MAX_PX,
+  HATCH_SPARK_SPEED_PX_S,
+  HATCH_BURST_DURATION_S,
+  MAX_DT_S,
+  SPRITE_FPS,
+} from './pet-config.js';
+import { loadSheet, loadLodgeSheet, drawFrame, type Sheet, type Stage } from './sprites.js';
 import {
   isFlashVisible,
   shakeOffset,
@@ -18,16 +27,19 @@ import {
   type EvolutionState,
   type PetChangedPayload,
 } from './evolution.js';
+import { hatchShakeOffset, sparkOffsets, startHatch, tickHatch, type HatchState } from './hatch.js';
 
 declare global {
   interface Window {
     beaverBuddy: {
       onPausedChanged(callback: (paused: boolean) => void): void;
       onPetChanged(callback: (pet: PetChangedPayload) => void): void;
+      onHatchStart(callback: () => void): void;
     };
     // Read-only diagnostic surface; nothing in the app reads it.
     __debugRoam?: RoamState;
     __debugPet?: { level: number; stage: Stage; evolving: boolean };
+    __debugHatch?: { phase: HatchState['phase'] };
   }
 }
 
@@ -62,6 +74,10 @@ let lastTimestampMs: number | null = null;
 let needsDraw = true;
 let petLevel = 1;
 let evolutionState: EvolutionState | null = null;
+let hatchState: HatchState | null = null;
+let lodgeSheet: Sheet | null = null;
+let hatchFrameIndex = 0;
+let hatchFrameAccumulatorS = 0;
 
 function loadCurrentSheet(): void {
   loadSheet(stage)
@@ -103,7 +119,7 @@ window.beaverBuddy.onPausedChanged((nextPaused) => {
 
 window.beaverBuddy.onPetChanged((pet) => {
   petLevel = pet.level;
-  if (pet.evolvingTo) {
+  if (pet.evolvingTo && !hatchState) {
     // A fresh page load always starts from the default 'baby' sheet, so a
     // launch that evolves immediately (e.g. persisted state already teen,
     // injected straight past adult) must sync to the pre-evolution stage
@@ -114,6 +130,16 @@ window.beaverBuddy.onPetChanged((pet) => {
     // Renderer-local freeze only (CLAUDE.md: tray Pause must stay a pure
     // user control) — roaming resumes on its own once the sequence ends.
     evolutionState = startEvolution(pet.evolvingTo);
+  } else if (pet.evolvingTo) {
+    // Stage crossing while the hatch owns the screen: an animated evolution
+    // would run invisibly behind the hatch (draw() renders only the hatch),
+    // flip the sheet at an arbitrary mid-hatch moment, and have its
+    // celebrate window swallowed. Skip the animation and sync straight to
+    // the post-evolution stage so the appear phase shows the pet at its
+    // true stage with no mid-sequence sprite flip. main.ts sends
+    // state:hatch before the pet update, so hatchState is already set here
+    // on a hatching launch.
+    setStage(pet.evolvingTo);
   } else if (!evolutionState && pet.stage !== stage) {
     // No transition in flight: sync directly (e.g. a late listener attach
     // catching up to state that already changed).
@@ -122,16 +148,92 @@ window.beaverBuddy.onPetChanged((pet) => {
   needsDraw = true;
 });
 
+window.beaverBuddy.onHatchStart(() => {
+  hatchState = startHatch();
+  loadLodgeSheet()
+    .then((loaded) => {
+      lodgeSheet = loaded;
+      needsDraw = true;
+    })
+    .catch((error: unknown) => console.error('Failed to load lodge sprite sheet:', error));
+  needsDraw = true;
+});
+
+// The hatch always plays in the bottom-left corner; the margin constant is
+// its only placement tuning.
+function hatchPosition(): { x: number; y: number } {
+  return { x: HATCH_CORNER_MARGIN_PX, y: bounds().height - HATCH_LODGE_TILE_PX };
+}
+
 // Last cleared/drawn region. Clearing only this rect (instead of the whole
 // 1728x1016 surface) keeps Chromium's damage rect — and therefore the
 // WindowServer repaint of the transparent window behind it — sprite-sized.
 let dirtyRect: { x: number; y: number; size: number } | null = null;
+
+// Renders the lodge-idle/shake/burst/spark/baby-appear visuals in place of
+// the normal roam draw while a hatch sequence is active.
+function drawHatch(state: HatchState): void {
+  const { x, y } = hatchPosition();
+
+  if (state.phase === 'baby-appear') {
+    if (!sheet) {
+      // Sheet not loaded: nothing drawn, but keep the dirty rect bounded to
+      // the hatch area — a null rect would make every hatch frame clear the
+      // full canvas (hatch redraws every frame), regressing the sprite-sized
+      // damage-rect discipline.
+      const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2);
+      dirtyRect = { x: x - pad, y: y - pad, size: HATCH_LODGE_TILE_PX + 2 * pad };
+      return;
+    }
+    // Bottom-aligned with the (larger) lodge tile so there's no visual jump
+    // between the lodge and the baby appearing at the handoff.
+    const babyY = bounds().height - sheet.meta.tile;
+    drawFrame(ctx, sheet, 'react', hatchFrameIndex, x, babyY, { mirror: false, rotationDeg: 0 });
+    const pad = Math.ceil(sheet.meta.tile / 2);
+    dirtyRect = { x: x - pad, y: babyY - pad, size: sheet.meta.tile + 2 * pad };
+    return;
+  }
+
+  if (!lodgeSheet) {
+    // Lodge sheet still loading (or failed): same bounded-rect rule as above
+    // so a load failure can never reintroduce per-frame full-canvas clears.
+    const pad = Math.ceil(HATCH_LODGE_TILE_PX / 2) + HATCH_SHAKE_JITTER_MAX_PX;
+    dirtyRect = { x: x - pad, y: y - pad, size: HATCH_LODGE_TILE_PX + 2 * pad };
+    return;
+  }
+
+  const anim = state.phase === 'lodge-idle' ? 'idle' : state.phase === 'shake' ? 'shake' : 'burst';
+  const shake = state.phase === 'shake' ? hatchShakeOffset(state, Math.random) : { dx: 0, dy: 0 };
+  const drawX = Math.round(x + shake.dx);
+  const drawY = Math.round(y + shake.dy);
+  drawFrame(ctx, lodgeSheet, anim, hatchFrameIndex, drawX, drawY, { mirror: false, rotationDeg: 0 });
+
+  const tile = lodgeSheet.meta.tile;
+  let pad = Math.ceil(tile / 2) + HATCH_SHAKE_JITTER_MAX_PX;
+
+  if (state.phase === 'burst') {
+    for (const offset of sparkOffsets(state)) {
+      const sparkX = Math.round(drawX + offset.dx);
+      const sparkY = Math.round(drawY + offset.dy);
+      drawFrame(ctx, lodgeSheet, 'spark', hatchFrameIndex, sparkX, sparkY, { mirror: false, rotationDeg: 0 });
+    }
+    // Sparks radiate outward for the whole burst duration — pad the dirty
+    // rect to the max travel distance so trailing sparks never smear.
+    pad += HATCH_SPARK_SPEED_PX_S * HATCH_BURST_DURATION_S;
+  }
+
+  dirtyRect = { x: drawX - pad, y: drawY - pad, size: tile + 2 * pad };
+}
 
 function draw(): void {
   if (dirtyRect) {
     ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.size, dirtyRect.size);
   } else {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  if (hatchState) {
+    drawHatch(hatchState);
+    return;
   }
   if (!sheet) {
     dirtyRect = null;
@@ -184,10 +286,10 @@ function frame(timestampMs: number): void {
   lastTimestampMs = timestampMs;
 
   const prev = roamState;
-  // Roaming freezes locally during an evolution sequence — this never
-  // touches the main-process pause state, so tray Pause stays a pure user
-  // control (see evolution.ts).
-  roamState = tick(roamState, dtSeconds, bounds(), paused || evolutionState !== null, Math.random);
+  // Roaming freezes locally during an evolution or hatch sequence — this
+  // never touches the main-process pause state, so tray Pause stays a pure
+  // user control (see evolution.ts).
+  roamState = tick(roamState, dtSeconds, bounds(), paused || evolutionState !== null || hatchState !== null, Math.random);
   window.__debugRoam = roamState;
   // Compare rounded positions: the sprite is drawn on whole pixels, so
   // sub-pixel movement between rAF ticks changes nothing on screen — this
@@ -229,7 +331,30 @@ function frame(timestampMs: number): void {
   }
   window.__debugPet = { level: petLevel, stage, evolving: evolutionState !== null };
 
-  if (moved || frameAdvanced || needsDraw || evolutionActive) {
+  let hatchActive = false;
+  if (hatchState) {
+    hatchState = tickHatch(hatchState, dtSeconds, Math.random);
+    hatchActive = true;
+    // Lodge/burst/spark/baby-appear frames run on the same fps accumulator
+    // as roam sprites (CLAUDE.md: one sprite-fps cadence, never conflated
+    // with render Hz) — a separate index because it's a different sheet.
+    hatchFrameAccumulatorS += dtSeconds;
+    const hatchFrameIntervalS = 1 / SPRITE_FPS;
+    while (hatchFrameAccumulatorS >= hatchFrameIntervalS) {
+      hatchFrameAccumulatorS -= hatchFrameIntervalS;
+      hatchFrameIndex += 1;
+    }
+    window.__debugHatch = { phase: hatchState.phase };
+    if (hatchState.phase === 'done') {
+      hatchState = null;
+      // Hand off to the roam machine: y is already ground (set at
+      // createRoamState init and untouched while frozen) — only x needs
+      // repositioning to the hatch corner.
+      roamState = { ...roamState, x: HATCH_CORNER_MARGIN_PX, frameHold: false };
+    }
+  }
+
+  if (moved || frameAdvanced || needsDraw || evolutionActive || hatchActive) {
     draw();
     needsDraw = false;
   }

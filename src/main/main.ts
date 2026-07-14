@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { app, BrowserWindow, powerMonitor, screen } from 'electron';
 import { applySessionHardening, applyWindowHardening } from './hardening';
-import { PAUSE_CHANGED_CHANNEL, PET_CHANGED_CHANNEL } from './ipc-channels';
+import { HATCH_START_CHANNEL, PAUSE_CHANGED_CHANNEL, PET_CHANGED_CHANNEL } from './ipc-channels';
+import { loadOnboardingState, saveOnboardingState } from './onboarding';
 import { createPauseState, isPaused, setSystemPause, toggleManualPause, type PauseState } from './pause-state';
 import { createTray, formatPetLabel } from './tray';
 import { XpEngine, type PetUpdate } from './xp/engine';
@@ -90,9 +91,23 @@ function printSmokeResultAndExit(win: BrowserWindow): void {
 app.whenReady().then(() => {
   applySessionHardening();
 
+  const stateDir = app.getPath('userData');
+
+  // --reset-hatch is the hidden QA reset: it bypasses the stored flag so the
+  // hatch replays immediately, without a separate clear-then-relaunch step.
+  const onboarding = loadOnboardingState(stateDir);
+  const shouldHatch = process.argv.includes('--reset-hatch') || !onboarding.hatched;
+  if (shouldHatch) {
+    // Persisted at trigger time, not sequence completion: guarantees
+    // exactly-once even if the app is killed mid-sequence (~6s window) —
+    // acceptable for a one-shot cosmetic onboarding, and --reset-hatch
+    // recovers it. Avoids adding a hatch:done renderer -> main channel.
+    saveOnboardingState(stateDir, { hatched: true });
+  }
+
   mainWindow = createWindow();
 
-  const xpEngine = new XpEngine(app.getPath('userData'));
+  const xpEngine = new XpEngine(stateDir);
 
   const tray = createTray({
     isPaused: () => isPaused(pauseState),
@@ -125,6 +140,12 @@ app.whenReady().then(() => {
   // engine update — including any evolution launch-time accrual already
   // triggered — is (re-)sent once the page is ready to receive it.
   mainWindow.webContents.once('did-finish-load', () => {
+    // Hatch first: the renderer suppresses the animated evolution for pet
+    // updates that arrive while a hatch is active, which only works if the
+    // hatch message lands before a launch-time evolving update.
+    if (shouldHatch) {
+      mainWindow?.webContents.send(HATCH_START_CHANNEL);
+    }
     mainWindow?.webContents.send(PET_CHANGED_CHANNEL, xpEngine.getLastUpdate());
   });
 

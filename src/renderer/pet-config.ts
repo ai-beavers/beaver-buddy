@@ -48,3 +48,31 @@ export const EVOLUTION_FLASH_BLINK_COUNT = 3;
 // Duration of one full on/off blink cycle; the white silhouette is visible
 // for the first half of each cycle.
 export const EVOLUTION_FLASH_BLINK_DURATION_S = 0.2;
+
+// Hatch onboarding sequence tuning (lodge-idle -> shake -> burst ->
+// baby-appear -> done). The hatch always plays in the bottom-left corner;
+// the margin below is its only placement tuning.
+export const HATCH_LODGE_TILE_PX = 48; // assets/STYLE.md: lodge + particles are 48x48 tiles
+export const HATCH_CORNER_MARGIN_PX = 8; // gap from the screen edge the lodge/baby sits at
+
+export const HATCH_LODGE_IDLE_DURATION_S = 0.8;
+
+// Escalating shake: HATCH_SHAKE_BURST_COUNT bursts of active jitter, each
+// separated by a pause that shrinks from *_PAUSE_START_S to *_PAUSE_END_S —
+// the Pokemon hatch rhythm. Jitter amplitude ramps HATCH_SHAKE_JITTER_MIN_PX
+// -> HATCH_SHAKE_JITTER_MAX_PX across the bursts, monotone non-decreasing.
+export const HATCH_SHAKE_BURST_COUNT = 4;
+export const HATCH_SHAKE_BURST_ACTIVE_S = 0.4;
+export const HATCH_SHAKE_PAUSE_START_S = 0.6;
+export const HATCH_SHAKE_PAUSE_END_S = 0.2;
+export const HATCH_SHAKE_JITTER_MIN_PX = 1;
+export const HATCH_SHAKE_JITTER_MAX_PX = 4;
+
+export const HATCH_BURST_DURATION_S = 0.7;
+// Sparks radiate outward from the lodge center on deterministic angles (no
+// physics/particle system) — count is seeded per-run within this range.
+export const HATCH_SPARK_COUNT_MIN = 4;
+export const HATCH_SPARK_COUNT_MAX = 6;
+export const HATCH_SPARK_SPEED_PX_S = 40;
+
+export const HATCH_BABY_APPEAR_DURATION_S = 1.0;

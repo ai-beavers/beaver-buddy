@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PAUSE_CHANGED_CHANNEL, PET_CHANGED_CHANNEL } from './ipc-channels';
+import { HATCH_START_CHANNEL, PAUSE_CHANGED_CHANNEL, PET_CHANGED_CHANNEL } from './ipc-channels';
 
 // preload.ts runs sandboxed and cannot require sibling modules, so it carries
 // a hand-synced copy of each channel literal instead of importing them. The
@@ -18,5 +18,10 @@ describe('ipc-channels drift guard', () => {
   it('preload.ts hand-synced channel literal matches PET_CHANGED_CHANNEL', () => {
     const match = source.match(/const PET_CHANGED_CHANNEL = '([^']*)'/);
     expect(match?.[1]).toBe(PET_CHANGED_CHANNEL);
+  });
+
+  it('preload.ts hand-synced channel literal matches HATCH_START_CHANNEL', () => {
+    const match = source.match(/const HATCH_START_CHANNEL = '([^']*)'/);
+    expect(match?.[1]).toBe(HATCH_START_CHANNEL);
   });
 });
