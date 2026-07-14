@@ -77,7 +77,7 @@ export const HATCH_SPARK_SPEED_PX_S = 40;
 
 export const HATCH_BABY_APPEAR_DURATION_S = 1.0;
 
-// Quip speech-bubble tuning (BL-8): a pixel-snapped rounded rect + tail
+// Quip speech-bubble tuning: a pixel-snapped rounded rect + tail
 // drawn above the pet. BUBBLE_CHAR_WIDTH_PX is a fixed-width approximation
 // of the monospace canvas font's glyph advance — bubble.ts's wrap/clamp
 // layout math needs to stay pure (no canvas ctx.measureText access) so it's

@@ -1,7 +1,7 @@
 // Pure state machine: (event, nowMs, rng) -> quip text or null. No DOM/
 // Electron/filesystem access, so it's fully unit-testable (roam.ts pattern).
 // Enforces two independent rules:
-//  - one quip per QUIP_COOLDOWN_MS window, across all triggers (R6);
+//  - one quip per QUIP_COOLDOWN_MS window, across all triggers;
 //  - never repeats the immediately-previous quip shown for a given trigger's
 //    pool (tracked by index, not text, so the evolution pool's {stage}
 //    substitution doesn't defeat the repeat check).

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { QUIP_POOLS } from './quips';
 
-// Data invariants the copy-tone review depends on (plan: "no emoji, no
-// exclamation spam, <=60 chars each"). Catches a regression the next time
+// This suite's own copy invariants: every line fits a small speech bubble
+// (<=60 chars, worst-case substitution included), reads dry rather than
+// shouty (no emoji, no exclamation marks), and each pool is big enough for
+// no-immediate-repeat to mean something. Catches a regression the next time
 // someone edits the pools by hand.
 describe('quip pools: copy invariants', () => {
   for (const [trigger, pool] of Object.entries(QUIP_POOLS)) {

@@ -6,8 +6,8 @@
 // UsageTracker.onTick, rather than running a second polling loop — a
 // duplicate constant here would just be a second name for the same number.
 
-// Minimum gap between two shown quips, regardless of trigger (R6: no more
-// than one quip per cooldown window).
+// Minimum gap between two shown quips, regardless of trigger — the beaver
+// never says more than one thing per cooldown window.
 export const QUIP_COOLDOWN_MS = 10 * 60_000;
 
 // How long the renderer keeps a quip's speech bubble on screen.

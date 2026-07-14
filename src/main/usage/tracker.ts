@@ -4,8 +4,8 @@
 // IPC/renderer wiring here (renderer never sees paths or log content).
 //
 // onChange fires only when a file actually changed; onTick fires on every
-// refresh regardless. The quip idle detector (BL-8) needs a snapshot even
-// when nothing changed (that's the definition of idle), so it rides onTick
+// refresh regardless. The quip idle detector needs a snapshot even when
+// nothing changed (that's the definition of idle), so it rides onTick
 // instead of a second polling loop.
 
 import fs from 'node:fs';
