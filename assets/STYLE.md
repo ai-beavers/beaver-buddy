@@ -74,13 +74,17 @@ ships with (hard alpha at the background cutout, no re-outlining).
 ## Facing & mirroring
 
 All frames are authored/ingested RIGHT-facing. The renderer mirrors
-horizontally for left-facing movement. The user's left-facing images —
-`baby-idle-left.png`/`baby-to-left-*.png` and `teen-to-right-1-{1,3,5}.png`
-(despite their names, left-facing mirrors of `-1`/`-1-2`/`-1-4`) — exist in
+horizontally for left-facing movement. The user's left-facing images
+(`{stage}-idle-left.png`, `{stage}-to-left-{1,2}.png`) exist in
 `assets-src/beaver/` but are unused: mixing them into a sheet row would make
 the sheet itself alternate facing per frame (a flip-flopping walk), so
 left-facing movement comes only from renderer mirroring, never from
 left-facing source frames.
+
+Source naming (owner-corrected, 2026-07-14, BL-12): `{stage}-idle-{dir}.png`
+is the idle pose; `{stage}-to-{dir}-{1,2}.png` are the two walk step frames.
+Earlier drops used ambiguous names that put an idle pose in the walk row —
+twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
 
 ## Sheet row order & timing
 
