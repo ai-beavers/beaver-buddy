@@ -5,7 +5,7 @@ const tsPlugin = require('@typescript-eslint/eslint-plugin');
 /** @type {import('eslint').Linter.Config[]} */
 module.exports = [
   {
-    ignores: ['dist/**', 'release/**', 'node_modules/**'],
+    ignores: ['dist/**', 'release/**', 'node_modules/**', '.worktrees/**', '.context/**'],
   },
   {
     files: ['src/main/**/*.ts'],

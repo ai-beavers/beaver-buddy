@@ -5,6 +5,6 @@ import { defineConfig } from 'vitest/config';
 // double-run the compiled CommonJS copy.
 export default defineConfig({
   test: {
-    exclude: ['**/node_modules/**', 'dist/**'],
+    exclude: ['**/node_modules/**', 'dist/**', '.worktrees/**', '.context/**'],
   },
 });
