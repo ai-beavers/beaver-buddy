@@ -248,6 +248,11 @@ app.whenReady().then(() => {
         if (mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
       },
       onOpenGrowthSettings: openGrowthSettings,
+      getUsageSources: () => detectUsageSources(),
+      onConnectUsage: () => {
+        usageTracker?.refresh();
+        // Status is re-read on rebuild via getUsageSources — no paths exposed.
+      },
     },
     debugTrayMenu ? (labels) => process.stdout.write(`TRAY_MENU: ${JSON.stringify(labels)}\n`) : undefined,
   );

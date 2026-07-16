@@ -6,6 +6,11 @@ import path from 'node:path';
 import { app, Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron';
 import { xpForLevel, type Stage } from './xp/curve';
 
+export interface TrayUsageStatus {
+  readonly claudeConnected: boolean;
+  readonly codexConnected: boolean;
+}
+
 export interface TrayCallbacks {
   onTogglePause: () => void;
   isPaused: () => boolean;
@@ -16,6 +21,9 @@ export interface TrayCallbacks {
   isMrrAvailable: () => boolean;
   onSelectGrowthMode: (mode: 'tokens' | 'mrr') => void;
   onOpenGrowthSettings: () => void;
+  getUsageSources: () => TrayUsageStatus;
+  // Re-scan local Claude Code / Codex logs (booleans only — never paths).
+  onConnectUsage: (target: 'claude' | 'codex') => void;
 }
 
 export function formatPetLabel(state: { readonly level: number; readonly stage: Stage; readonly xp: number }): string {
@@ -23,9 +31,31 @@ export function formatPetLabel(state: { readonly level: number; readonly stage: 
   return `Lv ${state.level} — ${state.stage} (${Math.floor(state.xp)}/${nextLevelXp})`;
 }
 
+export function formatUsageConnectLabel(name: string, connected: boolean): string {
+  return connected ? `${name} — connected` : `Connect ${name}`;
+}
+
 // Pure menu-shape builder — no Electron Menu/Tray construction, so it is
 // unit-testable without a running Electron process.
 export function buildMenuTemplate(callbacks: TrayCallbacks, rebuild: () => void): MenuItemConstructorOptions[] {
+  const usage = callbacks.getUsageSources();
+  const connectSubmenu: MenuItemConstructorOptions[] = [
+    {
+      label: formatUsageConnectLabel('Claude Code', usage.claudeConnected),
+      click: () => {
+        callbacks.onConnectUsage('claude');
+        rebuild();
+      },
+    },
+    {
+      label: formatUsageConnectLabel('Codex', usage.codexConnected),
+      click: () => {
+        callbacks.onConnectUsage('codex');
+        rebuild();
+      },
+    },
+  ];
+
   const growthSubmenu: MenuItemConstructorOptions[] = [
     {
       label: 'Source: Tokens',
@@ -61,6 +91,7 @@ export function buildMenuTemplate(callbacks: TrayCallbacks, rebuild: () => void)
       },
     },
     { type: 'separator' },
+    { label: 'Connect', submenu: connectSubmenu },
     { label: 'Growth', submenu: growthSubmenu },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },

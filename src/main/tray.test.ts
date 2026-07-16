@@ -28,6 +28,8 @@ describe('buildMenuTemplate', () => {
       isMrrAvailable: () => false,
       onSelectGrowthMode: () => {},
       onOpenGrowthSettings: () => {},
+      getUsageSources: () => ({ claudeConnected: false, codexConnected: false }),
+      onConnectUsage: () => {},
       ...overrides,
     };
   }
@@ -59,6 +61,65 @@ describe('buildMenuTemplate', () => {
     pauseItem?.click?.(undefined as never, undefined as never, undefined as never);
     expect(calls).toEqual(['toggle', 'rebuild']);
   });
+
+  it('includes a Connect submenu before Growth', () => {
+    const template = buildMenuTemplate(callbacks(), () => {});
+    const labels = template.map((i) => i.label);
+    expect(labels.indexOf('Connect')).toBeLessThan(labels.indexOf('Growth'));
+  });
+});
+
+describe('buildMenuTemplate: connect submenu', () => {
+  function callbacks(overrides: Partial<TrayCallbacks> = {}): TrayCallbacks {
+    return {
+      isPaused: () => false,
+      onTogglePause: () => {},
+      getPetLabel: () => 'Lv 1 — baby (0/100)',
+      getGrowthMode: () => 'tokens',
+      isMrrAvailable: () => false,
+      onSelectGrowthMode: () => {},
+      onOpenGrowthSettings: () => {},
+      getUsageSources: () => ({ claudeConnected: false, codexConnected: false }),
+      onConnectUsage: () => {},
+      ...overrides,
+    };
+  }
+
+  function connectSubmenu(template: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
+    const connect = template.find((i) => i.label === 'Connect');
+    return (connect?.submenu ?? []) as MenuItemConstructorOptions[];
+  }
+
+  it('shows Connect Claude Code / Connect Codex when not found', () => {
+    const submenu = connectSubmenu(buildMenuTemplate(callbacks(), () => {}));
+    expect(submenu.map((i) => i.label)).toEqual(['Connect Claude Code', 'Connect Codex']);
+  });
+
+  it('shows connected labels when sources are found', () => {
+    const submenu = connectSubmenu(
+      buildMenuTemplate(
+        callbacks({ getUsageSources: () => ({ claudeConnected: true, codexConnected: true }) }),
+        () => {},
+      ),
+    );
+    expect(submenu.map((i) => i.label)).toEqual(['Claude Code — connected', 'Codex — connected']);
+  });
+
+  it('connect click calls onConnectUsage then rebuild', () => {
+    const calls: string[] = [];
+    const submenu = connectSubmenu(
+      buildMenuTemplate(
+        callbacks({ onConnectUsage: (target) => calls.push(target) }),
+        () => calls.push('rebuild'),
+      ),
+    );
+    submenu.find((i) => i.label === 'Connect Claude Code')?.click?.(
+      undefined as never,
+      undefined as never,
+      undefined as never,
+    );
+    expect(calls).toEqual(['claude', 'rebuild']);
+  });
 });
 
 describe('buildMenuTemplate: growth submenu', () => {
@@ -71,10 +132,11 @@ describe('buildMenuTemplate: growth submenu', () => {
       isMrrAvailable: () => false,
       onSelectGrowthMode: () => {},
       onOpenGrowthSettings: () => {},
+      getUsageSources: () => ({ claudeConnected: false, codexConnected: false }),
+      onConnectUsage: () => {},
       ...overrides,
     };
   }
-
   function growthSubmenu(template: MenuItemConstructorOptions[]): MenuItemConstructorOptions[] {
     const growth = template.find((i) => i.label === 'Growth');
     return (growth?.submenu ?? []) as MenuItemConstructorOptions[];
