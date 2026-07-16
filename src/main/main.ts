@@ -17,6 +17,7 @@ import { DEFAULT_KEYCHAIN_SERVICE } from './mrr/mrr-config';
 import { MrrEngine } from './mrr/mrr-engine';
 import { loadSettingsState, saveSettingsState, type SettingsState } from './mrr/settings-store';
 import { openSettingsWindow } from './mrr/settings-window';
+import { setUnpackagedDockIcon } from './app-icon';
 
 const SMOKE_DELAY_MS = 3000;
 const INJECT_XP_FLAG_PREFIX = '--inject-xp=';
@@ -91,6 +92,14 @@ function parseKeychainService(argv: readonly string[]): string {
   return value && isValidKeychainService(value) ? value : DEFAULT_KEYCHAIN_SERVICE;
 }
 
+function appIconPath(): string {
+  // Opaque 1024² RGB master, no baked squircle (Apple HIG / Icon Composer).
+  // Packaged .app uses assets/beaver-buddy-icon.icns via electron-builder;
+  // system applies the continuous-corner mask. Unpackaged Dock uses
+  // setUnpackagedDockIcon (masks in-process — dock.setIcon bypasses the system).
+  return path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png');
+}
+
 function createWindow(): BrowserWindow {
   const { workArea } = screen.getPrimaryDisplay();
 
@@ -107,6 +116,7 @@ function createWindow(): BrowserWindow {
     focusable: false,
     resizable: false,
     backgroundColor: '#00000000',
+    icon: appIconPath(),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -151,6 +161,10 @@ function printSmokeResultAndExit(win: BrowserWindow): void {
 
 app.whenReady().then(() => {
   applySessionHardening();
+
+  // Unpackaged only: Electron.app has no bundle icon, so set Dock manually
+  // with a squircle mask. Packaged builds keep the system-masked .icns.
+  setUnpackagedDockIcon(appIconPath());
 
   const stateDir = app.getPath('userData');
 
