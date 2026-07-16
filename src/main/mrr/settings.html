@@ -66,7 +66,7 @@
       <div style="margin-top: 8px">
         <div class="row">
           <button id="connectClaude" type="button">Connect Claude Code</button>
-          <button id="disconnectClaude" type="button">Disconnect</button>
+          <button id="disconnectClaude" type="button" hidden>Disconnect Claude Code</button>
           <span id="claudeStatus"></span>
         </div>
         <p class="tokens" id="claudeTokens"></p>
@@ -74,7 +74,7 @@
       <div style="margin-top: 12px">
         <div class="row">
           <button id="connectCodex" type="button">Connect Codex</button>
-          <button id="disconnectCodex" type="button">Disconnect</button>
+          <button id="disconnectCodex" type="button" hidden>Disconnect Codex</button>
           <span id="codexStatus"></span>
         </div>
         <p class="tokens" id="codexTokens"></p>
@@ -135,11 +135,18 @@
       function renderSource(prefix, source) {
         const statusEl = document.getElementById(prefix + 'Status');
         const tokensEl = document.getElementById(prefix + 'Tokens');
+        const name = prefix === 'claude' ? 'Claude' : 'Codex';
+        const connectButton = document.getElementById('connect' + name);
+        const disconnectButton = document.getElementById('disconnect' + name);
         if (!source || !source.enabled) {
           statusEl.textContent = 'not connected';
           tokensEl.textContent = '';
+          connectButton.hidden = false;
+          disconnectButton.hidden = true;
           return;
         }
+        connectButton.hidden = true;
+        disconnectButton.hidden = false;
         if (source.connected) {
           statusEl.textContent = 'connected';
           tokensEl.textContent =
