@@ -160,6 +160,7 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
     height: 560,
     resizable: false,
     title: 'Beaver Buddy — Growth Settings',
+    icon: path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png'),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
