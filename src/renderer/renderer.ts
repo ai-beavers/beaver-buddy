@@ -78,18 +78,33 @@ if (!(canvasEl instanceof HTMLCanvasElement)) {
 }
 const canvas: HTMLCanvasElement = canvasEl;
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
 const context = canvas.getContext('2d');
 if (!context) {
   throw new Error('2d canvas context unavailable');
 }
 const ctx: CanvasRenderingContext2D = context;
-ctx.imageSmoothingEnabled = false;
+
+// HiDPI: size the backing store in device pixels, keep all draw/roam math in
+// CSS pixels via setTransform(dpr). Without this, Retina (dpr=2) bilinear-
+// upscales a 1x bitmap and canvas text reads as a blurry smudge — sprites
+// hide it better because nearest-neighbor chunky pixels forgive the scale.
+function syncCanvasResolution(): void {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = window.innerWidth;
+  const cssH = window.innerHeight;
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${cssH}px`;
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // setTransform / resizing the canvas resets this on some Chromium builds.
+  ctx.imageSmoothingEnabled = false;
+}
+syncCanvasResolution();
 
 function bounds(): Bounds {
-  return { width: canvas.width, height: canvas.height };
+  // CSS-pixel work area (matches roam/draw coordinates after the dpr transform).
+  return { width: window.innerWidth, height: window.innerHeight };
 }
 
 let paused = false;
@@ -175,6 +190,9 @@ window.beaverBuddy.onQuip((quip) => {
 });
 
 window.beaverBuddy.onHatchStart(() => {
+  // A mid-session restart (settings reset) can arrive while an evolution is
+  // mid-flight — cancel it so the hatch owns the screen cleanly.
+  evolutionState = null;
   hatchState = startHatch();
   loadLodgeSheet()
     .then((loaded) => {
@@ -265,7 +283,9 @@ function draw(): void {
   if (dirtyRect) {
     ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.width, dirtyRect.height);
   } else {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Clear in CSS pixels — the dpr transform maps this onto the full backing store.
+    const { width, height } = bounds();
+    ctx.clearRect(0, 0, width, height);
   }
   if (hatchState) {
     drawHatch(hatchState);

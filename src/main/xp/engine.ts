@@ -115,17 +115,31 @@ export class XpEngine {
     this.applyState({ xp: this.state.xp + Math.max(0, xpAmount), lastMrrAwardDate: localDate });
   }
 
+  // Factory-style pet restart: XP back to 0 (level 1 / baby). Keeps the
+  // lifetime-token cursor so historical usage is never re-awarded; clears
+  // the MRR award date so a same-day MRR poll can grant again after reset.
+  // Emits a non-evolving update — callers that want a hatch replay send
+  // HATCH_START themselves before this notification lands.
+  resetProgress(): void {
+    this.applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true });
+  }
+
   private applyXp(deltaXp: number, lastSeenLifetimeTokens: number): void {
     this.applyState({ xp: this.state.xp + deltaXp, lastSeenLifetimeTokens });
   }
 
-  private applyState(patch: Partial<XpState>): void {
+  private applyState(patch: Partial<XpState>, options: { allowStageSnap?: boolean } = {}): void {
     const before = this.getState();
     this.state = { ...this.state, ...patch };
     saveState(this.stateDir, this.state);
     const after = this.getState();
-    const evolvingTo = after.stage !== before.stage ? after.stage : undefined;
-    const update: PetUpdate = { level: after.level, stage: evolvingTo ? before.stage : after.stage, evolvingTo };
+    // Normal accrual: hold the pre-evolution stage and set evolvingTo so
+    // the renderer can play the transition. Hard reset snaps straight to
+    // the new stage (hatch owns the visual restart).
+    const stageChanged = after.stage !== before.stage;
+    const update: PetUpdate = options.allowStageSnap
+      ? { level: after.level, stage: after.stage }
+      : { level: after.level, stage: stageChanged ? before.stage : after.stage, evolvingTo: stageChanged ? after.stage : undefined };
     this.lastUpdate = update;
     for (const listener of this.listeners) listener(update);
   }

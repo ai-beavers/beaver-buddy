@@ -234,3 +234,36 @@ describe('XpEngine: growth mode gating (setMode/ingestLifetimeTokens/awardMrr)',
     expect(updates.some((u) => u.evolvingTo === 'teen')).toBe(true);
   });
 });
+
+describe('XpEngine: resetProgress', () => {
+  it('snaps XP to 0 / level 1 / baby without an evolvingTo transition', () => {
+    const engine = new XpEngine(stateDir, { xp: xpForLevel(32), lastSeenLifetimeTokens: 50_000, lastMrrAwardDate: '2026-07-13' });
+    const updates: PetUpdate[] = [];
+    engine.onUpdate((u) => updates.push(u));
+    engine.resetProgress();
+    expect(engine.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
+    expect(engine.getLastMrrAwardDate()).toBeNull();
+    expect(updates).toEqual([{ level: 1, stage: 'baby' }]);
+  });
+
+  it('keeps the lifetime-token cursor so historical usage is never re-awarded', () => {
+    const engine = new XpEngine(stateDir);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 20);
+    engine.resetProgress();
+    expect(engine.getState().xp).toBe(0);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 20); // same cursor: no new XP
+    expect(engine.getState().xp).toBe(0);
+    engine.ingestLifetimeTokens(TOKENS_PER_XP * 25); // only the new delta
+    expect(engine.getState().xp).toBe(5);
+  });
+
+  it('persists across a fresh engine load', () => {
+    const engine1 = new XpEngine(stateDir);
+    engine1.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    engine1.resetProgress();
+    const engine2 = new XpEngine(stateDir);
+    expect(engine2.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
+    engine2.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    expect(engine2.getState().xp).toBe(0);
+  });
+});

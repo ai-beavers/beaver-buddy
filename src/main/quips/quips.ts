@@ -3,53 +3,80 @@
 // data is interpolated into any of these except the evolution pool, whose
 // entries may contain a single `{stage}` placeholder that scheduler.ts fills
 // in with the pet's new stage name.
+//
+// Voice invariant: every line is all-lowercase. The beaver never capitalizes.
 
-export type QuipTrigger = 'appStart' | 'codingSession' | 'tokenSpike' | 'idle' | 'evolution';
+export type QuipTrigger =
+  | 'appStart'
+  | 'codingSession'
+  | 'spendWeak'
+  | 'spendOk'
+  | 'spendCrazy'
+  | 'idle'
+  | 'evolution';
 
 export const APP_START_QUIPS: readonly string[] = [
-  'Back already? I was mid-nap.',
-  "Morning. Dam's still standing, don't worry.",
-  "You're here. I'm here. Let's build something.",
-  'Booted up. No rebuilding required today.',
-  "Ready when you are. I've been ready for hours.",
+  'back already? i was mid-nap.',
+  "morning. dam's still standing, don't worry.",
+  "you're here. i'm here. let's build something.",
+  'booted up. no rebuilding required today.',
+  "ready when you are. i've been ready for hours.",
 ];
 
 export const CODING_SESSION_QUIPS: readonly string[] = [
-  'Still going? Respect the grind.',
-  'Look at you, chewing through this like timber.',
-  'Solid session. I timed it. I have nothing else to do.',
-  "You've been at this a while. Hydrate.",
-  'This is a proper work session. I approve.',
+  'still going? respect the grind.',
+  'look at you, chewing through this like timber.',
+  'solid session. i timed it. i have nothing else to do.',
+  "you've been at this a while. hydrate.",
+  'this is a proper work session. i approve.',
 ];
 
-export const TOKEN_SPIKE_QUIPS: readonly string[] = [
-  "You're burning tokens like crazy — nice.",
-  'Whoa, token furnace. Feed it.',
-  "That's a lot of tokens. Also, a lot of context.",
-  'Tokens flying. I can practically hear the API bill.',
-  "Someone's really going for it right now.",
+export const SPEND_WEAK_QUIPS: readonly string[] = [
+  'low token burn today, huh?',
+  'quiet day. soft launch energy.',
+  'barely cooking. cap.',
+  'touch grass mode. respect.',
+  'chill pace. dam.',
+];
+
+export const SPEND_OK_QUIPS: readonly string[] = [
+  "yo, you're shipping today.",
+  'valid grind. keep going.',
+  'main character hours.',
+  'built different today.',
+  'cooking. no notes.',
+];
+
+export const SPEND_CRAZY_QUIPS: readonly string[] = [
+  'bro is cooking. dam.',
+  "you're shipping hard today.",
+  'absolute unit energy.',
+  'sending it. no chill.',
+  'context window go brrr.',
 ];
 
 export const IDLE_QUIPS: readonly string[] = [
-  "Quiet. Too quiet. I'll just sit here.",
-  "Taking a break? I'll hold down the desktop.",
-  'No tokens, no problem. I like the silence.',
-  'Idle hands, idle beaver. We match.',
-  "Nothing's moving. Neither am I. Zen.",
+  "quiet. too quiet. i'll just sit here.",
+  "taking a break? i'll hold down the desktop.",
+  'no tokens, no problem. i like the silence.',
+  'idle hands, idle beaver. we match.',
+  "nothing's moving. neither am i. zen.",
 ];
 
 export const EVOLUTION_QUIPS: readonly string[] = [
-  'Leveled up to {stage}. Wood you look at that.',
-  'New stage: {stage}. Same beaver energy.',
-  'Evolved to {stage}. I earned this.',
-  'Behold: {stage} form. Slightly bigger, still smug.',
-  '{stage} now. Onward and upward.',
+  'leveled up to {stage}. wood you look at that.',
+  'new stage: {stage}. same beaver energy.',
+  'evolved to {stage}. i earned this.',
+  'behold: {stage} form. slightly bigger, still smug.',
+  '{stage} now. onward and upward.',
 ];
 
 export const QUIP_POOLS: Readonly<Record<QuipTrigger, readonly string[]>> = {
   appStart: APP_START_QUIPS,
   codingSession: CODING_SESSION_QUIPS,
-  tokenSpike: TOKEN_SPIKE_QUIPS,
+  spendWeak: SPEND_WEAK_QUIPS,
+  spendOk: SPEND_OK_QUIPS,
+  spendCrazy: SPEND_CRAZY_QUIPS,
   idle: IDLE_QUIPS,
   evolution: EVOLUTION_QUIPS,
 };

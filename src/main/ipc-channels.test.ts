@@ -7,7 +7,9 @@ import {
   QUIP_CHANGED_CHANNEL,
   SETTINGS_DISCONNECT_CHANNEL,
   SETTINGS_READ_STATUS_CHANNEL,
+  SETTINGS_RESET_PET_CHANNEL,
   SETTINGS_SAVE_CHANNEL,
+  SETTINGS_CONNECT_USAGE_CHANNEL,
 } from './ipc-channels';
 
 // preload.ts runs sandboxed and cannot require sibling modules, so it carries
@@ -55,5 +57,15 @@ describe('ipc-channels drift guard', () => {
   it('settings-preload.ts hand-synced channel literal matches SETTINGS_DISCONNECT_CHANNEL', () => {
     const match = settingsSource.match(/const SETTINGS_DISCONNECT_CHANNEL = '([^']*)'/);
     expect(match?.[1]).toBe(SETTINGS_DISCONNECT_CHANNEL);
+  });
+
+  it('settings-preload.ts hand-synced channel literal matches SETTINGS_RESET_PET_CHANNEL', () => {
+    const match = settingsSource.match(/const SETTINGS_RESET_PET_CHANNEL = '([^']*)'/);
+    expect(match?.[1]).toBe(SETTINGS_RESET_PET_CHANNEL);
+  });
+
+  it('settings-preload.ts hand-synced channel literal matches SETTINGS_CONNECT_USAGE_CHANNEL', () => {
+    const match = settingsSource.match(/const SETTINGS_CONNECT_USAGE_CHANNEL = '([^']*)'/);
+    expect(match?.[1]).toBe(SETTINGS_CONNECT_USAGE_CHANNEL);
   });
 });

@@ -16,6 +16,8 @@ export interface TrayCallbacks {
   isMrrAvailable: () => boolean;
   onSelectGrowthMode: (mode: 'tokens' | 'mrr') => void;
   onOpenGrowthSettings: () => void;
+  // Opens the same settings window, focused on Connect (Claude Code / Codex).
+  onOpenConnect: () => void;
 }
 
 export function formatPetLabel(state: { readonly level: number; readonly stage: Stage; readonly xp: number }): string {
@@ -48,7 +50,7 @@ export function buildMenuTemplate(callbacks: TrayCallbacks, rebuild: () => void)
       },
     });
   }
-  growthSubmenu.push({ type: 'separator' }, { label: 'Growth settings…', click: () => callbacks.onOpenGrowthSettings() });
+  growthSubmenu.push({ type: 'separator' }, { label: 'Settings…', click: () => callbacks.onOpenGrowthSettings() });
 
   return [
     { label: callbacks.getPetLabel(), enabled: false },
@@ -61,6 +63,7 @@ export function buildMenuTemplate(callbacks: TrayCallbacks, rebuild: () => void)
       },
     },
     { type: 'separator' },
+    { label: 'Connect…', click: () => callbacks.onOpenConnect() },
     { label: 'Growth', submenu: growthSubmenu },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },

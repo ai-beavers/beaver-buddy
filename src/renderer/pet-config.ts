@@ -95,12 +95,14 @@ export const HATCH_BABY_APPEAR_DURATION_S = 1.0;
 // of the monospace canvas font's glyph advance — bubble.ts's wrap/clamp
 // layout math needs to stay pure (no canvas ctx.measureText access) so it's
 // unit-testable, hence an approximated width instead of a measured one.
-export const BUBBLE_FONT_PX = 8;
-export const BUBBLE_CHAR_WIDTH_PX = 5;
-export const BUBBLE_MAX_CHARS_PER_LINE = 24;
-export const BUBBLE_LINE_HEIGHT_PX = 10;
-export const BUBBLE_PADDING_PX = 4;
-export const BUBBLE_TAIL_SIZE_PX = 3;
+// Sized for Retina overlays: sub-10px canvas text reads as a blurry smudge
+// once the window is composited; 12px + matching metrics stay legible.
+export const BUBBLE_FONT_PX = 12;
+export const BUBBLE_CHAR_WIDTH_PX = 7;
+export const BUBBLE_MAX_CHARS_PER_LINE = 28;
+export const BUBBLE_LINE_HEIGHT_PX = 15;
+export const BUBBLE_PADDING_PX = 8;
+export const BUBBLE_TAIL_SIZE_PX = 5;
 // Gap between the pet tile's top edge and the bubble's bottom edge (the tail
 // occupies part of this gap).
-export const BUBBLE_OFFSET_ABOVE_PET_PX = 6;
+export const BUBBLE_OFFSET_ABOVE_PET_PX = 8;

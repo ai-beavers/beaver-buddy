@@ -43,12 +43,18 @@ function addEntry(totals: Totals, entry: UsageEntry): Totals {
 
 // Local calendar date, not UTC — matches ccusage's default daily bucketing,
 // which is the ±5% cross-check tool that defines the acceptance metric.
-function localDateKey(timestampMs: number): string {
+export function localDateKey(timestampMs: number): string {
   const d = new Date(timestampMs);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+// Today's cumulative token total from an already-aggregated UsageTotals —
+// the spend-tier quip detectors key off this rather than a burn rate.
+export function todayTotalTokens(totals: UsageTotals, nowMs: number): number {
+  return totals.daily.get(localDateKey(nowMs))?.totalTokens ?? 0;
 }
 
 export function aggregate(entries: readonly UsageEntry[]): UsageTotals {

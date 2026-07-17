@@ -3,6 +3,11 @@
 Date: 2026-07-14
 Verdict: **pending final copy-tone / visual verdict** (orchestrator reviews the quip list and captures below)
 
+> **Superseded in part by [BL-13](BL-13-verdict.md):** the `tokenSpike` trigger
+> and rate-based detector were replaced by daily spend tiers
+> (`spendWeak` / `spendOk` / `spendCrazy`) and all-lowercase voice. Quip list
+> below is the BL-8-era snapshot kept for historical evidence.
+
 ## Full quip list (copy-tone review)
 
 Static strings only (CLAUDE.md: no LLM/telemetry). All ≤60 chars, no emoji, no

@@ -72,9 +72,11 @@ persists so relaunch skips straight to the pet.
 
 ### R6: Quips (no LLM)
 Pixel speech bubble; canned quip pool triggered by events: app start, long
-continuous coding session, token-burn spike ("you're burning tokens like crazy
-— nice"), idle period, evolution moments. Frequency-capped so it's charming,
-not annoying.
+continuous coding session, **daily token-spend tiers** (weak / ok / crazy —
+once per day on upward crossing of today's cumulative token total), idle
+period, evolution moments. Frequency-capped so it's charming, not annoying.
+Voice: **all-lowercase**, short reactions (not explainers), Gen Z / tech-bro
+slang OK, beaver "dam" as expression (not "damn").
 **Acceptance:** each trigger type demonstrably fires; no more than one quip per
 cooldown window; copy tone reviewed in R10 gate.
 

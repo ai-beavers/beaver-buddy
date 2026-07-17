@@ -20,8 +20,9 @@ a Tamagotchi for people who live in Claude Code and Codex.
   (it never steals a click, keystroke, or focus) plus a menu-bar tray icon.
 - **Hatches once** — first run plays a Pokémon-style lodge hatch, then the baby beaver
   settles in and starts roaming the screen edges.
-- **Talks** — canned pixel speech-bubble quips fire on events (app start, long coding
-  session, token-burn spike, idle, evolution). Frequency-capped so it stays charming.
+- **Talks** — canned pixel speech-bubble quips (all-lowercase beaver voice) fire
+  on events: app start, long coding session, daily token-spend tiers
+  (weak / ok / crazy), idle, evolution. Frequency-capped so it stays charming.
   No LLM, no network — the lines are static strings.
 - **Grows on your token burn** — reads your **local** Claude Code / Codex usage logs
   (`~/.claude`, `~/.codex`), turns them into XP, and evolves the beaver through life

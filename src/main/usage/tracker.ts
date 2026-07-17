@@ -7,18 +7,45 @@
 // refresh regardless. The quip idle detector needs a snapshot even when
 // nothing changed (that's the definition of idle), so it rides onTick
 // instead of a second polling loop.
+//
+// Claude Code / Codex logs are discovered (directory listing only) before
+// opt-in so Connect UI can show "logs found". File contents are parsed only
+// after setEnabledSources enables that source — never before.
 
 import fs from 'node:fs';
 import os from 'node:os';
 import { discoverPaths, type PathEnv } from './paths';
 import { parseClaudeFile } from './claude-parser';
 import { dedupeCodexEntries, parseCodexFile } from './codex-parser';
-import { aggregate, type UsageEntry, type UsageTotals } from './totals';
+import { aggregate, todayTotalTokens, type UsageEntry, type UsageTotals } from './totals';
 import { USAGE_REFRESH_MS } from './config';
 
 interface FileCacheEntry {
   readonly mtimeMs: number;
   readonly entries: readonly UsageEntry[];
+}
+
+export interface EnabledSources {
+  readonly claude: boolean;
+  readonly codex: boolean;
+}
+
+export interface SourceUsageSnapshot {
+  readonly enabled: boolean;
+  readonly logsFound: boolean;
+  // True only when the user opted in AND logs were found — never auto.
+  readonly connected: boolean;
+  readonly lifetimeTokens: number;
+  readonly todayTokens: number;
+}
+
+export interface UsageSourcesSnapshot {
+  readonly claude: SourceUsageSnapshot;
+  readonly codex: SourceUsageSnapshot;
+}
+
+function emptyUsageTotals(): UsageTotals {
+  return aggregate([]);
 }
 
 export class UsageTracker {
@@ -27,7 +54,12 @@ export class UsageTracker {
   private readonly fileCache = new Map<string, FileCacheEntry>();
   private readonly listeners = new Set<(totals: UsageTotals) => void>();
   private readonly tickListeners = new Set<(totals: UsageTotals) => void>();
-  private totals: UsageTotals = aggregate([]);
+  private totals: UsageTotals = emptyUsageTotals();
+  private claudeTotals: UsageTotals = emptyUsageTotals();
+  private codexTotals: UsageTotals = emptyUsageTotals();
+  private claudeLogsFound = false;
+  private codexLogsFound = false;
+  private enabled: EnabledSources = { claude: false, codex: false };
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(env: PathEnv = process.env, home: string = os.homedir()) {
@@ -37,6 +69,31 @@ export class UsageTracker {
 
   getTotals(): UsageTotals {
     return this.totals;
+  }
+
+  getSourcesSnapshot(nowMs: number = Date.now()): UsageSourcesSnapshot {
+    return {
+      claude: {
+        enabled: this.enabled.claude,
+        logsFound: this.claudeLogsFound,
+        connected: this.enabled.claude && this.claudeLogsFound,
+        lifetimeTokens: this.enabled.claude ? this.claudeTotals.lifetime.totalTokens : 0,
+        todayTokens: this.enabled.claude ? todayTotalTokens(this.claudeTotals, nowMs) : 0,
+      },
+      codex: {
+        enabled: this.enabled.codex,
+        logsFound: this.codexLogsFound,
+        connected: this.enabled.codex && this.codexLogsFound,
+        lifetimeTokens: this.enabled.codex ? this.codexTotals.lifetime.totalTokens : 0,
+        todayTokens: this.enabled.codex ? todayTotalTokens(this.codexTotals, nowMs) : 0,
+      },
+    };
+  }
+
+  setEnabledSources(enabled: EnabledSources): void {
+    if (this.enabled.claude === enabled.claude && this.enabled.codex === enabled.codex) return;
+    this.enabled = enabled;
+    this.refresh();
   }
 
   // Returns an unsubscribe function.
@@ -100,11 +157,18 @@ export class UsageTracker {
       sink.push(...(this.fileCache.get(filePath)?.entries ?? []));
     };
 
-    for (const filePath of claudeFiles) processFile(filePath, parseClaudeFile, claudeEntries);
-    for (const filePath of codexFiles) processFile(filePath, parseCodexFile, codexEntries);
+    // Parse only opted-in sources. Disabled sources contribute logsFound via
+    // discovery alone; their cache entries fall out of liveFiles and evict.
+    if (this.enabled.claude) {
+      for (const filePath of claudeFiles) processFile(filePath, parseClaudeFile, claudeEntries);
+    }
+    if (this.enabled.codex) {
+      for (const filePath of codexFiles) processFile(filePath, parseCodexFile, codexEntries);
+    }
 
-    // Drop cache entries for files that no longer show up in discovery
-    // (rotated/deleted logs) so they stop contributing to totals.
+    // Drop cache entries for files that no longer show up among enabled
+    // sources (rotated/deleted logs, or user disconnected) so they stop
+    // contributing to totals and are not re-read while disabled.
     for (const cachedPath of this.fileCache.keys()) {
       if (!liveFiles.has(cachedPath)) {
         this.fileCache.delete(cachedPath);
@@ -112,10 +176,32 @@ export class UsageTracker {
       }
     }
 
-    if (changed) {
-      // Codex event dedup is cross-file, so it runs over the combined set
-      // here rather than inside the per-file parser.
-      this.totals = aggregate([...claudeEntries, ...dedupeCodexEntries(codexEntries)]);
+    const nextClaudeLogs = claudeFiles.length > 0;
+    const nextCodexLogs = codexFiles.length > 0;
+    if (nextClaudeLogs !== this.claudeLogsFound || nextCodexLogs !== this.codexLogsFound) {
+      this.claudeLogsFound = nextClaudeLogs;
+      this.codexLogsFound = nextCodexLogs;
+      changed = true;
+    }
+
+    const nextClaudeTotals = aggregate(claudeEntries);
+    const nextCodexTotals = aggregate(dedupeCodexEntries(codexEntries));
+    const combined: UsageEntry[] = [];
+    if (this.enabled.claude) combined.push(...claudeEntries);
+    if (this.enabled.codex) combined.push(...dedupeCodexEntries(codexEntries));
+    const nextTotals = aggregate(combined);
+
+    const totalsChanged =
+      changed ||
+      nextTotals.lifetime.totalTokens !== this.totals.lifetime.totalTokens ||
+      nextClaudeTotals.lifetime.totalTokens !== this.claudeTotals.lifetime.totalTokens ||
+      nextCodexTotals.lifetime.totalTokens !== this.codexTotals.lifetime.totalTokens;
+
+    this.claudeTotals = nextClaudeTotals;
+    this.codexTotals = nextCodexTotals;
+
+    if (totalsChanged) {
+      this.totals = nextTotals;
       for (const listener of this.listeners) listener(this.totals);
     }
 

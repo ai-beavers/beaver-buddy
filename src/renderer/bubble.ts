@@ -114,10 +114,15 @@ export function drawBubble(ctx: CanvasRenderingContext2D, layout: BubbleLayout):
   ctx.stroke();
 
   ctx.fillStyle = BUBBLE_TEXT_COLOR;
-  ctx.font = `${BUBBLE_FONT_PX}px monospace`;
+  // Integer glyph origin keeps strokes on the CSS-pixel grid; HiDPI sharpness
+  // comes from renderer.ts's devicePixelRatio backing store, not from font hacks.
+  ctx.font = `bold ${BUBBLE_FONT_PX}px monospace`;
   ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
   lines.forEach((line, i) => {
-    ctx.fillText(line, x + BUBBLE_PADDING_PX, y + BUBBLE_PADDING_PX + i * BUBBLE_LINE_HEIGHT_PX);
+    const textX = Math.round(x + BUBBLE_PADDING_PX);
+    const textY = Math.round(y + BUBBLE_PADDING_PX + i * BUBBLE_LINE_HEIGHT_PX);
+    ctx.fillText(line, textX, textY);
   });
   ctx.restore();
 }

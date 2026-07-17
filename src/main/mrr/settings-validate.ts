@@ -18,7 +18,7 @@ export interface ValidatedSave {
 }
 
 export interface ValidatedDisconnect {
-  readonly target: 'stripe' | 'revenuecat';
+  readonly target: 'stripe' | 'revenuecat' | 'claude' | 'codex';
 }
 
 export function isValidationError(value: unknown): value is ValidationError {
@@ -70,6 +70,23 @@ export function validateSaveInput(input: unknown): ValidatedSave | ValidationErr
 export function validateDisconnectInput(input: unknown): ValidatedDisconnect | ValidationError {
   if (typeof input !== 'object' || input === null) return { error: 'payload must be an object' };
   const target = (input as Record<string, unknown>).target;
-  if (target !== 'stripe' && target !== 'revenuecat') return { error: 'target must be "stripe" or "revenuecat"' };
+  if (target !== 'stripe' && target !== 'revenuecat' && target !== 'claude' && target !== 'codex') {
+    return { error: 'target must be "stripe", "revenuecat", "claude", or "codex"' };
+  }
+  return { target };
+}
+
+export interface ValidatedConnectUsage {
+  readonly target: 'claude' | 'codex';
+}
+
+export function validateConnectUsageInput(input: unknown): ValidatedConnectUsage | ValidationError {
+  if (typeof input !== 'object' || input === null) return { error: 'payload must be an object' };
+  const obj = input as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (key !== 'target') return { error: `unexpected field: ${key}` };
+  }
+  const target = obj.target;
+  if (target !== 'claude' && target !== 'codex') return { error: 'target must be "claude" or "codex"' };
   return { target };
 }

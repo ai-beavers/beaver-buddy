@@ -46,11 +46,12 @@ describe('bubble: layoutBubble clamping', () => {
   });
 
   it('clamps x so the bubble never draws past the right edge of the workArea', () => {
-    const bounds = { width: 200, height: 2000 };
-    const layout = layoutBubble('a long quip line here', 190, 500, 32, bounds);
+    // Bounds must be wider than the bubble itself; this only asserts the
+    // pet-near-right-edge clamp, not the "bubble larger than the screen" case.
+    const bounds = { width: 400, height: 2000 };
+    const layout = layoutBubble('a long quip line here', 390, 500, 32, bounds);
     expect(layout.x + layout.width).toBeLessThanOrEqual(bounds.width);
   });
-
   it('clamps y so the bubble never draws above the top of the workArea', () => {
     // Pet right at the top edge: an unclamped bubble would go negative.
     const layout = layoutBubble('hi', 500, 0, 32, { width: 2000, height: 2000 });

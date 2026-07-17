@@ -9,7 +9,7 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
     />
-    <title>Growth settings</title>
+    <title>Settings</title>
     <style>
       body {
         font: 13px -apple-system, sans-serif;
@@ -34,6 +34,17 @@
         display: flex;
         gap: 8px;
         align-items: center;
+        flex-wrap: wrap;
+      }
+      .hint {
+        margin: 0 0 8px;
+        font-size: 12px;
+        color: #555;
+      }
+      .tokens {
+        font-size: 12px;
+        color: #333;
+        margin: 4px 0 0 0;
       }
       #status {
         margin-top: 10px;
@@ -46,6 +57,30 @@
     </style>
   </head>
   <body>
+    <fieldset>
+      <legend>Connect</legend>
+      <p class="hint">
+        Opt in to read local Claude Code / Codex usage logs on this Mac — no API keys.
+        Nothing is connected until you click Connect.
+      </p>
+      <div style="margin-top: 8px">
+        <div class="row">
+          <button id="connectClaude" type="button">Connect Claude Code</button>
+          <button id="disconnectClaude" type="button" hidden>Disconnect Claude Code</button>
+          <span id="claudeStatus"></span>
+        </div>
+        <p class="tokens" id="claudeTokens"></p>
+      </div>
+      <div style="margin-top: 12px">
+        <div class="row">
+          <button id="connectCodex" type="button">Connect Codex</button>
+          <button id="disconnectCodex" type="button" hidden>Disconnect Codex</button>
+          <span id="codexStatus"></span>
+        </div>
+        <p class="tokens" id="codexTokens"></p>
+      </div>
+    </fieldset>
+
     <fieldset>
       <legend>Stripe</legend>
       <label for="stripeKey">Secret key</label>
@@ -76,16 +111,50 @@
       <label class="row"><input type="radio" name="mode" id="modeMrr" value="mrr" /> MRR</label>
     </fieldset>
 
+    <fieldset>
+      <legend>Pet</legend>
+      <p class="hint">
+        Reset XP to level 1 (baby). Past token usage is not re-counted; only new activity earns XP again.
+      </p>
+      <button id="resetPet" type="button">Reset beaver…</button>
+    </fieldset>
+
     <div id="status"></div>
 
     <script>
-      // Plain inline vanilla JS — no build step, no bundler entry, just
-      // window.beaverBuddySettings from the settings window's own preload.
-      // Key fields are NEVER prefilled: refresh() only ever reads booleans.
       const api = window.beaverBuddySettings;
 
       function setStatus(text) {
         document.getElementById('status').textContent = text;
+      }
+
+      function formatTokens(n) {
+        return Number(n || 0).toLocaleString('en-US');
+      }
+
+      function renderSource(prefix, source) {
+        const statusEl = document.getElementById(prefix + 'Status');
+        const tokensEl = document.getElementById(prefix + 'Tokens');
+        const name = prefix === 'claude' ? 'Claude' : 'Codex';
+        const connectButton = document.getElementById('connect' + name);
+        const disconnectButton = document.getElementById('disconnect' + name);
+        if (!source || !source.enabled) {
+          statusEl.textContent = 'not connected';
+          tokensEl.textContent = '';
+          connectButton.hidden = false;
+          disconnectButton.hidden = true;
+          return;
+        }
+        connectButton.hidden = true;
+        disconnectButton.hidden = false;
+        if (source.connected) {
+          statusEl.textContent = 'connected';
+          tokensEl.textContent =
+            'today: ' + formatTokens(source.todayTokens) + ' · lifetime: ' + formatTokens(source.lifetimeTokens);
+          return;
+        }
+        statusEl.textContent = 'enabled — logs not found';
+        tokensEl.textContent = '';
       }
 
       async function refresh() {
@@ -96,6 +165,8 @@
         }
         document.getElementById('stripeStatus').textContent = status.stripeConnected ? 'connected' : 'not connected';
         document.getElementById('revenuecatStatus').textContent = status.revenuecatConnected ? 'connected' : 'not connected';
+        renderSource('claude', status.claude);
+        renderSource('codex', status.codex);
         const mrrAvailable = status.stripeConnected || status.revenuecatConnected;
         const mrrRadio = document.getElementById('modeMrr');
         mrrRadio.disabled = !mrrAvailable;
@@ -108,6 +179,33 @@
         setStatus(result && result.ok ? 'saved' : `error: ${result && result.error}`);
         await refresh();
       }
+
+      async function connectUsage(target) {
+        const result = await api.connectUsage(target);
+        if (!result || !result.ok) {
+          setStatus(`error: ${result && result.error}`);
+          return;
+        }
+        const label = target === 'claude' ? 'Claude Code' : 'Codex';
+        const source = target === 'claude' ? result.claude : result.codex;
+        setStatus(
+          source && source.connected
+            ? label + ' connected'
+            : label + ' enabled — no local logs found yet',
+        );
+        await refresh();
+      }
+
+      async function disconnectUsage(target) {
+        const result = await api.disconnect(target);
+        setStatus(result && result.ok ? 'disconnected' : `error: ${result && result.error}`);
+        await refresh();
+      }
+
+      document.getElementById('connectClaude').addEventListener('click', () => connectUsage('claude'));
+      document.getElementById('connectCodex').addEventListener('click', () => connectUsage('codex'));
+      document.getElementById('disconnectClaude').addEventListener('click', () => disconnectUsage('claude'));
+      document.getElementById('disconnectCodex').addEventListener('click', () => disconnectUsage('codex'));
 
       document.getElementById('saveStripe').addEventListener('click', () => {
         const stripeKey = document.getElementById('stripeKey').value;
@@ -139,6 +237,15 @@
 
       document.getElementById('modeTokens').addEventListener('change', () => save({ mode: 'tokens' }));
       document.getElementById('modeMrr').addEventListener('change', () => save({ mode: 'mrr' }));
+
+      document.getElementById('resetPet').addEventListener('click', async () => {
+        const confirmed = window.confirm(
+          'Reset the beaver to level 1 (baby)? Growth settings and API keys are kept. Past token usage will not be counted again.',
+        );
+        if (!confirmed) return;
+        const result = await api.resetPet();
+        setStatus(result && result.ok ? 'beaver reset to level 1' : `error: ${result && result.error}`);
+      });
 
       refresh();
     </script>

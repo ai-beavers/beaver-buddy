@@ -13,9 +13,13 @@ export const QUIP_COOLDOWN_MS = 10 * 60_000;
 // How long the renderer keeps a quip's speech bubble on screen.
 export const QUIP_DISPLAY_DURATION_MS = 6_000;
 
-// Token throughput (tokens/minute, measured between two tracker snapshots)
-// that counts as a "spike" worth commenting on.
-export const TOKEN_SPIKE_RATE_PER_MIN = 2_000;
+// Daily token-count floors for the spend-tier quips (tokens only — no USD).
+// Calibrated from independent HN / community / Anthropic-docs research:
+//   weak  < 2M   — light/occasional day
+//   ok    2M–20M — typical daily-driver cluster
+//   crazy ≥ 20M  — power-user territory (Anthropic's top ~5%)
+export const SPEND_TIER_OK_MIN_TOKENS_PER_DAY = 2_000_000;
+export const SPEND_TIER_CRAZY_MIN_TOKENS_PER_DAY = 20_000_000;
 
 // Minutes of continuous nonzero-token snapshots before a codingSession quip.
 export const CODING_SESSION_LENGTH_MIN = 20;
