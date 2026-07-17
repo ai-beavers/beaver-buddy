@@ -108,9 +108,10 @@ for the full visual evaluation.
 
 ### Windows usage tracking
 
-On Windows, Beaver Buddy discovers Claude Code usage logs under
-`%USERPROFILE%\.claude` and ignores the XDG path `~/.config/claude`, which is not
-a documented Claude Code location on Windows.
+On Windows, Beaver Buddy discovers Claude Code usage logs in **both** the
+legacy location `%USERPROFILE%\.claude` and the XDG path `~/.config/claude`
+(Union semantics — users who migrated or use WSL toolchains may have data in
+either spot).
 
 You can override the search location with the `CLAUDE_CONFIG_DIR` environment
 variable. It accepts comma-separated paths on all platforms; on Windows it also
@@ -118,17 +119,25 @@ accepts semicolons as separators (e.g. `C:\logs\claude;D:\more-logs`). Colons ar
 not treated as separators on Windows because they would conflict with drive
 letters.
 
-**Codex usage tracking on Windows** now checks the following candidate paths in
-order: `CODEX_HOME` (override), `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, and
-`~/.codex` (legacy). The first existing path is used. This is based on likely
-Codex locations rather than an empirically confirmed official path, so a Windows
-test installation is still recommended to validate the order.
+**Codex usage tracking on Windows** uses Union semantics: all existing candidate
+paths are scanned and results are merged, deduplicated by relative session path
+(earliest candidate wins on collision). The candidates in priority order are:
+`CODEX_HOME` (override), `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, and
+`~/.codex` (legacy). This handles the common case where the Codex desktop app
+creates an empty `%APPDATA%\Codex` folder that would otherwise hide CLI sessions
+under `~/.codex`.
 
 **MRR mode is not available on Windows yet.** It relies on a platform-specific
 secret store. macOS uses the Keychain via the `security` CLI; the Windows
 secret-store backend (Windows Credential Manager vs. `electron.safeStorage` +
 encrypted JSON in `userData`) requires a project-administrator decision and has
 therefore been deferred. The rest of the app works fully on Windows without it.
+
+**WSL-based Claude Code / Codex installations** use Linux-native paths under
+`\\wsl$\<distro>\...`, which are invisible to the native Windows process. If you
+use Claude Code or Codex inside WSL, set the `CLAUDE_CONFIG_DIR` or `CODEX_HOME`
+environment variable to point to the WSL path so Beaver Buddy can discover your
+usage logs.
 
 ## Project layout
 
@@ -181,6 +190,13 @@ therefore been deferred. The rest of the app works fully on Windows without it.
 
   This is expected behavior. The overlay is meant to stay above normal windows
   without stealing focus or clicks, not to sit above fullscreen games or videos.
+
+- **Animation pauses when the overlay is fully covered (Windows only)**
+
+  Chromium on Windows pauses rendering for fully occluded windows as a
+  power-saving optimization. When another window completely covers the beaver,
+  the animation stops and resumes once the overlay becomes visible again. This
+  is by design and cannot be overridden without battery-life impact.
 
 ## Contributing
 

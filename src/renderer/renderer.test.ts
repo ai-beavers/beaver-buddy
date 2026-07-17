@@ -154,4 +154,49 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
     expect(bounds()).toEqual({ width: 1920, height: 1080 });
     expect(ctx.clearRect).toHaveBeenCalledWith(0, 0, 1920, 1080);
   });
+
+  it('cancels an in-flight evolution when a hatch starts (mid-session reset)', async () => {
+    await import('./renderer.js');
+
+    // Start an evolution (simulating a stage-crossing token award).
+    listeners.pet[0]({ level: 5, stage: 'baby', evolvingTo: 'teen' });
+
+    const rafCallback = (windowStub.requestAnimationFrame as ReturnType<typeof vi.fn>).mock.calls[0][0] as (t: number) => void;
+    rafCallback(0);
+
+    expect(windowStub.__debugPet).toEqual({ level: 5, stage: 'baby', evolving: true });
+
+    // Mid-session reset: hatch starts while evolution is in flight.
+    listeners.hatch[0]();
+
+    // The hatch handler sets evolutionState = null synchronously; the rAF
+    // callback picks it up and sets __debugPet.evolving = false.
+    rafCallback(16);
+
+    expect(windowStub.__debugPet.evolving).toBe(false);
+  });
+
+  it('snaps to the reset stage during an active hatch without evolvingTo', async () => {
+    await import('./renderer.js');
+
+    // Sync to a non-baby stage first so there is a real stage delta on reset.
+    listeners.pet[0]({ level: 10, stage: 'teen' });
+
+    const rafCallback = (windowStub.requestAnimationFrame as ReturnType<typeof vi.fn>).mock.calls[0][0] as (t: number) => void;
+    rafCallback(0);
+
+    expect(windowStub.__debugPet.stage).toBe('teen');
+
+    // Start the hatch (mid-session reset).
+    listeners.hatch[0]();
+    rafCallback(16);
+
+    // Reset pet update: level → 1, stage → baby, no evolvingTo — the
+    // renderer must snap the sheet synchronously without playing an
+    // evolution animation, even while the hatch is active.
+    listeners.pet[0]({ level: 1, stage: 'baby' });
+    rafCallback(32);
+
+    expect(windowStub.__debugPet).toEqual({ level: 1, stage: 'baby', evolving: false });
+  });
 });

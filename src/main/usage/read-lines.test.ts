@@ -63,6 +63,14 @@ describe('readBoundedLines', () => {
   it('returns an empty array for a missing file', () => {
     expect(readBoundedLines(path.join(tmpDir, 'missing.jsonl'))).toEqual([]);
   });
+
+  it('handles CRLF line endings (0x0D 0x0A) by splitting on LF, leaving trailing \\r', () => {
+    // readBoundedLines splits on 0x0A (LF) only; CR (0x0D) from Windows
+    // CRLF endings is retained as part of the line content. This documents
+    // current behavior — callers (parsers) must handle trailing \\r.
+    const file = write('crlf.jsonl', 'line-one\r\n\r\nline-two\r\nline-three');
+    expect(readBoundedLines(file)).toEqual(['line-one\r', '\r', 'line-two\r', 'line-three']);
+  });
 });
 
 describe('readPrefix', () => {

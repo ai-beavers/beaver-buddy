@@ -64,20 +64,20 @@ describe.each(['darwin', 'linux'] as const)('discoverPaths — Claude on %s (XDG
 });
 
 describe('discoverPaths — Claude on Windows', () => {
-  it('ignores XDG path and uses legacy ~/.claude on win32', () => {
+  it('uses XDG (~/.config/claude) and legacy (~/.claude) together on win32 (Union)', () => {
     touch(path.join(home, '.config', 'claude', 'projects', 'project-x', 'session-x.jsonl'));
     touch(path.join(home, '.claude', 'projects', 'project-y', 'session-y.jsonl'));
 
     const { claudeFiles } = discoverPaths({}, home, 'win32');
-    expect(claudeFiles).toHaveLength(1);
-    expect(claudeFiles[0]).toBe(path.join(home, '.claude', 'projects', 'project-y', 'session-y.jsonl'));
+    expect(claudeFiles).toHaveLength(2);
   });
 
-  it('returns empty array when only XDG exists on win32', () => {
+  it('finds sessions from XDG (~/.config/claude) alone on win32 when legacy is missing', () => {
     touch(path.join(home, '.config', 'claude', 'projects', 'project-x', 'session-x.jsonl'));
 
     const { claudeFiles } = discoverPaths({}, home, 'win32');
-    expect(claudeFiles).toEqual([]);
+    expect(claudeFiles).toHaveLength(1);
+    expect(claudeFiles[0]).toBe(path.join(home, '.config', 'claude', 'projects', 'project-x', 'session-x.jsonl'));
   });
 
   it('still honors CLAUDE_CONFIG_DIR override on win32 (single path)', () => {
@@ -141,15 +141,17 @@ describe('discoverPaths — Codex', () => {
 });
 
 describe('discoverPaths — Codex on Windows', () => {
-  it('prefers %LOCALAPPDATA%\\Codex over ~/.codex when both exist', () => {
+  it('finds sessions from %LOCALAPPDATA%\\Codex AND ~/.codex (Union)', () => {
     const localAppData = path.join(home, 'AppData', 'Local');
     const legacy = path.join(home, '.codex');
     touch(path.join(localAppData, 'Codex', 'sessions', '2026', '07', '13', 'rollout-local.jsonl'));
     touch(path.join(legacy, 'sessions', '2026', '07', '13', 'rollout-legacy.jsonl'));
 
     const { codexFiles } = discoverPaths({ LOCALAPPDATA: localAppData }, home, 'win32');
-    expect(codexFiles).toHaveLength(1);
+    expect(codexFiles).toHaveLength(2);
+    // Candidate order: LOCALAPPDATA first, then ~/.codex
     expect(codexFiles[0]).toBe(path.join(localAppData, 'Codex', 'sessions', '2026', '07', '13', 'rollout-local.jsonl'));
+    expect(codexFiles[1]).toBe(path.join(legacy, 'sessions', '2026', '07', '13', 'rollout-legacy.jsonl'));
   });
 
   it('falls back to %APPDATA%\\Codex when LOCALAPPDATA is missing', () => {
@@ -178,5 +180,41 @@ describe('discoverPaths — Codex on Windows', () => {
     const { codexFiles } = discoverPaths({ CODEX_HOME: customHome, LOCALAPPDATA: localAppData }, home, 'win32');
     expect(codexFiles).toHaveLength(1);
     expect(codexFiles[0]).toBe(path.join(customHome, 'sessions', '2026', '07', '13', 'rollout-custom.jsonl'));
+  });
+
+  it('%APPDATA%\\Codex without sessions does not hide ~/.codex sessions (regression)', () => {
+    const appData = path.join(home, 'AppData', 'Roaming');
+    const legacy = path.join(home, '.codex');
+    // Mimics the Codex desktop app: APPDATA\Codex exists but has no sessions/
+    touch(path.join(appData, 'Codex', 'config.json'));
+    touch(path.join(legacy, 'sessions', '2026', '07', '13', 'rollout-legacy.jsonl'));
+
+    const { codexFiles } = discoverPaths({ APPDATA: appData }, home, 'win32');
+    expect(codexFiles).toHaveLength(1);
+    expect(codexFiles[0]).toBe(path.join(legacy, 'sessions', '2026', '07', '13', 'rollout-legacy.jsonl'));
+  });
+
+  it('same relative path in two roots: earlier candidate wins (dedup)', () => {
+    const localAppData = path.join(home, 'AppData', 'Local');
+    const legacy = path.join(home, '.codex');
+    const relPath = ['2026', '07', '13', 'rollout-dup.jsonl'];
+    touch(path.join(localAppData, 'Codex', 'sessions', ...relPath), '{"marker":"local"}');
+    touch(path.join(legacy, 'sessions', ...relPath), '{"marker":"legacy"}');
+
+    const { codexFiles } = discoverPaths({ LOCALAPPDATA: localAppData }, home, 'win32');
+    expect(codexFiles).toHaveLength(1);
+    expect(codexFiles[0]).toBe(path.join(localAppData, 'Codex', 'sessions', ...relPath));
+  });
+
+  it('sessions in earlier root beats archived_sessions in later root (cross-root priority)', () => {
+    const localAppData = path.join(home, 'AppData', 'Local');
+    const legacy = path.join(home, '.codex');
+    const relPath = ['2026', '07', '13', 'rollout-cross.jsonl'];
+    touch(path.join(localAppData, 'Codex', 'sessions', ...relPath), '{"marker":"live"}');
+    touch(path.join(legacy, 'archived_sessions', ...relPath), '{"marker":"archived"}');
+
+    const { codexFiles } = discoverPaths({ LOCALAPPDATA: localAppData }, home, 'win32');
+    expect(codexFiles).toHaveLength(1);
+    expect(codexFiles[0]).toBe(path.join(localAppData, 'Codex', 'sessions', ...relPath));
   });
 });

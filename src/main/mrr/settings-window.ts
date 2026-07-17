@@ -271,7 +271,13 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
     useContentSize: true,
     resizable: false,
     title: 'Beaver Buddy — Settings',
-    icon: path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png'),
+    // .ico on Windows (multi-resolution, native taskbar sharpness); 1024² PNG
+    // master on macOS/Linux (system/Dock applies the continuous-corner mask).
+    icon: path.join(
+      app.getAppPath(),
+      'assets',
+      process.platform === 'win32' ? 'icon.ico' : 'beaver-buddy-icon.png',
+    ),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

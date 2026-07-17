@@ -52,7 +52,11 @@ function claudeConfigDirs(env: PathEnv, home: string, platform: Platform): strin
   const legacy = path.join(home, '.claude');
 
   if (platform === 'win32') {
-    return [legacy].filter((d) => fs.existsSync(d));
+    // Same Union semantics as Unix: both the XDG location and the legacy one
+    // are used if present, since users who migrated or use WSL toolchains may
+    // have data in either spot.
+    const xdg = path.join(home, '.config', 'claude');
+    return [xdg, legacy].filter((d) => fs.existsSync(d));
   }
 
   // No override on Unix-like systems: both the current XDG location and the
@@ -122,12 +126,29 @@ function findCodexRolloutFiles(root: string): Map<string, string> {
   return byRelativePath;
 }
 
-function findCodexFiles(codexHome: string): string[] {
+function findCodexFiles(codexHome: string): Map<string, string> {
   // sessions/ wins on a duplicate relative path (documented Codex behavior).
   const winners = findCodexRolloutFiles(path.join(codexHome, 'sessions'));
   const archived = findCodexRolloutFiles(path.join(codexHome, 'archived_sessions'));
   for (const [relative, absolute] of archived) {
     if (!winners.has(relative)) winners.set(relative, absolute);
+  }
+  return winners;
+}
+
+// Union across every existing candidate root: on Windows a session-less
+// candidate (e.g. the Codex desktop app's userData folder) must not hide CLI
+// sessions elsewhere. On a duplicate relative path the earliest candidate
+// wins (candidate order = priority), even if its copy comes from
+// archived_sessions/; within one root sessions/ still beats
+// archived_sessions/ (see findCodexFiles). With zero or one root this is
+// result- and order-identical to the previous first-existing-wins behavior.
+function findAllCodexFiles(roots: readonly string[]): string[] {
+  const winners = new Map<string, string>();
+  for (const root of roots) {
+    for (const [relative, absolute] of findCodexFiles(root)) {
+      if (!winners.has(relative)) winners.set(relative, absolute);
+    }
   }
   return [...winners.values()];
 }
@@ -151,8 +172,9 @@ function codexHomes(env: PathEnv, home: string, platform: Platform): string[] {
   return [path.join(home, '.codex')];
 }
 
-function resolveCodexHome(env: PathEnv, home: string, platform: Platform): string | undefined {
-  return codexHomes(env, home, platform).find((codexHome) => fs.existsSync(codexHome));
+function resolveCodexHomes(env: PathEnv, home: string, platform: Platform): string[] {
+  // Union, not first-existing-wins: every existing candidate may hold sessions.
+  return codexHomes(env, home, platform).filter((codexHome) => fs.existsSync(codexHome));
 }
 
 export function discoverPaths(
@@ -162,8 +184,7 @@ export function discoverPaths(
 ): DiscoveredPaths {
   const claudeFiles = claudeConfigDirs(env, home, platform).flatMap(findClaudeFiles);
 
-  const codexHome = resolveCodexHome(env, home, platform);
-  const codexFiles = codexHome ? findCodexFiles(codexHome) : [];
+  const codexFiles = findAllCodexFiles(resolveCodexHomes(env, home, platform));
 
   return { claudeFiles, codexFiles };
 }

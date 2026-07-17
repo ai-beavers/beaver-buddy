@@ -289,7 +289,7 @@ describe('createSettingsHandlers', () => {
 });
 
 describe('openSettingsWindow', () => {
-  it('pins the measured content height, useContentSize and fixed-size flags', () => {
+  it('pins the measured content height, useContentSize, fixed-size flags, and platform icon', () => {
     const deps: SettingsWindowDeps = {
       stateDir: '/unused',
       keychainService: 'svc',
@@ -314,8 +314,17 @@ describe('openSettingsWindow', () => {
     // 713 = 705 px content (CDP worst-case measurement 2026-07-17, see
     // settings-window.ts) + 8 px buffer; workArea mock is 4000 px, so the
     // cap does not apply here.
+    const expectedIcon = process.platform === 'win32'
+      ? path.join('/app', 'assets', 'icon.ico')
+      : path.join('/app', 'assets', 'beaver-buddy-icon.png');
     expect(BrowserWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ width: 420, height: 713, useContentSize: true, resizable: false }),
+      expect.objectContaining({
+        width: 420,
+        height: 713,
+        useContentSize: true,
+        resizable: false,
+        icon: expectedIcon,
+      }),
     );
   });
 });

@@ -203,6 +203,11 @@ window.beaverBuddy.onBoundsChanged((next) => {
   // window.innerWidth/Height, which may not be atomically updated when the
   // overlay window is resized.
   logicalBounds = { width: next.width, height: next.height };
+  // Re-read DPR on every bounds change: a DPI switch between displays with
+  // identical DIP work areas can bypass the main-process guard (which only
+  // compares x/y/w/h, not scaleFactor), so this handler may be the sole
+  // trigger for a DPR update (see also the rAF-loop drift guard below).
+  currentDpr = window.devicePixelRatio || 1;
   applyDpr(canvas, ctx, logicalBounds.width, logicalBounds.height, currentDpr);
   needsDraw = true;
   roamState = clampRoamStateToBounds(roamState, bounds());
@@ -364,6 +369,19 @@ function draw(): void {
 
 function frame(timestampMs: number): void {
   requestAnimationFrame(frame);
+
+  // Self-healing DPR drift guard: when DPI changes without a corresponding
+  // DIP-bounds change (e.g. primary monitor switch between two displays with
+  // identical logical work areas), neither the main-process BOUNDS_CHANGED
+  // guard (x/y/w/h only) nor the DOM resize event fires — leaving currentDpr
+  // stale and the canvas blurry. A single float comparison per frame catches
+  // this and re-sizes the backing store once.
+  const liveDpr = window.devicePixelRatio || 1;
+  if (liveDpr !== currentDpr) {
+    currentDpr = liveDpr;
+    applyDpr(canvas, ctx, logicalBounds.width, logicalBounds.height, currentDpr);
+    needsDraw = true;
+  }
 
   if (document.hidden) {
     // Fully skip: no movement, no frame advance, no draw. Reset the clock

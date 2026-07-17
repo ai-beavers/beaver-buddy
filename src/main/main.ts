@@ -291,7 +291,16 @@ app.whenReady().then(async () => {
         mainWindow?.webContents.send(HATCH_START_CHANNEL);
         // Emits the pet update through the onUpdate wiring above, which
         // does tray.refresh() + PET_CHANGED — nothing else to notify.
-        await xpEngine.resetProgress();
+        try {
+          await xpEngine.resetProgress();
+        } catch {
+          // Persist failure (e.g. Windows transient rename lock from AV):
+          // the hatch already started, but the XP state did not actually
+          // change. Resync the renderer with the real current state so it
+          // does not stay stuck on a false reset.
+          const lastUpdate = xpEngine.getLastUpdate();
+          mainWindow?.webContents.send(PET_CHANGED_CHANNEL, lastUpdate);
+        }
       },
       getUsageSources: () => {
         usageTracker?.refresh();
