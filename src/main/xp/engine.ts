@@ -27,7 +27,7 @@ export interface PetUpdate {
 // touching real usage-log files or a real Electron process.
 export interface TrackerLike {
   getTotals(): UsageTotals;
-  onChange(callback: (totals: UsageTotals) => void): () => void;
+  onChange(callback: (totals: UsageTotals) => void | Promise<void>): () => void;
 }
 
 // Growth source, mirrored from settings-store.ts's Mode without importing
@@ -80,58 +80,64 @@ export class XpEngine {
 
   // Wires the usage tracker: applies whatever it has already scanned once,
   // then every subsequent change. Returns an unsubscribe function.
-  attachTracker(tracker: TrackerLike): () => void {
+  async attachTracker(tracker: TrackerLike): Promise<() => void> {
     const unsubscribe = tracker.onChange((totals) => this.ingestLifetimeTokens(totals.lifetime.totalTokens));
-    this.ingestLifetimeTokens(tracker.getTotals().lifetime.totalTokens);
+    await this.ingestLifetimeTokens(tracker.getTotals().lifetime.totalTokens);
     return unsubscribe;
   }
 
-  ingestLifetimeTokens(totalTokens: number): void {
+  async ingestLifetimeTokens(totalTokens: number): Promise<void> {
     const delta = Math.max(0, totalTokens - this.state.lastSeenLifetimeTokens);
     if (delta === 0) return; // cursor only moves forward — no double count
     if (this.mode === 'mrr') {
       // Cursor keeps advancing silently — no XP award — so switching back
       // to tokens mode later can never retroactively award this history
       // (the no-double-count invariant holds in both switch directions).
-      this.applyState({ lastSeenLifetimeTokens: totalTokens });
+      await this.applyState({ lastSeenLifetimeTokens: totalTokens });
       return;
     }
-    this.applyXp(delta / TOKENS_PER_XP, totalTokens);
+    await this.applyXp(delta / TOKENS_PER_XP, totalTokens);
   }
 
   // Dev-only acceptance path (--inject-xp): goes through the same
   // persist/level/evolution logic as real accrual, but leaves the token
   // cursor untouched so it can never mask or double-count real usage.
-  injectXp(amount: number): void {
+  async injectXp(amount: number): Promise<void> {
     if (!(amount > 0)) return;
-    this.applyXp(amount, this.state.lastSeenLifetimeTokens);
+    await this.applyXp(amount, this.state.lastSeenLifetimeTokens);
   }
 
   // MRR growth-mode award path: applies XP and records the local date it
   // was awarded for, atomically (one saveState), so a poll that finds
   // mrr_dollars * rate rounds to 0 XP still records the date and is not
   // retried later the same day.
-  awardMrr(xpAmount: number, localDate: string): void {
-    this.applyState({ xp: this.state.xp + Math.max(0, xpAmount), lastMrrAwardDate: localDate });
+  async awardMrr(xpAmount: number, localDate: string): Promise<void> {
+    await this.applyState({ xp: this.state.xp + Math.max(0, xpAmount), lastMrrAwardDate: localDate });
   }
 
-  // Factory-style pet restart: XP back to 0 (level 1 / baby). Keeps the
-  // lifetime-token cursor so historical usage is never re-awarded; clears
-  // the MRR award date so a same-day MRR poll can grant again after reset.
-  // Emits a non-evolving update — callers that want a hatch replay send
-  // HATCH_START themselves before this notification lands.
-  resetProgress(): void {
-    this.applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true });
+  // User-visible progress reset (settings window danger zone): XP back to
+  // 0 (level 1 / baby), lastMrrAwardDate cleared so a same-day MRR poll can
+  // grant again after reset. Goes through applyState with allowStageSnap: a
+  // stage regression is not an evolution, so the emitted update must carry
+  // no evolvingTo (otherwise main.ts would fire the evolution quip and the
+  // renderer would start its evolution sequence instead of the hatch replay
+  // — callers send HATCH_START themselves before this notification lands).
+  // lastSeenLifetimeTokens stays untouched: it is the usage tracker's
+  // forward-only durable cursor, and resetting it would re-award the entire
+  // lifetime token history on the next tracker tick — silently undoing the
+  // reset.
+  async resetProgress(): Promise<void> {
+    await this.applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true });
   }
 
-  private applyXp(deltaXp: number, lastSeenLifetimeTokens: number): void {
-    this.applyState({ xp: this.state.xp + deltaXp, lastSeenLifetimeTokens });
+  private async applyXp(deltaXp: number, lastSeenLifetimeTokens: number): Promise<void> {
+    await this.applyState({ xp: this.state.xp + deltaXp, lastSeenLifetimeTokens });
   }
 
-  private applyState(patch: Partial<XpState>, options: { allowStageSnap?: boolean } = {}): void {
+  private async applyState(patch: Partial<XpState>, options: { allowStageSnap?: boolean } = {}): Promise<void> {
     const before = this.getState();
     this.state = { ...this.state, ...patch };
-    saveState(this.stateDir, this.state);
+    await saveState(this.stateDir, this.state);
     const after = this.getState();
     // Normal accrual: hold the pre-evolution stage and set evolvingTo so
     // the renderer can play the transition. Hard reset snaps straight to

@@ -7,7 +7,7 @@
 // something actually changed (dirty flag) and fully skips work while the
 // document is hidden.
 
-import { createRoamState, tick, type RoamState, type Bounds } from './roam.js';
+import { clampRoamStateToBounds, createRoamState, tick, type RoamState, type Bounds } from './roam.js';
 import {
   BUBBLE_TAIL_SIZE_PX,
   EVOLUTION_SHAKE_JITTER_PX,
@@ -32,6 +32,7 @@ import {
 } from './evolution.js';
 import { hatchShakeOffset, sparkOffsets, startHatch, tickHatch, type HatchState } from './hatch.js';
 import { drawBubble, layoutBubble } from './bubble.js';
+import { applyDpr } from './canvas-dpr.js';
 
 interface QuipChangedPayload {
   readonly text: string;
@@ -45,6 +46,7 @@ declare global {
       onPetChanged(callback: (pet: PetChangedPayload) => void): void;
       onHatchStart(callback: () => void): void;
       onQuip(callback: (quip: QuipChangedPayload) => void): void;
+      onBoundsChanged(callback: (bounds: { width: number; height: number }) => void): void;
     };
     // Read-only diagnostic surface; nothing in the app reads it.
     __debugRoam?: RoamState;
@@ -84,27 +86,18 @@ if (!context) {
 }
 const ctx: CanvasRenderingContext2D = context;
 
-// HiDPI: size the backing store in device pixels, keep all draw/roam math in
-// CSS pixels via setTransform(dpr). Without this, Retina (dpr=2) bilinear-
+// HiDPI: the backing store is sized in device pixels while all roam/draw
+// math stays in logical (CSS) pixels via the DPR context transform. Without
+// this, a dpr>1 display (Retina, Windows 125 %/150 %/200 %) bilinear-
 // upscales a 1x bitmap and canvas text reads as a blurry smudge — sprites
 // hide it better because nearest-neighbor chunky pixels forgive the scale.
-function syncCanvasResolution(): void {
-  const dpr = window.devicePixelRatio || 1;
-  const cssW = window.innerWidth;
-  const cssH = window.innerHeight;
-  canvas.style.width = `${cssW}px`;
-  canvas.style.height = `${cssH}px`;
-  canvas.width = Math.round(cssW * dpr);
-  canvas.height = Math.round(cssH * dpr);
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // setTransform / resizing the canvas resets this on some Chromium builds.
-  ctx.imageSmoothingEnabled = false;
-}
-syncCanvasResolution();
+let logicalBounds: Bounds = { width: window.innerWidth, height: window.innerHeight };
+let currentDpr = window.devicePixelRatio || 1;
 
-function bounds(): Bounds {
-  // CSS-pixel work area (matches roam/draw coordinates after the dpr transform).
-  return { width: window.innerWidth, height: window.innerHeight };
+applyDpr(canvas, ctx, logicalBounds.width, logicalBounds.height, currentDpr);
+
+export function bounds(): Bounds {
+  return logicalBounds;
 }
 
 let paused = false;
@@ -191,7 +184,9 @@ window.beaverBuddy.onQuip((quip) => {
 
 window.beaverBuddy.onHatchStart(() => {
   // A mid-session restart (settings reset) can arrive while an evolution is
-  // mid-flight — cancel it so the hatch owns the screen cleanly.
+  // mid-flight — cancel it so the hatch owns the screen cleanly and the
+  // post-hatch pet update is not discarded by the !evolutionState guard in
+  // onPetChanged (which would snap the renderer back to the pre-reset stage).
   evolutionState = null;
   hatchState = startHatch();
   loadLodgeSheet()
@@ -201,6 +196,33 @@ window.beaverBuddy.onHatchStart(() => {
     })
     .catch((error: unknown) => console.error('Failed to load lodge sprite sheet:', error));
   needsDraw = true;
+});
+
+window.beaverBuddy.onBoundsChanged((next) => {
+  // Use the explicit bounds from the main process rather than
+  // window.innerWidth/Height, which may not be atomically updated when the
+  // overlay window is resized.
+  logicalBounds = { width: next.width, height: next.height };
+  // Re-read DPR on every bounds change: a DPI switch between displays with
+  // identical DIP work areas can bypass the main-process guard (which only
+  // compares x/y/w/h, not scaleFactor), so this handler may be the sole
+  // trigger for a DPR update (see also the rAF-loop drift guard below).
+  currentDpr = window.devicePixelRatio || 1;
+  applyDpr(canvas, ctx, logicalBounds.width, logicalBounds.height, currentDpr);
+  needsDraw = true;
+  roamState = clampRoamStateToBounds(roamState, bounds());
+});
+
+// onBoundsChanged only fires when the main process detects a work-area change.
+// Windows display scaling can change the DPR without changing the logical
+// window size, so watch for DPR jumps on resize events as well.
+window.addEventListener('resize', () => {
+  const nextDpr = window.devicePixelRatio || 1;
+  if (nextDpr !== currentDpr) {
+    currentDpr = nextDpr;
+    applyDpr(canvas, ctx, logicalBounds.width, logicalBounds.height, currentDpr);
+    needsDraw = true;
+  }
 });
 
 // The hatch always plays in the bottom-left corner; the margin constant is
@@ -283,9 +305,9 @@ function draw(): void {
   if (dirtyRect) {
     ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.width, dirtyRect.height);
   } else {
-    // Clear in CSS pixels — the dpr transform maps this onto the full backing store.
-    const { width, height } = bounds();
-    ctx.clearRect(0, 0, width, height);
+    // Clear in logical coordinates: the context is scaled by DPR, so this
+    // covers the entire physical canvas without using canvas.width/height.
+    ctx.clearRect(0, 0, bounds().width, bounds().height);
   }
   if (hatchState) {
     drawHatch(hatchState);
@@ -347,6 +369,19 @@ function draw(): void {
 
 function frame(timestampMs: number): void {
   requestAnimationFrame(frame);
+
+  // Self-healing DPR drift guard: when DPI changes without a corresponding
+  // DIP-bounds change (e.g. primary monitor switch between two displays with
+  // identical logical work areas), neither the main-process BOUNDS_CHANGED
+  // guard (x/y/w/h only) nor the DOM resize event fires — leaving currentDpr
+  // stale and the canvas blurry. A single float comparison per frame catches
+  // this and re-sizes the backing store once.
+  const liveDpr = window.devicePixelRatio || 1;
+  if (liveDpr !== currentDpr) {
+    currentDpr = liveDpr;
+    applyDpr(canvas, ctx, logicalBounds.width, logicalBounds.height, currentDpr);
+    needsDraw = true;
+  }
 
   if (document.hidden) {
     // Fully skip: no movement, no frame advance, no draw. Reset the clock

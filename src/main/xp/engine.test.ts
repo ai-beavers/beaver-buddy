@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { XpEngine, type PetUpdate, type TrackerLike } from './engine';
 import { TOKENS_PER_XP, xpForLevel } from './curve';
+import { loadState } from './store';
 import type { UsageTotals } from '../usage/totals';
 
 let stateDir: string;
@@ -30,67 +31,67 @@ class FakeTracker implements TrackerLike {
     return this.totals;
   }
 
-  onChange(callback: (totals: UsageTotals) => void): () => void {
+  onChange(callback: (totals: UsageTotals) => void | Promise<void>): () => void {
     this.listeners.add(callback);
     return () => this.listeners.delete(callback);
   }
 
-  setTotalTokens(totalTokens: number): void {
+  async setTotalTokens(totalTokens: number): Promise<void> {
     this.totals = totalsOf(totalTokens);
-    for (const listener of this.listeners) listener(this.totals);
+    for (const listener of this.listeners) await listener(this.totals);
   }
 }
 
 describe('XpEngine: delta accrual', () => {
-  it('converts a token delta into xp at TOKENS_PER_XP', () => {
+  it('converts a token delta into xp at TOKENS_PER_XP', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
     expect(engine.getState().xp).toBe(5);
   });
 
-  it('accrues only the delta on subsequent ingests', () => {
+  it('accrues only the delta on subsequent ingests', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 8);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 8);
     expect(engine.getState().xp).toBe(8);
   });
 });
 
 describe('XpEngine: idempotent cursor', () => {
-  it('the same lifetime total ingested twice does not double-count', () => {
+  it('the same lifetime total ingested twice does not double-count', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
     expect(engine.getState().xp).toBe(10);
   });
 
-  it('a total that dips below the cursor (log rotation) is ignored, not subtracted', () => {
+  it('a total that dips below the cursor (log rotation) is ignored, not subtracted', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 3); // rotated log, smaller total
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 3); // rotated log, smaller total
     expect(engine.getState().xp).toBe(10);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 12); // growth resumes past the old cursor
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 12); // growth resumes past the old cursor
     expect(engine.getState().xp).toBe(12);
   });
 
-  it('restart replay: a fresh engine loading persisted state does not double-count the same total', () => {
+  it('restart replay: a fresh engine loading persisted state does not double-count the same total', async () => {
     const engine1 = new XpEngine(stateDir);
-    engine1.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine1.ingestLifetimeTokens(TOKENS_PER_XP * 10);
 
     const engine2 = new XpEngine(stateDir); // simulates relaunch, reloads from disk
-    engine2.ingestLifetimeTokens(TOKENS_PER_XP * 10); // same total replayed on restart
+    await engine2.ingestLifetimeTokens(TOKENS_PER_XP * 10); // same total replayed on restart
     expect(engine2.getState().xp).toBe(10);
   });
 });
 
 describe('XpEngine: evolution', () => {
-  it('fires exactly once per stage crossing, with the target stage', () => {
+  it('fires exactly once per stage crossing, with the target stage', async () => {
     const engine = new XpEngine(stateDir);
     const updates: PetUpdate[] = [];
     engine.onUpdate((u) => updates.push(u));
 
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(15)); // reach level 15, still baby
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(16)); // cross into teen
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(15)); // reach level 15, still baby
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(16)); // cross into teen
 
     const evolutions = updates.filter((u) => u.evolvingTo !== undefined);
     expect(evolutions).toHaveLength(1);
@@ -99,13 +100,13 @@ describe('XpEngine: evolution', () => {
     expect(engine.getState().stage).toBe('teen'); // internal state already updated
   });
 
-  it('does not fire on updates that stay within the same stage', () => {
+  it('does not fire on updates that stay within the same stage', async () => {
     const engine = new XpEngine(stateDir);
     const updates: PetUpdate[] = [];
     engine.onUpdate((u) => updates.push(u));
 
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 100);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 200);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 100);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 200);
 
     expect(updates.every((u) => u.evolvingTo === undefined)).toBe(true);
   });
@@ -117,45 +118,45 @@ describe('XpEngine: getLastUpdate (late-listener resend)', () => {
     expect(engine.getLastUpdate()).toEqual({ level: 20, stage: 'teen' });
   });
 
-  it('preserves an evolution emitted before any listener attached', () => {
+  it('preserves an evolution emitted before any listener attached', async () => {
     // Launch-crossing scenario: accrual (with a stage crossing) happens
     // before the renderer page is ready — the resend must still carry the
     // evolvingTo, not a stale reconstruction.
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17));
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17));
     expect(engine.getLastUpdate()).toEqual({ level: 17, stage: 'baby', evolvingTo: 'teen' });
   });
 
-  it('tracks the latest emission', () => {
+  it('tracks the latest emission', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // crossing
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(18)); // plain accrual
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // crossing
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(18)); // plain accrual
     expect(engine.getLastUpdate()).toEqual({ level: 18, stage: 'teen', evolvingTo: undefined });
   });
 });
 
 describe('XpEngine: attachTracker', () => {
-  it('ingests the tracker current totals once, then subsequent onChange totals', () => {
+  it('ingests the tracker current totals once, then subsequent onChange totals', async () => {
     const tracker = new FakeTracker();
     tracker.setTotalTokens(TOKENS_PER_XP * 4); // already-scanned before attach
 
     const engine = new XpEngine(stateDir);
-    engine.attachTracker(tracker);
+    await engine.attachTracker(tracker);
     expect(engine.getState().xp).toBe(4);
 
-    tracker.setTotalTokens(TOKENS_PER_XP * 9);
+    await tracker.setTotalTokens(TOKENS_PER_XP * 9);
     expect(engine.getState().xp).toBe(9);
   });
 });
 
 describe('XpEngine: --inject-xp path', () => {
-  it('adds xp directly through the same persist/level/evolution logic, without moving the token cursor', () => {
+  it('adds xp directly through the same persist/level/evolution logic, without moving the token cursor', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 3);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 3);
 
     const updates: PetUpdate[] = [];
     engine.onUpdate((u) => updates.push(u));
-    engine.injectXp(xpForLevel(16) - 3); // push straight into teen
+    await engine.injectXp(xpForLevel(16) - 3); // push straight into teen
 
     expect(engine.getState().level).toBe(16);
     expect(engine.getState().stage).toBe('teen');
@@ -163,107 +164,147 @@ describe('XpEngine: --inject-xp path', () => {
 
     // Token cursor unaffected by injection: replaying the same real total
     // that was already ingested does not double count.
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 3);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 3);
     expect(engine.getState().level).toBe(16);
   });
 
-  it('persists injected xp across a simulated restart', () => {
+  it('persists injected xp across a simulated restart', async () => {
     const engine1 = new XpEngine(stateDir);
-    engine1.injectXp(xpForLevel(15));
+    await engine1.injectXp(xpForLevel(15));
 
     const engine2 = new XpEngine(stateDir);
     expect(engine2.getState().level).toBe(15);
     expect(engine2.getState().stage).toBe('baby');
   });
 
-  it('ignores non-positive amounts', () => {
+  it('ignores non-positive amounts', async () => {
     const engine = new XpEngine(stateDir);
-    engine.injectXp(0);
-    engine.injectXp(-5);
+    await engine.injectXp(0);
+    await engine.injectXp(-5);
     expect(engine.getState().xp).toBe(0);
   });
 });
 
 describe('XpEngine: growth mode gating (setMode/ingestLifetimeTokens/awardMrr)', () => {
-  it('defaults to tokens mode: token ingestion awards XP as before', () => {
+  it('defaults to tokens mode: token ingestion awards XP as before', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 5);
     expect(engine.getState().xp).toBe(5);
   });
 
-  it('mrr mode: token ingestion advances the cursor silently, no XP awarded', () => {
+  it('mrr mode: token ingestion advances the cursor silently, no XP awarded', async () => {
     const engine = new XpEngine(stateDir);
     engine.setMode('mrr');
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 100);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 100);
     expect(engine.getState().xp).toBe(0);
   });
 
-  it('no-double-count switching tokens -> mrr -> tokens: the token history consumed while in mrr mode is never retroactively awarded', () => {
+  it('no-double-count switching tokens -> mrr -> tokens: the token history consumed while in mrr mode is never retroactively awarded', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 3); // tokens mode: 3 xp
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 3); // tokens mode: 3 xp
     engine.setMode('mrr');
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10); // mrr mode: cursor advances, no award
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10); // mrr mode: cursor advances, no award
     engine.setMode('tokens');
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 10); // same total re-ingested: cursor already there, delta 0
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10); // same total re-ingested: cursor already there, delta 0
     expect(engine.getState().xp).toBe(3);
   });
 
-  it('no-double-count switching mrr -> tokens -> mrr: lastMrrAwardDate persists through the tokens interlude', () => {
+  it('no-double-count switching mrr -> tokens -> mrr: lastMrrAwardDate persists through the tokens interlude', async () => {
     const engine = new XpEngine(stateDir);
     engine.setMode('mrr');
-    engine.awardMrr(500, '2026-07-13');
+    await engine.awardMrr(500, '2026-07-13');
     engine.setMode('tokens');
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 2); // unrelated token accrual while in tokens mode
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 2); // unrelated token accrual while in tokens mode
     engine.setMode('mrr');
     expect(engine.getLastMrrAwardDate()).toBe('2026-07-13'); // survived the round trip
     expect(engine.getState().xp).toBe(502);
   });
 
-  it('awardMrr records the date even when the awarded xp rounds to 0', () => {
+  it('awardMrr records the date even when the awarded xp rounds to 0', async () => {
     const engine = new XpEngine(stateDir);
-    engine.awardMrr(0, '2026-07-13');
+    await engine.awardMrr(0, '2026-07-13');
     expect(engine.getLastMrrAwardDate()).toBe('2026-07-13');
     expect(engine.getState().xp).toBe(0);
   });
 
-  it('awardMrr fires an evolution update on a stage crossing, same as other award paths', () => {
+  it('awardMrr fires an evolution update on a stage crossing, same as other award paths', async () => {
     const engine = new XpEngine(stateDir);
     const updates: PetUpdate[] = [];
     engine.onUpdate((u) => updates.push(u));
-    engine.awardMrr(xpForLevel(16), '2026-07-13');
+    await engine.awardMrr(xpForLevel(16), '2026-07-13');
     expect(updates.some((u) => u.evolvingTo === 'teen')).toBe(true);
   });
 });
 
 describe('XpEngine: resetProgress', () => {
-  it('snaps XP to 0 / level 1 / baby without an evolvingTo transition', () => {
+  it('resets xp/level/stage to 0/1/baby and persists', async () => {
+    const engine = new XpEngine(stateDir);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // teen
+    await engine.resetProgress();
+
+    expect(engine.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
+    expect(loadState(stateDir)).toEqual({
+      xp: 0,
+      lastSeenLifetimeTokens: TOKENS_PER_XP * xpForLevel(17),
+      lastMrrAwardDate: null,
+    });
+  });
+
+  it('keeps the forward-only token cursor, so the tracker never re-awards the history after a reset', async () => {
+    const engine = new XpEngine(stateDir);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine.resetProgress();
+
+    // Same total replayed (e.g. next tracker tick): cursor already there, delta 0.
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    expect(engine.getState().xp).toBe(0);
+    // Only genuine growth past the old cursor accrues again.
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 12);
+    expect(engine.getState().xp).toBe(2);
+  });
+
+  it('emits exactly one update { level: 1, stage: baby } without evolvingTo and tracks it as last update', async () => {
+    const engine = new XpEngine(stateDir);
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // teen
+    const updates: PetUpdate[] = [];
+    engine.onUpdate((u) => updates.push(u));
+
+    await engine.resetProgress();
+
+    // A stage regression is not an evolution: no evolvingTo, and the stage
+    // in the payload is the post-reset one (baby), not the pre-reset one.
+    expect(updates).toEqual([{ level: 1, stage: 'baby' }]);
+    expect(engine.getLastUpdate()).toEqual({ level: 1, stage: 'baby' });
+  });
+
+  it('clears lastMrrAwardDate so a same-day MRR poll can grant again', async () => {
     const engine = new XpEngine(stateDir, { xp: xpForLevel(32), lastSeenLifetimeTokens: 50_000, lastMrrAwardDate: '2026-07-13' });
     const updates: PetUpdate[] = [];
     engine.onUpdate((u) => updates.push(u));
-    engine.resetProgress();
+    await engine.resetProgress();
     expect(engine.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
     expect(engine.getLastMrrAwardDate()).toBeNull();
     expect(updates).toEqual([{ level: 1, stage: 'baby' }]);
   });
 
-  it('keeps the lifetime-token cursor so historical usage is never re-awarded', () => {
+  it('accrues only the delta past the pre-reset cursor afterwards', async () => {
     const engine = new XpEngine(stateDir);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 20);
-    engine.resetProgress();
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 20);
+    await engine.resetProgress();
     expect(engine.getState().xp).toBe(0);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 20); // same cursor: no new XP
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 20); // same cursor: no new XP
     expect(engine.getState().xp).toBe(0);
-    engine.ingestLifetimeTokens(TOKENS_PER_XP * 25); // only the new delta
+    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 25); // only the new delta
     expect(engine.getState().xp).toBe(5);
   });
 
-  it('persists across a fresh engine load', () => {
+  it('persists across a fresh engine load', async () => {
     const engine1 = new XpEngine(stateDir);
-    engine1.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    engine1.resetProgress();
+    await engine1.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine1.resetProgress();
     const engine2 = new XpEngine(stateDir);
     expect(engine2.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
-    engine2.ingestLifetimeTokens(TOKENS_PER_XP * 10);
+    await engine2.ingestLifetimeTokens(TOKENS_PER_XP * 10);
     expect(engine2.getState().xp).toBe(0);
   });
 });

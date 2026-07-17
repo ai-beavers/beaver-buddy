@@ -33,6 +33,6 @@ export function loadOnboardingState(stateDir: string): OnboardingState {
   }
 }
 
-export function saveOnboardingState(stateDir: string, state: OnboardingState): void {
-  atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
+export async function saveOnboardingState(stateDir: string, state: OnboardingState): Promise<void> {
+  await atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
 }

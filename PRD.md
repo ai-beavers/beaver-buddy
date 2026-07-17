@@ -1,9 +1,9 @@
-# PRD: Beaver Buddy — a pixel-art desktop beaver for macOS
+# PRD: Beaver Buddy — a pixel-art desktop beaver for macOS and Windows
 
 ## Vision
 
 A Tamagotchi-style desktop pet in the spirit of VS Code Pets — but living on the
-macOS desktop itself, not inside an editor. A unique, pixel-art **beaver** runs
+desktop itself, not inside an editor. A unique, pixel-art **beaver** runs
 around your screen, reacts to what you do, occasionally says something, and
 **evolves as you burn AI tokens** (or, later, as your MRR grows). It must look
 genuinely good — cool colors, coherent pixel aesthetic, "Steve Jobs and Jony Ive
@@ -13,8 +13,11 @@ would be proud" — never like AI slop.
 
 - No chat with the beaver, no question-asking UI, no buttons for prompts.
 - No OpenAI / LLM calls anywhere in the MVP. Quips are canned strings.
-- No Windows/Linux, no multiple simultaneous pets, no App Store distribution.
+- No multiple simultaneous pets, no App Store distribution.
 - No telemetry.
+- **Scope note:** This repo currently focuses on building out the Windows
+  implementation. macOS support remains in the codebase but is not actively
+  extended.
 
 ## Tech direction (decided)
 
@@ -41,7 +44,7 @@ reflected in later items' implementations.
 ### R2: Overlay app shell
 Electron tray app; transparent click-through overlay on the primary display;
 beaver layer NEVER steals clicks or keystrokes from the apps below; tray menu
-with Pause/Resume and Quit; launches on macOS 14+.
+with Pause/Resume and Quit; launches on macOS 14+ and Windows 10/11.
 **Acceptance:** with the beaver on screen, clicking "through" it hits the app
 underneath; idle CPU < 5%; overlay survives display sleep/wake.
 
@@ -99,7 +102,8 @@ constants file.
 ### R9: MRR growth mode (growth system 2, phase 2)
 Optional settings: connect **Stripe** and/or **RevenueCat** with read-only keys;
 daily MRR poll converts to XP under a user-selected mode toggle
-(tokens | MRR). Keys stored in macOS Keychain, never in plaintext config.
+(tokens | MRR). Keys stored in the platform's secure storage (macOS Keychain /
+Windows secure storage), never in plaintext config.
 **Acceptance:** with a test Stripe account, MRR fetch works and drives XP; with
 no keys, the mode is hidden; toggling modes never double-counts XP.
 
@@ -107,6 +111,9 @@ no keys, the mode is hidden; toggling modes never double-counts XP.
 Every UI-visible item (R3–R6, R8) closes with a designer-skill review pass
 (frontend-design / design-review) on real screenshots: palette coherence, pixel
 grid discipline, animation timing, "would a human designer approve this?"
+For Windows-visible items the gate must also cover Windows-specific surfaces:
+the NSIS installer and Explorer app icon, the tray icon on light and dark
+taskbar backgrounds, and the overlay at 100 %/125 %/150 %/200 % display scaling.
 **Acceptance:** review artifacts (screenshots on a clean/synthetic desktop — no
 personal windows, notifications, or file names; repo is public — plus verdict
 notes) committed under `docs/design-reviews/`; any FAIL loops back before the

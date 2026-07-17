@@ -41,11 +41,10 @@ async function loadMeta(src: string): Promise<SheetMeta> {
 }
 
 export async function loadSheet(stage: Stage): Promise<Sheet> {
-  // Adult sprite art doesn't exist yet — BL-11 ingested the user's baby/teen
-  // images only (see assets/STYLE.md provenance). Falls back to the teen
-  // sheet until a real adult sheet ships; swap this mapping out then.
-  const spriteStage: 'baby' | 'teen' = stage === 'adult' ? 'teen' : stage;
-  const base = `assets/sprites/beaver-${spriteStage}`;
+  // Every stage ships its own sheet — the adult sheet is a derived
+  // placeholder until final art lands (flight-plan #7; see
+  // scripts/gen-sprites/build-adult-placeholder.ts and assets/STYLE.md).
+  const base = `assets/sprites/beaver-${stage}`;
   const [image, meta] = await Promise.all([loadImage(`${base}.png`), loadMeta(`${base}.json`)]);
   return { image, meta };
 }

@@ -19,7 +19,7 @@ describe('settings store', () => {
     expect(loadSettingsState(stateDir)).toEqual(freshState());
   });
 
-  it('roundtrips a saved state', () => {
+  it('roundtrips a saved state', async () => {
     const state = {
       mode: 'mrr' as const,
       stripeConnected: true,
@@ -27,7 +27,7 @@ describe('settings store', () => {
       claudeEnabled: true,
       codexEnabled: false,
     };
-    saveSettingsState(stateDir, state);
+    await saveSettingsState(stateDir, state);
     expect(loadSettingsState(stateDir)).toEqual(state);
   });
 
@@ -61,8 +61,8 @@ describe('settings store', () => {
     });
   });
 
-  it('never persists key material — only mode/connected/opt-in booleans are ever written', () => {
-    saveSettingsState(stateDir, {
+  it('never persists key material — only mode/connected/opt-in booleans are ever written', async () => {
+    await saveSettingsState(stateDir, {
       mode: 'mrr',
       stripeConnected: true,
       revenuecatConnected: true,

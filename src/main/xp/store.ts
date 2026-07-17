@@ -48,6 +48,6 @@ export function loadState(stateDir: string): XpState {
   }
 }
 
-export function saveState(stateDir: string, state: XpState): void {
-  atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
+export async function saveState(stateDir: string, state: XpState): Promise<void> {
+  await atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
 }

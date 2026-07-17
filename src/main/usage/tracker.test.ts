@@ -42,7 +42,7 @@ describe('UsageTracker', () => {
     tracker.refresh();
 
     const changes: number[] = [];
-    tracker.onChange((totals) => changes.push(totals.lifetime.totalTokens));
+    tracker.onChange((totals) => { changes.push(totals.lifetime.totalTokens); });
 
     writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });
     tracker.refresh();
@@ -58,7 +58,7 @@ describe('UsageTracker', () => {
     tracker.refresh();
 
     const changes: unknown[] = [];
-    tracker.onChange((totals) => changes.push(totals));
+    tracker.onChange((totals) => { changes.push(totals); });
     tracker.refresh();
 
     expect(changes).toEqual([]);
@@ -83,8 +83,8 @@ describe('UsageTracker', () => {
 
     const ticks: number[] = [];
     const changes: number[] = [];
-    tracker.onTick((totals) => ticks.push(totals.lifetime.totalTokens));
-    tracker.onChange((totals) => changes.push(totals.lifetime.totalTokens));
+    tracker.onTick((totals) => { ticks.push(totals.lifetime.totalTokens); });
+    tracker.onChange((totals) => { changes.push(totals.lifetime.totalTokens); });
 
     tracker.refresh(); // nothing changed
     writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });

@@ -19,8 +19,8 @@ describe('onboarding store', () => {
     expect(loadOnboardingState(stateDir)).toEqual({ hatched: false });
   });
 
-  it('roundtrips a saved state', () => {
-    saveOnboardingState(stateDir, { hatched: true });
+  it('roundtrips a saved state', async () => {
+    await saveOnboardingState(stateDir, { hatched: true });
     expect(loadOnboardingState(stateDir)).toEqual({ hatched: true });
   });
 
@@ -36,9 +36,9 @@ describe('onboarding store', () => {
     expect(loadOnboardingState(stateDir)).toEqual({ hatched: false });
   });
 
-  it('leaves no stray tmp files behind after a save (shared atomic helper)', () => {
-    saveOnboardingState(stateDir, { hatched: true });
-    saveOnboardingState(stateDir, { hatched: false });
+  it('leaves no stray tmp files behind after a save (shared atomic helper)', async () => {
+    await saveOnboardingState(stateDir, { hatched: true });
+    await saveOnboardingState(stateDir, { hatched: false });
     const entries = fs.readdirSync(stateDir);
     expect(entries).toEqual(['onboarding-state.json']);
   });
