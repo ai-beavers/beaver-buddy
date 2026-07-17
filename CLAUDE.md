@@ -103,6 +103,10 @@ extended.
   ground constants file.
 - Comments carry invariants and rationale for platform workarounds / parsing quirks —
   not narration. No PR/plan references in comments.
+- **Quip voice:** every canned line is all-lowercase. Short reactions over
+  explainers; "dam" is the beaver expression (never "damn"). Spend-tier quips
+  key off today's cumulative token total (weak <2M / ok 2M–20M / crazy ≥20M),
+  once per day on upward crossing — not a per-minute rate and not USD.
 - App state persists in ONE app-support directory (secrets excepted → platform
   secure storage); deleting it = factory reset.
 

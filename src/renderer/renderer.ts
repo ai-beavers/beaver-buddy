@@ -86,9 +86,11 @@ if (!context) {
 }
 const ctx: CanvasRenderingContext2D = context;
 
-// Roaming, bubbles, hatch placement and dirty-rect math all operate in logical
-// pixels. The canvas backing store and context transform scale by DPR so the
-// pixel art stays crisp on Windows 125 %/150 %/200 % displays.
+// HiDPI: the backing store is sized in device pixels while all roam/draw
+// math stays in logical (CSS) pixels via the DPR context transform. Without
+// this, a dpr>1 display (Retina, Windows 125 %/150 %/200 %) bilinear-
+// upscales a 1x bitmap and canvas text reads as a blurry smudge — sprites
+// hide it better because nearest-neighbor chunky pixels forgive the scale.
 let logicalBounds: Bounds = { width: window.innerWidth, height: window.innerHeight };
 let currentDpr = window.devicePixelRatio || 1;
 
@@ -181,11 +183,12 @@ window.beaverBuddy.onQuip((quip) => {
 });
 
 window.beaverBuddy.onHatchStart(() => {
-  hatchState = startHatch();
-  // A hatch restarts the pet from baby: drop any in-flight evolution so the
+  // A mid-session restart (settings reset) can arrive while an evolution is
+  // mid-flight — cancel it so the hatch owns the screen cleanly and the
   // post-hatch pet update is not discarded by the !evolutionState guard in
-  // onPetChanged and the renderer cannot snap back to the pre-reset stage.
+  // onPetChanged (which would snap the renderer back to the pre-reset stage).
   evolutionState = null;
+  hatchState = startHatch();
   loadLodgeSheet()
     .then((loaded) => {
       lodgeSheet = loaded;

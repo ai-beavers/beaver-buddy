@@ -10,6 +10,8 @@ mac:
   category: public.app-category.utilities
   minimumSystemVersion: '14.0'
   target: dmg
+  # Apple iconset built from the 1024² master (opaque RGB, no baked mask).
+  icon: assets/beaver-buddy-icon.icns
 win:
   target:
     - nsis

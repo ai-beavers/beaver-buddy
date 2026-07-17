@@ -38,6 +38,7 @@ describe('UsageTracker', () => {
 
   it('picks up a new log file on refresh and fires onChange', () => {
     const tracker = new UsageTracker({}, home);
+    tracker.setEnabledSources({ claude: true, codex: false });
     tracker.refresh();
 
     const changes: number[] = [];
@@ -53,6 +54,7 @@ describe('UsageTracker', () => {
   it('does not fire onChange when nothing changed between refreshes', () => {
     writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });
     const tracker = new UsageTracker({}, home);
+    tracker.setEnabledSources({ claude: true, codex: false });
     tracker.refresh();
 
     const changes: unknown[] = [];
@@ -65,6 +67,7 @@ describe('UsageTracker', () => {
   it('evicts a deleted log file from the totals on the next refresh', () => {
     writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });
     const tracker = new UsageTracker({}, home);
+    tracker.setEnabledSources({ claude: true, codex: false });
     tracker.refresh();
     expect(tracker.getTotals().lifetime.totalTokens).toBe(15);
 
@@ -75,6 +78,7 @@ describe('UsageTracker', () => {
 
   it('fires onTick on every refresh, changed or not, unlike onChange', () => {
     const tracker = new UsageTracker({}, home);
+    tracker.setEnabledSources({ claude: true, codex: false });
     tracker.refresh();
 
     const ticks: number[] = [];
@@ -88,6 +92,44 @@ describe('UsageTracker', () => {
 
     expect(ticks).toEqual([0, 15]);
     expect(changes).toEqual([15]);
+  });
+
+  it('ignores logs until the user opts in via setEnabledSources', () => {
+    writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });
+    const tracker = new UsageTracker({}, home);
+    tracker.refresh();
+    expect(tracker.getTotals().lifetime.totalTokens).toBe(0);
+    expect(tracker.getSourcesSnapshot().claude).toMatchObject({
+      enabled: false,
+      logsFound: true,
+      connected: false,
+      lifetimeTokens: 0,
+    });
+
+    tracker.setEnabledSources({ claude: true, codex: false });
+    expect(tracker.getTotals().lifetime.totalTokens).toBe(15);
+    expect(tracker.getSourcesSnapshot().claude).toMatchObject({
+      enabled: true,
+      connected: true,
+      lifetimeTokens: 15,
+    });
+  });
+
+  it('does not read log file contents until the user opts in', () => {
+    writeClaudeSession(home, 'project-a', 'session-1', { input: 10, output: 5 });
+    const openSpy = vi.spyOn(fs, 'openSync');
+    const tracker = new UsageTracker({}, home);
+    tracker.refresh();
+
+    const jsonlOpens = () =>
+      openSpy.mock.calls.filter(([p]) => String(p).includes('.jsonl'));
+    expect(jsonlOpens()).toEqual([]);
+    expect(tracker.getSourcesSnapshot().claude.logsFound).toBe(true);
+
+    tracker.setEnabledSources({ claude: true, codex: false });
+    expect(jsonlOpens().length).toBeGreaterThan(0);
+    expect(tracker.getTotals().lifetime.totalTokens).toBe(15);
+    openSpy.mockRestore();
   });
 
   it('coalesces refreshes onto a single timer interval (fake timers)', () => {

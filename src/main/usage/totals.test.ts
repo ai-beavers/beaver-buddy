@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregate, type UsageEntry } from './totals';
+import { aggregate, todayTotalTokens, type UsageEntry } from './totals';
 
 function entry(overrides: Partial<UsageEntry>): UsageEntry {
   return {
@@ -57,5 +57,21 @@ describe('aggregate', () => {
     const { daily, lifetime } = aggregate([]);
     expect(daily.size).toBe(0);
     expect(lifetime.totalTokens).toBe(0);
+  });
+});
+
+describe('todayTotalTokens', () => {
+  it('returns today\'s bucket totalTokens', () => {
+    const morning = new Date(2026, 2, 1, 9, 0, 0).getTime();
+    const totals = aggregate([
+      entry({ timestampMs: morning, inputTokens: 10, outputTokens: 5 }),
+      entry({ timestampMs: new Date(2026, 1, 28, 12, 0, 0).getTime(), inputTokens: 100 }),
+    ]);
+    expect(todayTotalTokens(totals, morning)).toBe(15);
+  });
+
+  it('returns 0 when today has no entries', () => {
+    const totals = aggregate([entry({ timestampMs: new Date(2026, 0, 1).getTime(), inputTokens: 50 })]);
+    expect(todayTotalTokens(totals, new Date(2026, 2, 1).getTime())).toBe(0);
   });
 });

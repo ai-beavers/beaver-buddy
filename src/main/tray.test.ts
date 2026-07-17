@@ -106,6 +106,7 @@ describe('buildMenuTemplate', () => {
       isMrrAvailable: () => false,
       onSelectGrowthMode: () => {},
       onOpenGrowthSettings: () => {},
+      onOpenConnect: () => {},
       ...overrides,
     };
   }
@@ -137,6 +138,20 @@ describe('buildMenuTemplate', () => {
     pauseItem?.click?.(undefined as never, undefined as never, undefined as never);
     expect(calls).toEqual(['toggle', 'rebuild']);
   });
+
+  it('includes Connect… before Growth (opens settings modal, not a submenu)', () => {
+    const template = buildMenuTemplate(callbacks(), () => {});
+    const labels = template.map((i) => i.label);
+    expect(labels.indexOf('Connect…')).toBeLessThan(labels.indexOf('Growth'));
+    expect(template.find((i) => i.label === 'Connect…')?.submenu).toBeUndefined();
+  });
+
+  it('Connect… click calls onOpenConnect', () => {
+    const calls: string[] = [];
+    const template = buildMenuTemplate(callbacks({ onOpenConnect: () => calls.push('connect') }), () => {});
+    template.find((i) => i.label === 'Connect…')?.click?.(undefined as never, undefined as never, undefined as never);
+    expect(calls).toEqual(['connect']);
+  });
 });
 
 describe('buildMenuTemplate: growth submenu', () => {
@@ -149,6 +164,7 @@ describe('buildMenuTemplate: growth submenu', () => {
       isMrrAvailable: () => false,
       onSelectGrowthMode: () => {},
       onOpenGrowthSettings: () => {},
+      onOpenConnect: () => {},
       ...overrides,
     };
   }
@@ -173,9 +189,9 @@ describe('buildMenuTemplate: growth submenu', () => {
     expect(submenu.find((i) => i.label === 'Source: Tokens')).toMatchObject({ checked: false });
   });
 
-  it('always includes a Growth settings… item', () => {
+  it('always includes a Settings… item', () => {
     const submenu = growthSubmenu(buildMenuTemplate(callbacks(), () => {}));
-    expect(submenu.some((i) => i.label === 'Growth settings…')).toBe(true);
+    expect(submenu.some((i) => i.label === 'Settings…')).toBe(true);
   });
 
   it('mode click calls onSelectGrowthMode then rebuild', () => {
@@ -192,7 +208,7 @@ describe('buildMenuTemplate: growth submenu', () => {
     const submenu = growthSubmenu(
       buildMenuTemplate(callbacks({ onOpenGrowthSettings: () => calls.push('open') }), () => {}),
     );
-    submenu.find((i) => i.label === 'Growth settings…')?.click?.(undefined as never, undefined as never, undefined as never);
+    submenu.find((i) => i.label === 'Settings…')?.click?.(undefined as never, undefined as never, undefined as never);
     expect(calls).toEqual(['open']);
   });
 });
@@ -242,6 +258,7 @@ describe('createTray single-click menu', () => {
       isMrrAvailable: () => false,
       onSelectGrowthMode: () => {},
       onOpenGrowthSettings: () => {},
+      onOpenConnect: () => {},
       ...overrides,
     };
   }

@@ -24,5 +24,11 @@ describe('quip pools: copy invariants', () => {
         expect(line).not.toMatch(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u);
       }
     });
+
+    it(`${trigger}: all-lowercase (beaver voice)`, () => {
+      for (const line of pool) {
+        expect(line).toBe(line.toLowerCase());
+      }
+    });
   }
 });

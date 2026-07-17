@@ -9,18 +9,34 @@
 import path from 'node:path';
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import { applyWindowHardening } from '../hardening';
-import { SETTINGS_DISCONNECT_CHANNEL, SETTINGS_READ_STATUS_CHANNEL, SETTINGS_RESET_PROGRESS_CHANNEL, SETTINGS_SAVE_CHANNEL } from '../ipc-channels';
+import {
+  SETTINGS_CONNECT_USAGE_CHANNEL,
+  SETTINGS_DISCONNECT_CHANNEL,
+  SETTINGS_READ_STATUS_CHANNEL,
+  SETTINGS_RESET_PROGRESS_CHANNEL,
+  SETTINGS_SAVE_CHANNEL,
+} from '../ipc-channels';
+import type { UsageSourcesSnapshot } from '../usage/tracker';
 import { REVENUECAT_KEY_ACCOUNT, REVENUECAT_PROJECT_ACCOUNT, STRIPE_KEY_ACCOUNT } from './mrr-config';
 import { deleteSecret, setSecret } from './secrets';
 import { saveSettingsState, type Mode, type SettingsState } from './settings-store';
-import { isValidationError, validateDisconnectInput, validateSaveInput } from './settings-validate';
+import {
+  isValidationError,
+  validateConnectUsageInput,
+  validateDisconnectInput,
+  validateSaveInput,
+} from './settings-validate';
 
 export interface SettingsWindowDeps {
   readonly stateDir: string;
   readonly keychainService: string;
   readonly getSettings: () => SettingsState;
   readonly onSettingsChanged: (next: SettingsState) => void;
+  // Wipes pet XP to level 1 / baby and replays hatch — growth keys/mode untouched.
   readonly onProgressReset: () => Promise<void>;
+  // Re-scan logs + return per-source status (enabled is opt-in; tokens only when enabled).
+  readonly getUsageSources: () => UsageSourcesSnapshot;
+  readonly onUsageEnabledChanged: (next: { claudeEnabled: boolean; codexEnabled: boolean }) => void;
 }
 
 let settingsWindow: BrowserWindow | null = null;
@@ -47,6 +63,26 @@ export interface SettingsHandlers {
   save(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
   disconnect(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
   resetProgress(event: IpcMainInvokeEvent): Promise<unknown>;
+  connectUsage(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
+}
+
+function usagePayload(usage: UsageSourcesSnapshot) {
+  return {
+    claude: {
+      enabled: usage.claude.enabled,
+      connected: usage.claude.connected,
+      logsFound: usage.claude.logsFound,
+      lifetimeTokens: usage.claude.lifetimeTokens,
+      todayTokens: usage.claude.todayTokens,
+    },
+    codex: {
+      enabled: usage.codex.enabled,
+      connected: usage.codex.connected,
+      logsFound: usage.codex.logsFound,
+      lifetimeTokens: usage.codex.lifetimeTokens,
+      todayTokens: usage.codex.todayTokens,
+    },
+  };
 }
 
 // Handler bodies are Electron-free (validate + keychain + settings store +
@@ -60,7 +96,12 @@ export function createSettingsHandlers(
     readStatus(event) {
       if (!isAuthorized(event)) return { error: 'unauthorized' };
       const s = deps.getSettings();
-      return { stripeConnected: s.stripeConnected, revenuecatConnected: s.revenuecatConnected, mode: s.mode };
+      return {
+        stripeConnected: s.stripeConnected,
+        revenuecatConnected: s.revenuecatConnected,
+        mode: s.mode,
+        ...usagePayload(deps.getUsageSources()),
+      };
     },
 
     async save(event, payload) {
@@ -87,7 +128,13 @@ export function createSettingsHandlers(
       }
 
       const mode = nextModeAfterSave(parsed.mode ?? current.mode, stripeConnected, revenuecatConnected);
-      const next: SettingsState = { mode, stripeConnected, revenuecatConnected };
+      const next: SettingsState = {
+        mode,
+        stripeConnected,
+        revenuecatConnected,
+        claudeEnabled: current.claudeEnabled,
+        codexEnabled: current.codexEnabled,
+      };
       await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
       return { ok: true };
@@ -99,6 +146,19 @@ export function createSettingsHandlers(
       if (isValidationError(parsed)) return { ok: false, error: parsed.error };
 
       const current = deps.getSettings();
+
+      if (parsed.target === 'claude' || parsed.target === 'codex') {
+        const next: SettingsState = {
+          ...current,
+          claudeEnabled: parsed.target === 'claude' ? false : current.claudeEnabled,
+          codexEnabled: parsed.target === 'codex' ? false : current.codexEnabled,
+        };
+        await saveSettingsState(deps.stateDir, next);
+        deps.onSettingsChanged(next);
+        deps.onUsageEnabledChanged({ claudeEnabled: next.claudeEnabled, codexEnabled: next.codexEnabled });
+        return { ok: true, ...usagePayload(deps.getUsageSources()) };
+      }
+
       let stripeConnected = current.stripeConnected;
       let revenuecatConnected = current.revenuecatConnected;
 
@@ -116,7 +176,13 @@ export function createSettingsHandlers(
       }
 
       const mode = nextModeAfterDisconnect(current.mode, stripeConnected, revenuecatConnected);
-      const next: SettingsState = { mode, stripeConnected, revenuecatConnected };
+      const next: SettingsState = {
+        mode,
+        stripeConnected,
+        revenuecatConnected,
+        claudeEnabled: current.claudeEnabled,
+        codexEnabled: current.codexEnabled,
+      };
       await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
       return { ok: true };
@@ -134,6 +200,30 @@ export function createSettingsHandlers(
         return { ok: false, error: 'reset failed' };
       }
     },
+
+    async connectUsage(event, payload) {
+      if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };
+      const parsed = validateConnectUsageInput(payload);
+      if (isValidationError(parsed)) return { ok: false, error: parsed.error };
+
+      const current = deps.getSettings();
+      const next: SettingsState = {
+        ...current,
+        claudeEnabled: parsed.target === 'claude' ? true : current.claudeEnabled,
+        codexEnabled: parsed.target === 'codex' ? true : current.codexEnabled,
+      };
+      await saveSettingsState(deps.stateDir, next);
+      deps.onSettingsChanged(next);
+      deps.onUsageEnabledChanged({ claudeEnabled: next.claudeEnabled, codexEnabled: next.codexEnabled });
+      const usage = deps.getUsageSources();
+      const source = parsed.target === 'claude' ? usage.claude : usage.codex;
+      return {
+        ok: true,
+        target: parsed.target,
+        connected: source.connected,
+        ...usagePayload(usage),
+      };
+    },
   };
 }
 
@@ -146,6 +236,7 @@ function registerHandlers(deps: SettingsWindowDeps): void {
   ipcMain.handle(SETTINGS_SAVE_CHANNEL, (event, payload: unknown) => handlers.save(event, payload));
   ipcMain.handle(SETTINGS_DISCONNECT_CHANNEL, (event, payload: unknown) => handlers.disconnect(event, payload));
   ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL, (event) => handlers.resetProgress(event));
+  ipcMain.handle(SETTINGS_CONNECT_USAGE_CHANNEL, (event, payload: unknown) => handlers.connectUsage(event, payload));
 }
 
 export function openSettingsWindow(deps: SettingsWindowDeps): void {
@@ -158,9 +249,12 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
 
   const win = new BrowserWindow({
     width: 420,
-    height: 540, // +60 over the original 480: the Reset danger-zone fieldset needs the room (window is not resizable)
+    // Room for the Connect Claude/Codex section plus the Reset danger-zone
+    // fieldset (window is not resizable).
+    height: 680,
     resizable: false,
-    title: 'Beaver Buddy — Growth Settings',
+    title: 'Beaver Buddy — Settings',
+    icon: path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png'),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

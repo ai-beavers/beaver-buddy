@@ -11,6 +11,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { createSettingsHandlers, nextModeAfterDisconnect, nextModeAfterSave, type SettingsWindowDeps } from './settings-window';
 import { deleteSecret, setSecret } from './secrets';
 import type { SettingsState } from './settings-store';
+import type { UsageSourcesSnapshot } from '../usage/tracker';
 
 vi.mock('./secrets', () => ({
   setSecret: vi.fn().mockResolvedValue(undefined),
@@ -56,6 +57,8 @@ describe('createSettingsHandlers', () => {
   let stateDir: string;
   let settings: SettingsState;
   let changed: SettingsState[];
+  let usageEnabledCalls: { claudeEnabled: boolean; codexEnabled: boolean }[];
+  let usageSnapshot: UsageSourcesSnapshot;
 
   const fakeEvent = {} as IpcMainInvokeEvent;
 
@@ -69,41 +72,123 @@ describe('createSettingsHandlers', () => {
         changed.push(next);
       },
       onProgressReset: vi.fn().mockResolvedValue(undefined),
+      getUsageSources: () => usageSnapshot,
+      onUsageEnabledChanged: (next) => {
+        usageEnabledCalls.push(next);
+        usageSnapshot = {
+          claude: {
+            ...usageSnapshot.claude,
+            enabled: next.claudeEnabled,
+            connected: next.claudeEnabled && usageSnapshot.claude.logsFound,
+            lifetimeTokens: next.claudeEnabled ? usageSnapshot.claude.lifetimeTokens : 0,
+            todayTokens: next.claudeEnabled ? usageSnapshot.claude.todayTokens : 0,
+          },
+          codex: {
+            ...usageSnapshot.codex,
+            enabled: next.codexEnabled,
+            connected: next.codexEnabled && usageSnapshot.codex.logsFound,
+            lifetimeTokens: next.codexEnabled ? usageSnapshot.codex.lifetimeTokens : 0,
+            todayTokens: next.codexEnabled ? usageSnapshot.codex.todayTokens : 0,
+          },
+        };
+      },
     };
   }
 
   beforeEach(() => {
     stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-settings-window-'));
-    settings = { mode: 'tokens', stripeConnected: false, revenuecatConnected: false };
+    settings = {
+      mode: 'tokens',
+      stripeConnected: false,
+      revenuecatConnected: false,
+      claudeEnabled: false,
+      codexEnabled: false,
+    };
     changed = [];
     setSecretMock.mockClear();
     deleteSecretMock.mockClear();
+    usageEnabledCalls = [];
+    usageSnapshot = {
+      claude: { enabled: false, logsFound: true, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+      codex: { enabled: false, logsFound: true, connected: false, lifetimeTokens: 9_000_000, todayTokens: 1_000 },
+    };
   });
 
   afterEach(() => {
     fs.rmSync(stateDir, { recursive: true, force: true });
   });
 
-  it('unauthorized sender is rejected on all four handlers, with no state change', async () => {
+  it('unauthorized sender is rejected on all handlers, with no state change', async () => {
     const d = deps();
     const handlers = createSettingsHandlers(d, () => false);
     expect(handlers.readStatus(fakeEvent)).toEqual({ error: 'unauthorized' });
     await expect(handlers.save(fakeEvent, { stripeKey: 'rk_fake' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     await expect(handlers.disconnect(fakeEvent, { target: 'stripe' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: false, error: 'unauthorized' });
+    await expect(handlers.connectUsage(fakeEvent, { target: 'claude' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     expect(changed).toHaveLength(0);
     expect(d.onProgressReset).not.toHaveBeenCalled();
   });
 
-  it('readStatus returns only the three booleans/mode fields', () => {
+  it('readStatus returns mode/connected booleans plus per-source usage, never secrets', () => {
     const handlers = createSettingsHandlers(deps(), () => true);
-    expect(handlers.readStatus(fakeEvent)).toEqual({ stripeConnected: false, revenuecatConnected: false, mode: 'tokens' });
+    expect(handlers.readStatus(fakeEvent)).toEqual({
+      stripeConnected: false,
+      revenuecatConnected: false,
+      mode: 'tokens',
+      claude: { enabled: false, connected: false, logsFound: true, lifetimeTokens: 0, todayTokens: 0 },
+      codex: { enabled: false, connected: false, logsFound: true, lifetimeTokens: 9_000_000, todayTokens: 1_000 },
+    });
+  });
+
+  it('readStatus does not auto-connect just because logs exist', () => {
+    const handlers = createSettingsHandlers(deps(), () => true);
+    const status = handlers.readStatus(fakeEvent) as {
+      claude: { enabled: boolean; connected: boolean };
+      codex: { enabled: boolean; connected: boolean };
+    };
+    expect(status.claude).toMatchObject({ enabled: false, connected: false });
+    expect(status.codex).toMatchObject({ enabled: false, connected: false });
+  });
+
+  it('connectUsage opts in and reports connected when logs exist', async () => {
+    const handlers = createSettingsHandlers(deps(), () => true);
+    const result = (await handlers.connectUsage(fakeEvent, { target: 'codex' })) as {
+      ok: boolean;
+      connected: boolean;
+      codex: { enabled: boolean; connected: boolean; todayTokens: number };
+    };
+    expect(result.ok).toBe(true);
+    expect(result.connected).toBe(true);
+    expect(result.codex).toMatchObject({ enabled: true, connected: true, todayTokens: 1_000 });
+    expect(settings.codexEnabled).toBe(true);
+    expect(settings.claudeEnabled).toBe(false);
+    expect(usageEnabledCalls).toEqual([{ claudeEnabled: false, codexEnabled: true }]);
+  });
+
+  it('disconnect claude opts out without touching stripe keys', async () => {
+    settings = { ...settings, claudeEnabled: true };
+    usageSnapshot = {
+      ...usageSnapshot,
+      claude: { enabled: true, logsFound: true, connected: true, lifetimeTokens: 5, todayTokens: 2 },
+    };
+    const handlers = createSettingsHandlers(deps(), () => true);
+    await expect(handlers.disconnect(fakeEvent, { target: 'claude' })).resolves.toMatchObject({ ok: true });
+    expect(settings.claudeEnabled).toBe(false);
+    expect(usageEnabledCalls).toEqual([{ claudeEnabled: false, codexEnabled: false }]);
   });
 
   it('save with a key connects the source and persists', async () => {
     const handlers = createSettingsHandlers(deps(), () => true);
     await expect(handlers.save(fakeEvent, { stripeKey: 'rk_fake' })).resolves.toEqual({ ok: true });
-    expect(settings).toEqual({ mode: 'tokens', stripeConnected: true, revenuecatConnected: false });
+    expect(settings).toEqual({
+      mode: 'tokens',
+      stripeConnected: true,
+      revenuecatConnected: false,
+      claudeEnabled: false,
+      codexEnabled: false,
+    });
+    expect(changed).toHaveLength(1);
     expect(setSecretMock).toHaveBeenCalledWith(stateDir, 'svc', 'stripe-key', 'rk_fake');
   });
 
@@ -123,18 +208,30 @@ describe('createSettingsHandlers', () => {
   });
 
   it('disconnecting the last source forces mode back to tokens', async () => {
-    settings = { mode: 'mrr', stripeConnected: true, revenuecatConnected: false };
+    settings = { mode: 'mrr', stripeConnected: true, revenuecatConnected: false, claudeEnabled: false, codexEnabled: false };
     const handlers = createSettingsHandlers(deps(), () => true);
     await handlers.disconnect(fakeEvent, { target: 'stripe' });
-    expect(settings).toEqual({ mode: 'tokens', stripeConnected: false, revenuecatConnected: false });
+    expect(settings).toEqual({
+      mode: 'tokens',
+      stripeConnected: false,
+      revenuecatConnected: false,
+      claudeEnabled: false,
+      codexEnabled: false,
+    });
     expect(deleteSecretMock).toHaveBeenCalledWith(stateDir, 'svc', 'stripe-key');
   });
 
   it('disconnecting one of two sources preserves mrr mode', async () => {
-    settings = { mode: 'mrr', stripeConnected: true, revenuecatConnected: true };
+    settings = { mode: 'mrr', stripeConnected: true, revenuecatConnected: true, claudeEnabled: false, codexEnabled: false };
     const handlers = createSettingsHandlers(deps(), () => true);
     await handlers.disconnect(fakeEvent, { target: 'revenuecat' });
-    expect(settings).toEqual({ mode: 'mrr', stripeConnected: true, revenuecatConnected: false });
+    expect(settings).toEqual({
+      mode: 'mrr',
+      stripeConnected: true,
+      revenuecatConnected: false,
+      claudeEnabled: false,
+      codexEnabled: false,
+    });
     expect(deleteSecretMock).toHaveBeenCalledWith(stateDir, 'svc', 'revenuecat-key');
     expect(deleteSecretMock).toHaveBeenCalledWith(stateDir, 'svc', 'revenuecat-project');
   });
@@ -144,6 +241,17 @@ describe('createSettingsHandlers', () => {
     const handlers = createSettingsHandlers(d, () => true);
     await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: true });
     expect(d.onProgressReset).toHaveBeenCalledTimes(1);
+  });
+
+  it('resetProgress leaves growth settings and usage opt-ins untouched', async () => {
+    settings = { ...settings, stripeConnected: true, claudeEnabled: true };
+    const d = deps();
+    const handlers = createSettingsHandlers(d, () => true);
+    await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: true });
+    expect(d.onProgressReset).toHaveBeenCalledTimes(1);
+    expect(settings.stripeConnected).toBe(true);
+    expect(settings.claudeEnabled).toBe(true);
+    expect(changed).toHaveLength(0);
   });
 
   it('resetProgress maps a dep failure onto { ok: false }', async () => {
