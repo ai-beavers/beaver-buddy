@@ -14,7 +14,9 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
+    "assets:adult-placeholder": "node scripts/gen-sprites/build-adult-placeholder.ts",
     "assets:build": "node scripts/gen-sprites/build.ts",
+    "assets:icons": "node scripts/gen-sprites/build-icons.ts",
     "assets:ingest": "node scripts/gen-sprites/ingest-images.mjs",
     "usage:cli": "npm run build && node scripts/usage-cli.js"
   },
