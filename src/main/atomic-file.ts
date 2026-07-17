@@ -18,13 +18,13 @@ function isRetriableError(error: unknown): boolean {
   return code === 'EPERM' || code === 'EBUSY';
 }
 
-export async function atomicWriteFile(stateDir: string, fileName: string, contents: string): Promise<void> {
+export async function atomicWriteFile(stateDir: string, fileName: string, contents: string | Buffer): Promise<void> {
   await fs.mkdir(stateDir, { recursive: true });
   const filePath = path.join(stateDir, fileName);
   const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
   try {
-    await fs.writeFile(tmpPath, contents, 'utf8');
+    await fs.writeFile(tmpPath, contents);
 
     for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
       try {

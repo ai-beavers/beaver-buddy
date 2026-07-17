@@ -36,6 +36,13 @@ describe('atomicWriteFile', () => {
     expect(fs.readFileSync(filePath, 'utf8')).toBe('new');
   });
 
+  it('writes binary Buffer contents without encoding loss', async () => {
+    const filePath = path.join(stateDir, 'blob.enc');
+    const buffer = Buffer.from([0x00, 0xff, 0x42, 0x13]);
+    await atomicWriteFile(stateDir, 'blob.enc', buffer);
+    expect(fs.readFileSync(filePath)).toEqual(buffer);
+  });
+
   it('retries transient EPERM errors during rename and eventually succeeds', async () => {
     const realRename = fs.promises.rename;
     const renameSpy = vi
