@@ -12,3 +12,23 @@ mac:
   target: dmg
   # Apple iconset built from the 1024² master (opaque RGB, no baked mask).
   icon: assets/beaver-buddy-icon.icns
+win:
+  target:
+    - nsis
+    - portable
+  icon: assets/icon.ico
+  # Signing is opt-in via WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD; without a
+  # certificate electron-builder skips signing (never forceCodeSigning).
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+nsis:
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Beaver Buddy
+  installerLanguages:
+    - en_US
+    - de_DE

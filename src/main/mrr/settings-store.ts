@@ -72,7 +72,12 @@ export function loadSettingsState(stateDir: string): SettingsState {
     if (isValidState(parsed)) return parsed;
     const migrated = migrateState(parsed);
     if (migrated) {
-      saveSettingsState(stateDir, migrated);
+      // Fire-and-forget: loadSettingsState stays sync, and a failed
+      // migration persist is non-fatal — the in-memory migrated state is
+      // still returned and the next save rewrites the file.
+      void saveSettingsState(stateDir, migrated).catch((error: unknown) => {
+        console.error('Failed to persist migrated growth settings:', error);
+      });
       return migrated;
     }
     return freshState();
@@ -81,6 +86,6 @@ export function loadSettingsState(stateDir: string): SettingsState {
   }
 }
 
-export function saveSettingsState(stateDir: string, state: SettingsState): void {
-  atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
+export async function saveSettingsState(stateDir: string, state: SettingsState): Promise<void> {
+  await atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
 }

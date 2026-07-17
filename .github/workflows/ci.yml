@@ -14,7 +14,12 @@ permissions:
 
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,3 +41,68 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Determine signing mode
+        # Fork PRs never receive secrets, so this is fork-safe: no secrets ->
+        # throwaway self-signed certificate. Real cert secrets are propagated
+        # via GITHUB_ENV (values stay masked in logs).
+        if: matrix.os == 'windows-latest'
+        id: signing
+        shell: pwsh
+        env:
+          SECRET_WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          SECRET_WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+        run: |
+          if (-not [string]::IsNullOrEmpty($env:SECRET_WIN_CSC_LINK) -and
+              -not [string]::IsNullOrEmpty($env:SECRET_WIN_CSC_KEY_PASSWORD)) {
+            Write-Output 'mode=real' >> $env:GITHUB_OUTPUT
+            Write-Output 'Signing with repository certificate (WIN_CSC_LINK secret).'
+            Write-Output "WIN_CSC_LINK=$env:SECRET_WIN_CSC_LINK" >> $env:GITHUB_ENV
+            Write-Output "WIN_CSC_KEY_PASSWORD=$env:SECRET_WIN_CSC_KEY_PASSWORD" >> $env:GITHUB_ENV
+          } else {
+            Write-Output 'mode=selfsigned' >> $env:GITHUB_OUTPUT
+            Write-Output 'No signing secrets available (e.g. fork PR); will use a throwaway self-signed certificate.'
+          }
+
+      - name: Create throwaway self-signed certificate
+        if: matrix.os == 'windows-latest' && steps.signing.outputs.mode == 'selfsigned'
+        shell: pwsh
+        run: |
+          $password = -join ((48..57) + (65..90) + (97..122) | Get-Random -Count 32 | ForEach-Object { [char]$_ })
+          $secure = ConvertTo-SecureString -String $password -Force -AsPlainText
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject 'CN=Beaver Buddy CI (self-signed)' `
+            -FriendlyName 'Beaver Buddy CI throwaway signing cert' `
+            -CertStoreLocation Cert:\CurrentUser\My `
+            -KeyExportPolicy Exportable `
+            -NotAfter (Get-Date).AddDays(2)
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'beaver-buddy-ci-throwaway.pfx'
+          Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $secure | Out-Null
+          Remove-Item -LiteralPath "Cert:\CurrentUser\My\$($cert.Thumbprint)" -Force
+          Write-Output "WIN_CSC_LINK=$pfxPath" >> $env:GITHUB_ENV
+          Write-Output "WIN_CSC_KEY_PASSWORD=$password" >> $env:GITHUB_ENV
+
+      - name: Package Windows
+        if: matrix.os == 'windows-latest'
+        run: npx electron-builder --win --publish never
+
+      - name: Verify signatures
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          if ('${{ steps.signing.outputs.mode }}' -eq 'selfsigned') {
+            ./scripts/verify-signatures.ps1 -ExpectedSubjectContains 'Beaver Buddy CI (self-signed)'
+          } else {
+            ./scripts/verify-signatures.ps1
+          }
+
+      - name: Upload Windows artifacts
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/*.exe

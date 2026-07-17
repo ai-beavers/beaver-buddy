@@ -150,6 +150,18 @@ function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
   };
 }
 
+export function clampRoamStateToBounds(state: RoamState, bounds: Bounds): RoamState {
+  const max = maxX(bounds);
+  const ground = groundY(bounds);
+  return {
+    ...state,
+    x: clamp(state.x, 0, max),
+    y: Math.min(state.y, ground),
+    targetX: clamp(state.targetX, 0, max),
+    climbTargetY: Math.min(state.climbTargetY, ground),
+  };
+}
+
 export function createRoamState(bounds: Bounds, rng: Rng): RoamState {
   const ground = groundY(bounds);
   const x = clamp(rng() * maxX(bounds), 0, maxX(bounds));

@@ -1,10 +1,17 @@
 import path from 'node:path';
 import { app, BrowserWindow, powerMonitor, screen } from 'electron';
 import { applySessionHardening, applyWindowHardening } from './hardening';
-import { HATCH_START_CHANNEL, PAUSE_CHANGED_CHANNEL, PET_CHANGED_CHANNEL, QUIP_CHANGED_CHANNEL } from './ipc-channels';
+import {
+  BOUNDS_CHANGED_CHANNEL,
+  HATCH_START_CHANNEL,
+  PAUSE_CHANGED_CHANNEL,
+  PET_CHANGED_CHANNEL,
+  QUIP_CHANGED_CHANNEL,
+} from './ipc-channels';
 import { loadOnboardingState, saveOnboardingState } from './onboarding';
 import { createPauseState, isPaused, setSystemPause, toggleManualPause, type PauseState } from './pause-state';
 import { createTray, formatPetLabel } from './tray';
+import { configureAlwaysOnTop, fitWindowToWorkArea, getOverlayWindowBounds, getPrimaryWorkAreaInfo, onWorkAreaChanged } from './overlay-adapter';
 import { XpEngine, type PetUpdate } from './xp/engine';
 import { UsageTracker } from './usage/tracker';
 import { todayTotalTokens } from './usage/totals';
@@ -26,6 +33,22 @@ const QUIP_FLAG = '--quip';
 const KEYCHAIN_SERVICE_FLAG = '--keychain-service';
 const MRR_POLL_NOW_FLAG = '--mrr-poll-now';
 const QUIP_TRIGGERS = Object.keys(QUIP_POOLS) as readonly QuipTrigger[];
+
+// Enforce a single running instance. A second launch terminates immediately
+// and, on Windows, asks the first instance to surface its window.
+const singleInstanceLock = app.requestSingleInstanceLock();
+if (!singleInstanceLock) {
+  app.quit();
+  process.exit(0);
+}
+
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  }
+});
 
 let pauseState: PauseState = createPauseState();
 let mainWindow: BrowserWindow | null = null;
@@ -102,13 +125,13 @@ function appIconPath(): string {
 }
 
 function createWindow(): BrowserWindow {
-  const { workArea } = screen.getPrimaryDisplay();
+  const initialBounds = getOverlayWindowBounds(screen.getPrimaryDisplay());
 
   const win = new BrowserWindow({
-    x: workArea.x,
-    y: workArea.y,
-    width: workArea.width,
-    height: workArea.height,
+    x: initialBounds.x,
+    y: initialBounds.y,
+    width: initialBounds.width,
+    height: initialBounds.height,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -126,7 +149,7 @@ function createWindow(): BrowserWindow {
     },
   });
 
-  win.setAlwaysOnTop(true, 'floating');
+  configureAlwaysOnTop(win);
   win.setIgnoreMouseEvents(true);
   ignoresMouseEvents = true;
 
@@ -154,13 +177,26 @@ function printSmokeResultAndExit(win: BrowserWindow): void {
       // set once at window construction and cannot change afterwards.
       transparent: true,
       paused: isPaused(pauseState),
+      // Windows transparent frameless windows are enlarged by ~3px by the OS,
+      // so exact equality fails. Allow a small tolerance in each dimension.
+      boundsMatchWorkArea: (() => {
+        const wb = win.getBounds();
+        const wa = getOverlayWindowBounds(screen.getPrimaryDisplay());
+        const tolerance = 4;
+        return (
+          Math.abs(wb.x - wa.x) <= tolerance &&
+          Math.abs(wb.y - wa.y) <= tolerance &&
+          Math.abs(wb.width - wa.width) <= tolerance &&
+          Math.abs(wb.height - wa.height) <= tolerance
+        );
+      })(),
     };
     process.stdout.write(`${JSON.stringify(result)}\n`);
     app.exit(0);
   }, SMOKE_DELAY_MS);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   applySessionHardening();
 
   // Unpackaged only: Electron.app has no bundle icon, so set Dock manually
@@ -178,10 +214,35 @@ app.whenReady().then(() => {
     // exactly-once even if the app is killed mid-sequence (~6s window) —
     // acceptable for a one-shot cosmetic onboarding, and --reset-hatch
     // recovers it. Avoids adding a hatch:done renderer -> main channel.
-    saveOnboardingState(stateDir, { hatched: true });
+    await saveOnboardingState(stateDir, { hatched: true });
   }
 
   mainWindow = createWindow();
+
+  let lastWorkArea = getPrimaryWorkAreaInfo();
+  fitWindowToWorkArea(mainWindow, lastWorkArea);
+
+  const unsubscribeWorkArea = onWorkAreaChanged((next) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (
+      next.x === lastWorkArea.x &&
+      next.y === lastWorkArea.y &&
+      next.width === lastWorkArea.width &&
+      next.height === lastWorkArea.height
+    ) {
+      return;
+    }
+    lastWorkArea = next;
+    fitWindowToWorkArea(mainWindow, next);
+    mainWindow.webContents.send(BOUNDS_CHANGED_CHANNEL, {
+      width: next.width,
+      height: next.height,
+    });
+  });
+
+  mainWindow.on('closed', () => {
+    unsubscribeWorkArea();
+  });
 
   const xpEngine = new XpEngine(stateDir);
 
@@ -193,6 +254,7 @@ app.whenReady().then(() => {
   const mrrEngine = new MrrEngine({
     xpEngine,
     getMode: () => growthSettings.mode,
+    getSecretStoreDir: () => stateDir,
     getKeychainService: () => keychainService,
     getConnected: () => ({ stripe: growthSettings.stripeConnected, revenuecat: growthSettings.revenuecatConnected }),
   });
@@ -219,12 +281,26 @@ app.whenReady().then(() => {
         tray.refresh();
         if (growthSettings.mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
       },
-      onPetReset: () => {
-        // Hatch first so the renderer has hatchState before PET_CHANGED from
-        // resetProgress (same ordering as a first-launch hatch).
+      onProgressReset: async () => {
+        // Persist before send: same exactly-once discipline as the launch
+        // hatch path — a kill mid-hatch must not re-hatch on next launch.
+        await saveOnboardingState(stateDir, { hatched: true });
+        // Hatch before the pet update, same ordering invariant as
+        // did-finish-load (the renderer suppresses evolution handling while
+        // a hatch is active).
         mainWindow?.webContents.send(HATCH_START_CHANNEL);
-        saveOnboardingState(stateDir, { hatched: true });
-        xpEngine.resetProgress();
+        // Emits the pet update through the onUpdate wiring above, which
+        // does tray.refresh() + PET_CHANGED — nothing else to notify.
+        try {
+          await xpEngine.resetProgress();
+        } catch {
+          // Persist failure (e.g. Windows transient rename lock from AV):
+          // the hatch already started, but the XP state did not actually
+          // change. Resync the renderer with the real current state so it
+          // does not stay stuck on a false reset.
+          const lastUpdate = xpEngine.getLastUpdate();
+          mainWindow?.webContents.send(PET_CHANGED_CHANNEL, lastUpdate);
+        }
       },
       getUsageSources: () => {
         usageTracker?.refresh();
@@ -252,10 +328,10 @@ app.whenReady().then(() => {
       getPetLabel: () => formatPetLabel(xpEngine.getState()),
       getGrowthMode: () => growthSettings.mode,
       isMrrAvailable: () => growthSettings.stripeConnected || growthSettings.revenuecatConnected,
-      onSelectGrowthMode: (mode) => {
+      onSelectGrowthMode: async (mode) => {
         if (mode === 'mrr' && !(growthSettings.stripeConnected || growthSettings.revenuecatConnected)) return;
         growthSettings = { ...growthSettings, mode };
-        saveSettingsState(stateDir, growthSettings);
+        await saveSettingsState(stateDir, growthSettings);
         xpEngine.setMode(growthSettings.mode);
         if (mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
       },
@@ -279,7 +355,7 @@ app.whenReady().then(() => {
 
   const injectXpAmount = parseInjectXp(process.argv);
   if (injectXpAmount !== null) {
-    xpEngine.injectXp(injectXpAmount);
+    await xpEngine.injectXp(injectXpAmount);
   }
 
   const usageTrackerInstance = new UsageTracker();
@@ -289,7 +365,7 @@ app.whenReady().then(() => {
     codex: growthSettings.codexEnabled,
   });
   usageTrackerInstance.start();
-  xpEngine.attachTracker(usageTrackerInstance);
+  await xpEngine.attachTracker(usageTrackerInstance);
 
   // codingSession/spend-tier/idle detection rides the tracker's own refresh
   // cadence via onTick (fires whether usage changed or not — idle detection
@@ -311,6 +387,13 @@ app.whenReady().then(() => {
   // engine update — including any evolution launch-time accrual already
   // triggered — is (re-)sent once the page is ready to receive it.
   mainWindow.webContents.once('did-finish-load', () => {
+    // Send the initial bounds explicitly so the renderer never has to infer
+    // the work area from window.innerWidth/Height.
+    mainWindow?.webContents.send(BOUNDS_CHANGED_CHANNEL, {
+      width: lastWorkArea.width,
+      height: lastWorkArea.height,
+    });
+
     // Hatch first: the renderer suppresses the animated evolution for pet
     // updates that arrive while a hatch is active, which only works if the
     // hatch message lands before a launch-time evolving update.

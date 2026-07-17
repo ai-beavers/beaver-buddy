@@ -12,7 +12,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 const SETTINGS_SAVE_CHANNEL = 'settings:save'; // must match src/main/ipc-channels.ts
 const SETTINGS_READ_STATUS_CHANNEL = 'settings:read-status'; // must match src/main/ipc-channels.ts
 const SETTINGS_DISCONNECT_CHANNEL = 'settings:disconnect'; // must match src/main/ipc-channels.ts
-const SETTINGS_RESET_PET_CHANNEL = 'settings:reset-pet'; // must match src/main/ipc-channels.ts
+const SETTINGS_RESET_PROGRESS_CHANNEL = 'settings:reset-progress'; // must match src/main/ipc-channels.ts
 const SETTINGS_CONNECT_USAGE_CHANNEL = 'settings:connect-usage'; // must match src/main/ipc-channels.ts
 
 export interface SaveSettingsPayload {
@@ -27,7 +27,7 @@ contextBridge.exposeInMainWorld('beaverBuddySettings', {
   readStatus: (): Promise<unknown> => ipcRenderer.invoke(SETTINGS_READ_STATUS_CHANNEL),
   disconnect: (target: 'stripe' | 'revenuecat' | 'claude' | 'codex'): Promise<unknown> =>
     ipcRenderer.invoke(SETTINGS_DISCONNECT_CHANNEL, { target }),
-  resetPet: (): Promise<unknown> => ipcRenderer.invoke(SETTINGS_RESET_PET_CHANNEL),
+  resetProgress: (): Promise<unknown> => ipcRenderer.invoke(SETTINGS_RESET_PROGRESS_CHANNEL),
   connectUsage: (target: 'claude' | 'codex'): Promise<unknown> =>
     ipcRenderer.invoke(SETTINGS_CONNECT_USAGE_CHANNEL, { target }),
 });

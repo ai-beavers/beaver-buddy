@@ -6,8 +6,12 @@ written to be enforceable without a human in the loop.
 
 ## What this is
 
-A pixel-art desktop beaver for macOS: transparent Electron overlay, roams the screen,
-canned quips, evolves on AI-token burn (later: MRR). Public repo.
+A pixel-art desktop beaver for macOS and Windows: transparent Electron overlay,
+roams the screen, canned quips, evolves on AI-token burn (later: MRR). Public repo.
+
+**Scope note:** This repository currently focuses on building out the Windows
+implementation. macOS support remains in the codebase but is not actively
+extended.
 
 ## Stack (locked)
 
@@ -25,6 +29,14 @@ canned quips, evolves on AI-token burn (later: MRR). Public repo.
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` for every
   renderer; preload exposes a minimal typed API only.
+
+## App lifecycle
+
+- Only one app instance may run at a time. `src/main/main.ts` requests an Electron
+  single-instance lock at startup; a second launch exits immediately without
+  creating a window, tray icon, or extra tracking process. If a second launch
+  occurs while the running instance is minimized, that instance is restored and
+  focused.
 - All filesystem, Keychain, and network access lives in the **main process** behind
   narrow validated IPC. The renderer never sees raw paths, log contents, or secrets.
 - No remote content: deny navigation, new-window creation, arbitrary protocols,
@@ -34,8 +46,8 @@ canned quips, evolves on AI-token burn (later: MRR). Public repo.
 ## Security & privacy (public repo — non-negotiable)
 
 - **No secrets in the repo, ever**: no API keys, tokens, or `.env` files. R9 secrets
-  live in the macOS Keychain — the one sanctioned exception to the single
-  state-directory rule below.
+  live in the platform's secure storage (macOS Keychain / Windows secure storage)
+  — the one sanctioned exception to the single state-directory rule below.
 - Usage-log reading (PRD R7) is **read-only and enumerated**: only the specific
   Claude Code / Codex usage files the parser documents, parsed with bounded reads and
   schema validation; treat contents as sensitive AND malformed-by-default. Never log,
@@ -52,6 +64,21 @@ canned quips, evolves on AI-token burn (later: MRR). Public repo.
   the renderer or error messages.
 - No telemetry. No LLM/OpenAI calls anywhere in the MVP. Quips are static strings.
 
+## Usage-log paths
+
+- On Windows, Claude Code logs are discovered only under `%USERPROFILE%\.claude`.
+  The XDG path `~/.config/claude` is ignored on Windows.
+- On macOS and Linux, both `~/.config/claude` (XDG) and `~/.claude` (legacy) are
+  checked.
+- `CLAUDE_CONFIG_DIR` is the override with highest priority on all platforms. It
+  accepts comma-separated paths everywhere; on Windows it also accepts semicolons
+  as separators. Colons are intentionally not treated as separators on Windows
+  because they would conflict with drive letters (`C:\`).
+- Codex usage logs on Windows are discovered in this priority:
+  `CODEX_HOME` (override) > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` >
+  `~/.codex` (legacy). The first existing path is used. On macOS/Linux, logs are
+  read from `~/.codex` only.
+
 ## Overlay etiquette
 
 - Click-through is a hard invariant: the overlay never steals clicks, keystrokes, or
@@ -63,6 +90,10 @@ canned quips, evolves on AI-token burn (later: MRR). Public repo.
   Budget: idle CPU ~<5%, movement smooth at display refresh; sprite frames animate at
   their own 8–12 fps cadence (two separate constants — don't conflate render Hz with
   sprite fps).
+- HiDPI scaling must not break click-through, pixel-grid discipline, or logical
+  bounds. Roaming, hatch placement, bubbles and dirty rects always use logical
+  pixels; the canvas backing store and context transform scale by device pixel
+  ratio. `imageSmoothingEnabled` stays `false` so pixel art stays nearest-neighbor.
 
 ## Code style
 
@@ -76,8 +107,8 @@ canned quips, evolves on AI-token burn (later: MRR). Public repo.
   explainers; "dam" is the beaver expression (never "damn"). Spend-tier quips
   key off today's cumulative token total (weak <2M / ok 2M–20M / crazy ≥20M),
   once per day on upward crossing — not a per-minute rate and not USD.
-- App state persists in ONE app-support directory (secrets excepted → Keychain);
-  deleting it = factory reset.
+- App state persists in ONE app-support directory (secrets excepted → platform
+  secure storage); deleting it = factory reset.
 
 ## Assets
 
@@ -93,6 +124,11 @@ canned quips, evolves on AI-token burn (later: MRR). Public repo.
 acceptance criteria demonstrably hold → diff contains only the item's scope. Then PR.
 "Compiles" is never "verified".
 
+For materially visible Windows changes (overlay, tray, icons, HiDPI), the
+acceptance criteria must also hold in a Windows design gate: clean/synthetic
+desktop screenshots, a verdict under `docs/design-reviews/`, and any FAILs either
+fixed or documented as known limitations.
+
 ## Testing & design gate
 
 - Every logic module (level curve, XP accrual, log parser, quip scheduler) ships with
@@ -101,6 +137,9 @@ acceptance criteria demonstrably hold → diff contains only the item's scope. T
   per micro-tweak. Screenshots are taken on a clean/synthetic desktop background
   (no personal windows, notifications, or file names) and land in
   `docs/design-reviews/` with verdict notes.
+- Windows-specific visual changes must be evaluated on Windows or a Windows VM at
+  100 % and at least one HiDPI scaling (preferably 200 %). Automated packaging
+  (`electron-builder --win`) is required, but cannot replace the visual gate.
 
 ## Git & PRs
 

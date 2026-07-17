@@ -7,7 +7,7 @@ import {
   QUIP_CHANGED_CHANNEL,
   SETTINGS_DISCONNECT_CHANNEL,
   SETTINGS_READ_STATUS_CHANNEL,
-  SETTINGS_RESET_PET_CHANNEL,
+  SETTINGS_RESET_PROGRESS_CHANNEL,
   SETTINGS_SAVE_CHANNEL,
   SETTINGS_CONNECT_USAGE_CHANNEL,
 } from './ipc-channels';
@@ -59,9 +59,9 @@ describe('ipc-channels drift guard', () => {
     expect(match?.[1]).toBe(SETTINGS_DISCONNECT_CHANNEL);
   });
 
-  it('settings-preload.ts hand-synced channel literal matches SETTINGS_RESET_PET_CHANNEL', () => {
-    const match = settingsSource.match(/const SETTINGS_RESET_PET_CHANNEL = '([^']*)'/);
-    expect(match?.[1]).toBe(SETTINGS_RESET_PET_CHANNEL);
+  it('settings-preload.ts hand-synced channel literal matches SETTINGS_RESET_PROGRESS_CHANNEL', () => {
+    const match = settingsSource.match(/const SETTINGS_RESET_PROGRESS_CHANNEL = '([^']*)'/);
+    expect(match?.[1]).toBe(SETTINGS_RESET_PROGRESS_CHANNEL);
   });
 
   it('settings-preload.ts hand-synced channel literal matches SETTINGS_CONNECT_USAGE_CHANNEL', () => {

@@ -7,18 +7,18 @@
 // though no other window's preload exposes them).
 
 import path from 'node:path';
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, type IpcMainInvokeEvent } from 'electron';
 import { applyWindowHardening } from '../hardening';
 import {
   SETTINGS_CONNECT_USAGE_CHANNEL,
   SETTINGS_DISCONNECT_CHANNEL,
   SETTINGS_READ_STATUS_CHANNEL,
-  SETTINGS_RESET_PET_CHANNEL,
+  SETTINGS_RESET_PROGRESS_CHANNEL,
   SETTINGS_SAVE_CHANNEL,
 } from '../ipc-channels';
 import type { UsageSourcesSnapshot } from '../usage/tracker';
-import { deleteKeychainSecret, setKeychainSecret } from './keychain';
 import { REVENUECAT_KEY_ACCOUNT, REVENUECAT_PROJECT_ACCOUNT, STRIPE_KEY_ACCOUNT } from './mrr-config';
+import { deleteSecret, setSecret } from './secrets';
 import { saveSettingsState, type Mode, type SettingsState } from './settings-store';
 import {
   isValidationError,
@@ -33,7 +33,7 @@ export interface SettingsWindowDeps {
   readonly getSettings: () => SettingsState;
   readonly onSettingsChanged: (next: SettingsState) => void;
   // Wipes pet XP to level 1 / baby and replays hatch — growth keys/mode untouched.
-  readonly onPetReset: () => void;
+  readonly onProgressReset: () => Promise<void>;
   // Re-scan logs + return per-source status (enabled is opt-in; tokens only when enabled).
   readonly getUsageSources: () => UsageSourcesSnapshot;
   readonly onUsageEnabledChanged: (next: { claudeEnabled: boolean; codexEnabled: boolean }) => void;
@@ -41,6 +41,18 @@ export interface SettingsWindowDeps {
 
 let settingsWindow: BrowserWindow | null = null;
 let handlersRegistered = false;
+
+// Measured on Windows 2026-07-17 via CDP (scripts/cdp-screenshot.mjs --measure,
+// worst case: #claudeStatus/#codexStatus, both token lines and #status filled):
+// documentElement.scrollHeight = 705 CSS-px -> +8 px buffer for DPI rounding and
+// Windows font metrics = 713. With useContentSize the height is the content
+// size, so the measured value maps 1:1 onto the option.
+const SETTINGS_WINDOW_CONTENT_HEIGHT = 713;
+// useContentSize height covers only the content; workAreaSize is the total
+// usable screen, so reserve room for the OS title bar (~31 px on Windows)
+// plus slack before capping — keeps the whole window on small/high-DPI
+// screens (e.g. 1366x768 or 1080p @150%, workArea ~688 px).
+const TITLE_BAR_ALLOWANCE = 40;
 
 function isFromSettingsWindow(event: IpcMainInvokeEvent): boolean {
   return settingsWindow !== null && !settingsWindow.isDestroyed() && event.senderFrame === settingsWindow.webContents.mainFrame;
@@ -62,8 +74,8 @@ export interface SettingsHandlers {
   readStatus(event: IpcMainInvokeEvent): unknown;
   save(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
   disconnect(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
-  resetPet(event: IpcMainInvokeEvent): unknown;
-  connectUsage(event: IpcMainInvokeEvent, payload: unknown): unknown;
+  resetProgress(event: IpcMainInvokeEvent): Promise<unknown>;
+  connectUsage(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
 }
 
 function usagePayload(usage: UsageSourcesSnapshot) {
@@ -115,16 +127,16 @@ export function createSettingsHandlers(
 
       try {
         if (parsed.stripeKey) {
-          await setKeychainSecret(deps.keychainService, STRIPE_KEY_ACCOUNT, parsed.stripeKey);
+          await setSecret(deps.stateDir, deps.keychainService, STRIPE_KEY_ACCOUNT, parsed.stripeKey);
           stripeConnected = true;
         }
         if (parsed.revenuecatKey && parsed.revenuecatProjectId) {
-          await setKeychainSecret(deps.keychainService, REVENUECAT_KEY_ACCOUNT, parsed.revenuecatKey);
-          await setKeychainSecret(deps.keychainService, REVENUECAT_PROJECT_ACCOUNT, parsed.revenuecatProjectId);
+          await setSecret(deps.stateDir, deps.keychainService, REVENUECAT_KEY_ACCOUNT, parsed.revenuecatKey);
+          await setSecret(deps.stateDir, deps.keychainService, REVENUECAT_PROJECT_ACCOUNT, parsed.revenuecatProjectId);
           revenuecatConnected = true;
         }
       } catch {
-        return { ok: false, error: 'keychain write failed' };
+        return { ok: false, error: 'secret write failed' };
       }
 
       const mode = nextModeAfterSave(parsed.mode ?? current.mode, stripeConnected, revenuecatConnected);
@@ -135,7 +147,7 @@ export function createSettingsHandlers(
         claudeEnabled: current.claudeEnabled,
         codexEnabled: current.codexEnabled,
       };
-      saveSettingsState(deps.stateDir, next);
+      await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
       return { ok: true };
     },
@@ -153,7 +165,7 @@ export function createSettingsHandlers(
           claudeEnabled: parsed.target === 'claude' ? false : current.claudeEnabled,
           codexEnabled: parsed.target === 'codex' ? false : current.codexEnabled,
         };
-        saveSettingsState(deps.stateDir, next);
+        await saveSettingsState(deps.stateDir, next);
         deps.onSettingsChanged(next);
         deps.onUsageEnabledChanged({ claudeEnabled: next.claudeEnabled, codexEnabled: next.codexEnabled });
         return { ok: true, ...usagePayload(deps.getUsageSources()) };
@@ -164,15 +176,15 @@ export function createSettingsHandlers(
 
       try {
         if (parsed.target === 'stripe') {
-          await deleteKeychainSecret(deps.keychainService, STRIPE_KEY_ACCOUNT);
+          await deleteSecret(deps.stateDir, deps.keychainService, STRIPE_KEY_ACCOUNT);
           stripeConnected = false;
         } else {
-          await deleteKeychainSecret(deps.keychainService, REVENUECAT_KEY_ACCOUNT);
-          await deleteKeychainSecret(deps.keychainService, REVENUECAT_PROJECT_ACCOUNT);
+          await deleteSecret(deps.stateDir, deps.keychainService, REVENUECAT_KEY_ACCOUNT);
+          await deleteSecret(deps.stateDir, deps.keychainService, REVENUECAT_PROJECT_ACCOUNT);
           revenuecatConnected = false;
         }
       } catch {
-        return { ok: false, error: 'keychain delete failed' };
+        return { ok: false, error: 'secret delete failed' };
       }
 
       const mode = nextModeAfterDisconnect(current.mode, stripeConnected, revenuecatConnected);
@@ -183,18 +195,25 @@ export function createSettingsHandlers(
         claudeEnabled: current.claudeEnabled,
         codexEnabled: current.codexEnabled,
       };
-      saveSettingsState(deps.stateDir, next);
+      await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
       return { ok: true };
     },
 
-    resetPet(event) {
+    // The reset orchestration itself (persist onboarding, hatch send, XP
+    // engine reset) lives with the dep's caller in main.ts — this handler
+    // only guards the sender and maps success/failure onto the result.
+    async resetProgress(event) {
       if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };
-      deps.onPetReset();
-      return { ok: true };
+      try {
+        await deps.onProgressReset();
+        return { ok: true };
+      } catch {
+        return { ok: false, error: 'reset failed' };
+      }
     },
 
-    connectUsage(event, payload) {
+    async connectUsage(event, payload) {
       if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };
       const parsed = validateConnectUsageInput(payload);
       if (isValidationError(parsed)) return { ok: false, error: parsed.error };
@@ -205,7 +224,7 @@ export function createSettingsHandlers(
         claudeEnabled: parsed.target === 'claude' ? true : current.claudeEnabled,
         codexEnabled: parsed.target === 'codex' ? true : current.codexEnabled,
       };
-      saveSettingsState(deps.stateDir, next);
+      await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
       deps.onUsageEnabledChanged({ claudeEnabled: next.claudeEnabled, codexEnabled: next.codexEnabled });
       const usage = deps.getUsageSources();
@@ -228,7 +247,7 @@ function registerHandlers(deps: SettingsWindowDeps): void {
   ipcMain.handle(SETTINGS_READ_STATUS_CHANNEL, (event) => handlers.readStatus(event));
   ipcMain.handle(SETTINGS_SAVE_CHANNEL, (event, payload: unknown) => handlers.save(event, payload));
   ipcMain.handle(SETTINGS_DISCONNECT_CHANNEL, (event, payload: unknown) => handlers.disconnect(event, payload));
-  ipcMain.handle(SETTINGS_RESET_PET_CHANNEL, (event) => handlers.resetPet(event));
+  ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL, (event) => handlers.resetProgress(event));
   ipcMain.handle(SETTINGS_CONNECT_USAGE_CHANNEL, (event, payload: unknown) => handlers.connectUsage(event, payload));
 }
 
@@ -242,10 +261,23 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
 
   const win = new BrowserWindow({
     width: 420,
-    height: 680,
+    // Content-sized (useContentSize): all 5 fieldsets + the status line fit
+    // without scrolling; capped so window + title bar stay inside the work
+    // area on small/high-DPI screens (content then scrolls, no data loss).
+    height: Math.min(
+      SETTINGS_WINDOW_CONTENT_HEIGHT,
+      screen.getPrimaryDisplay().workAreaSize.height - TITLE_BAR_ALLOWANCE,
+    ),
+    useContentSize: true,
     resizable: false,
     title: 'Beaver Buddy — Settings',
-    icon: path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png'),
+    // .ico on Windows (multi-resolution, native taskbar sharpness); 1024² PNG
+    // master on macOS/Linux (system/Dock applies the continuous-corner mask).
+    icon: path.join(
+      app.getAppPath(),
+      'assets',
+      process.platform === 'win32' ? 'icon.ico' : 'beaver-buddy-icon.png',
+    ),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

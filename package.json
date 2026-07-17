@@ -2,23 +2,26 @@
   "name": "beaver-buddy",
   "version": "0.1.0",
   "private": true,
-  "description": "Pixel-art desktop beaver overlay for macOS",
+  "description": "Pixel-art desktop beaver overlay for macOS and Windows",
+  "author": "AI Beavers",
   "main": "dist/main/main.js",
   "engines": {
     "node": "24.x"
   },
   "scripts": {
     "start": "npm run build && electron .",
-    "build": "tsc && tsc -p src/renderer/tsconfig.json && cp src/renderer/index.html dist/renderer/index.html && mkdir -p dist/renderer/assets && rm -rf dist/renderer/assets/sprites && cp -R assets/sprites dist/renderer/assets/sprites && cp src/main/mrr/settings.html dist/main/mrr/settings.html",
+    "build": "tsc && tsc -p src/renderer/tsconfig.json && node scripts/build-assets.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
+    "assets:adult-placeholder": "node scripts/gen-sprites/build-adult-placeholder.ts",
     "assets:build": "node scripts/gen-sprites/build.ts",
+    "assets:icons": "node scripts/gen-sprites/build-icons.ts",
     "assets:ingest": "node scripts/gen-sprites/ingest-images.mjs",
     "usage:cli": "npm run build && node scripts/usage-cli.js"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
     "electron": "43.1.1",

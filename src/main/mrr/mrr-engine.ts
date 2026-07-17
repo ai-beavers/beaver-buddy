@@ -8,7 +8,7 @@
 // usage/tracker.ts): never keeps the process alive on its own.
 
 import type { XpEngine } from '../xp/engine';
-import { getKeychainSecret } from './keychain';
+import { getSecret } from './secrets';
 import { getStripeMrr } from './stripe';
 import { getRevenueCatMrr } from './revenuecat';
 import type { FetchLike } from './https-allowlist';
@@ -17,6 +17,7 @@ import { MRR_MAX_DOLLARS, MRR_POLL_MS, MRR_XP_PER_DOLLAR, REVENUECAT_KEY_ACCOUNT
 export interface MrrEngineDeps {
   readonly xpEngine: Pick<XpEngine, 'getLastMrrAwardDate' | 'awardMrr'>;
   readonly getMode: () => 'tokens' | 'mrr';
+  readonly getSecretStoreDir: () => string;
   readonly getKeychainService: () => string;
   readonly getConnected: () => { readonly stripe: boolean; readonly revenuecat: boolean };
   readonly fetchImpl?: FetchLike;
@@ -53,7 +54,7 @@ export class MrrEngine {
   }
 
   async pollNow(): Promise<void> {
-    const { xpEngine, getMode, getKeychainService, getConnected, now, fetchImpl } = this.deps;
+    const { xpEngine, getMode, getSecretStoreDir, getKeychainService, getConnected, now, fetchImpl } = this.deps;
     if (getMode() !== 'mrr') return;
 
     const today = localDateString((now ?? (() => new Date()))());
@@ -64,12 +65,13 @@ export class MrrEngine {
     if (lastAward !== null && today <= lastAward) return;
 
     const connected = getConnected();
+    const storeDir = getSecretStoreDir();
     const service = getKeychainService();
     let totalDollars = 0;
     let sawConnectedSource = false;
 
     if (connected.stripe) {
-      const apiKey = await getKeychainSecret(service, STRIPE_KEY_ACCOUNT);
+      const apiKey = await getSecret(storeDir, service, STRIPE_KEY_ACCOUNT);
       if (!apiKey) return; // connected flag says yes but the key is gone — no guessed award
       const mrr = await getStripeMrr({ apiKey, fetchImpl });
       if (mrr === null) return;
@@ -78,8 +80,8 @@ export class MrrEngine {
     }
 
     if (connected.revenuecat) {
-      const apiKey = await getKeychainSecret(service, REVENUECAT_KEY_ACCOUNT);
-      const projectId = await getKeychainSecret(service, REVENUECAT_PROJECT_ACCOUNT);
+      const apiKey = await getSecret(storeDir, service, REVENUECAT_KEY_ACCOUNT);
+      const projectId = await getSecret(storeDir, service, REVENUECAT_PROJECT_ACCOUNT);
       if (!apiKey || !projectId) return;
       const mrr = await getRevenueCatMrr({ apiKey, projectId, fetchImpl });
       if (mrr === null) return;
@@ -93,6 +95,6 @@ export class MrrEngine {
     // garbage value is not retried the same day), absurd values cap at
     // MRR_MAX_DOLLARS so a corrupt response can't mint unbounded XP.
     const dollars = Number.isFinite(totalDollars) ? Math.min(Math.max(0, totalDollars), MRR_MAX_DOLLARS) : 0;
-    xpEngine.awardMrr(Math.floor(dollars * MRR_XP_PER_DOLLAR), today);
+    await xpEngine.awardMrr(Math.floor(dollars * MRR_XP_PER_DOLLAR), today);
   }
 }

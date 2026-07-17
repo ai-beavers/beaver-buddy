@@ -7,7 +7,7 @@ mechanics.
 
 ## Quick start
 
-Requires macOS 14+ and Node 24.x.
+Requires Node 24.x and either macOS 14+ or Windows 10/11.
 
 ```sh
 npm ci && npm run typecheck && npm run lint && npm test

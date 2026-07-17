@@ -10,8 +10,8 @@ lodge sheet is untouched and stays fully palette/outline-bound.
 
 Defined once in `scripts/gen-sprites/palette.ts`; the lodge's pixel map
 references colors by the one-char key. `.` is transparent and never a
-palette entry. Beaver sheets (`beaver-{baby,teen}.png`) are RGBA truecolor,
-not indexed — this table does not constrain them.
+palette entry. Beaver sheets (`beaver-{baby,teen,adult}.png`) are RGBA
+truecolor, not indexed — this table does not constrain them.
 
 | Key | Hex       | Name                    | Used for |
 |-----|-----------|-------------------------|----------|
@@ -38,9 +38,10 @@ keys (and the lodge pixel map that references some of them) don't churn.
 
 ## Grid & tiles
 
-- **Beaver stages** (`beaver-{baby,teen}.png`): 96×96 transparent RGBA
-  tiles, ingested from the user's own images at their native chunky-pixel
-  resolution (no 1-art-pixel-per-sheet-pixel rule — see Provenance).
+- **Beaver stages** (`beaver-{baby,teen,adult}.png`): 96×96 transparent RGBA
+  tiles. Baby/teen are ingested from the user's own images at their native
+  chunky-pixel resolution; adult is a placeholder derived from the teen
+  sheet (no 1-art-pixel-per-sheet-pixel rule — see Provenance).
   Renderer draws at `PET_SCALE = 1` (`src/renderer/pet-config.ts`): 96px
   native tile → 96px on screen, integer nearest-neighbor blit.
 - **Lodge + particles** (`lodge.png`): unchanged, 48×48 indexed-palette
@@ -90,20 +91,26 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
 
 - **Beaver stages**: `idle(1), walk(N)` — no run/sleep/react (BL-11 slimmed
   the animation set to match `roam.ts`'s idle/walk-only state machine).
-  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×2. fps hint: 8. The
+  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×2. `beaver-adult.png`:
+  walk×2 (placeholder derived from teen — see Provenance). fps hint: 8. The
   idle pose never appears in a walk row — walk cycles are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
   frames are 8×8 particles centered in the 48×48 tile (rows/cols 20–27, also
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
   `SPRITE_FPS` constant is 8 — see `src/renderer/pet-config.ts` for why that
   mismatch is cosmetic, not a bug).
-- Adult stage has no art yet: `sprites.ts#loadSheet` falls back to the teen
-  sheet until it does.
+- Adult stage art is provisional: `beaver-adult.png/.json` is mechanically
+  derived from the committed teen sheet by
+  `scripts/gen-sprites/build-adult-placeholder.ts` (`npm run
+  assets:adult-placeholder`) — per frame a crop to the content bbox plus a
+  nearest-neighbor upscale to the full 96px tile height, so the adult reads
+  as a larger teen. Final adult art stays open on flight-plan #7.
 
 ## Provenance
 
-**Beaver stages** (`beaver-baby.png`, `beaver-teen.png`): user-generated
-images (external image-gen, owner-supplied), ingested via
+**Beaver stages** (`beaver-baby.png`, `beaver-teen.png`, `beaver-adult.png`):
+baby/teen are user-generated images (external image-gen, owner-supplied),
+ingested via
 `scripts/gen-sprites/ingest-images.mjs` — background removal (flood-fill
 transparency from the borders over near-white/near-black/already-transparent
 pixels, then a hard alpha threshold), crop to content bbox, premultiplied-
@@ -114,7 +121,12 @@ owner decision, 2026-07-14. Source images live in the gitignored
 `assets-src/beaver/` (not committed — no raw image-gen intermediates in the
 repo, same rule as everywhere else); only the ingested sheets are committed.
 Right-facing frames only — the user's left-facing images are unused (see
-Facing & mirroring above). No adult-stage art exists yet.
+Facing & mirroring above). The adult sheet is not ingested from source
+images — no authored adult art exists yet (flight-plan #7); it is a
+placeholder derived from the committed teen sheet (per-frame crop to the
+content bbox + nearest-neighbor upscale to the full tile height) by
+`scripts/gen-sprites/build-adult-placeholder.ts`, committed like the other
+sheets and byte-deterministic.
 
 **Lodge** (`lodge.png`): pixel maps authored by OpenAI Codex (vision-guided
 from a user-supplied reference image), iterated through visual design-review

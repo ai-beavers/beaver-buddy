@@ -15,6 +15,7 @@ const PAUSE_CHANGED_CHANNEL = 'state:paused'; // must match src/main/ipc-channel
 const PET_CHANGED_CHANNEL = 'state:pet'; // must match src/main/ipc-channels.ts
 const HATCH_START_CHANNEL = 'state:hatch'; // must match src/main/ipc-channels.ts
 const QUIP_CHANGED_CHANNEL = 'state:quip'; // must match src/main/ipc-channels.ts
+const BOUNDS_CHANGED_CHANNEL = 'state:bounds'; // must match src/main/ipc-channels.ts
 
 interface PetChangedPayload {
   level: number;
@@ -25,6 +26,11 @@ interface PetChangedPayload {
 interface QuipChangedPayload {
   text: string;
   durationMs: number;
+}
+
+interface BoundsChangedPayload {
+  width: number;
+  height: number;
 }
 
 contextBridge.exposeInMainWorld('beaverBuddy', {
@@ -48,6 +54,13 @@ contextBridge.exposeInMainWorld('beaverBuddy', {
   onQuip: (callback: (quip: QuipChangedPayload) => void): void => {
     ipcRenderer.on(QUIP_CHANGED_CHANNEL, (_event, quip: QuipChangedPayload) => {
       callback(quip);
+    });
+  },
+  // One-way main -> renderer only; notifies the renderer of the overlay's
+  // current work-area bounds so it does not rely on window.innerWidth/Height.
+  onBoundsChanged: (callback: (bounds: BoundsChangedPayload) => void): void => {
+    ipcRenderer.on(BOUNDS_CHANGED_CHANNEL, (_event, bounds: BoundsChangedPayload) => {
+      callback(bounds);
     });
   },
 });
