@@ -1,9 +1,8 @@
 # Contributing
 
 See the [Contributing section of README.md](README.md#contributing) for the full
-picture. Before opening a PR, read [`CLAUDE.md`](CLAUDE.md) (the enforced guardrails)
-and [`PRD.md`](PRD.md) (the product source of truth) — this doc only covers the
-mechanics.
+picture. Before opening a PR, read [`PRD.md`](PRD.md) (the product source of truth) —
+this doc only covers the mechanics.
 
 ## Quick start
 

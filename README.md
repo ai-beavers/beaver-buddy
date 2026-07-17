@@ -204,9 +204,8 @@ usage logs.
 ## Contributing
 
 Contributions are welcome. This repo is executed largely by autonomous build items, so
-the guardrails are strict and enforced in review — please read
-[`CLAUDE.md`](CLAUDE.md) (the full guardrails) and [`PRD.md`](PRD.md) (the product
-source of truth) before opening a PR.
+the guardrails are strict and enforced in review — please read [`PRD.md`](PRD.md)
+(the product source of truth) before opening a PR.
 
 The essentials:
 
