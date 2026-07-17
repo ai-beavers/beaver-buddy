@@ -7,7 +7,7 @@
 // though no other window's preload exposes them).
 
 import path from 'node:path';
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, type IpcMainInvokeEvent } from 'electron';
 import { applyWindowHardening } from '../hardening';
 import {
   SETTINGS_CONNECT_USAGE_CHANNEL,
@@ -41,6 +41,18 @@ export interface SettingsWindowDeps {
 
 let settingsWindow: BrowserWindow | null = null;
 let handlersRegistered = false;
+
+// Measured on Windows 2026-07-17 via CDP (scripts/cdp-screenshot.mjs --measure,
+// worst case: #claudeStatus/#codexStatus, both token lines and #status filled):
+// documentElement.scrollHeight = 705 CSS-px -> +8 px buffer for DPI rounding and
+// Windows font metrics = 713. With useContentSize the height is the content
+// size, so the measured value maps 1:1 onto the option.
+const SETTINGS_WINDOW_CONTENT_HEIGHT = 713;
+// useContentSize height covers only the content; workAreaSize is the total
+// usable screen, so reserve room for the OS title bar (~31 px on Windows)
+// plus slack before capping — keeps the whole window on small/high-DPI
+// screens (e.g. 1366x768 or 1080p @150%, workArea ~688 px).
+const TITLE_BAR_ALLOWANCE = 40;
 
 function isFromSettingsWindow(event: IpcMainInvokeEvent): boolean {
   return settingsWindow !== null && !settingsWindow.isDestroyed() && event.senderFrame === settingsWindow.webContents.mainFrame;
@@ -249,9 +261,14 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
 
   const win = new BrowserWindow({
     width: 420,
-    // Room for the Connect Claude/Codex section plus the Reset danger-zone
-    // fieldset (window is not resizable).
-    height: 680,
+    // Content-sized (useContentSize): all 5 fieldsets + the status line fit
+    // without scrolling; capped so window + title bar stay inside the work
+    // area on small/high-DPI screens (content then scrolls, no data loss).
+    height: Math.min(
+      SETTINGS_WINDOW_CONTENT_HEIGHT,
+      screen.getPrimaryDisplay().workAreaSize.height - TITLE_BAR_ALLOWANCE,
+    ),
+    useContentSize: true,
     resizable: false,
     title: 'Beaver Buddy — Settings',
     icon: path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png'),

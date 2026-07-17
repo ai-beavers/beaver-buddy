@@ -1,17 +1,43 @@
 // Secret store is mocked (never the real one); the handlers under test are
 // Electron-free by construction (createSettingsHandlers takes the frame
-// check as a predicate), so importing settings-window.ts here is safe the
-// same way tray.test.ts's import of tray.ts is — no Electron API is called.
+// check as a predicate). Electron itself is mocked too, so the window-options
+// pin test at the bottom can call openSettingsWindow without a real app.
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { IpcMainInvokeEvent } from 'electron';
-import { createSettingsHandlers, nextModeAfterDisconnect, nextModeAfterSave, type SettingsWindowDeps } from './settings-window';
+import { BrowserWindow, type IpcMainInvokeEvent } from 'electron';
+import { createSettingsHandlers, nextModeAfterDisconnect, nextModeAfterSave, openSettingsWindow, type SettingsWindowDeps } from './settings-window';
 import { deleteSecret, setSecret } from './secrets';
 import type { SettingsState } from './settings-store';
 import type { UsageSourcesSnapshot } from '../usage/tracker';
+
+vi.mock('electron', () => {
+  const fakeWin = {
+    loadFile: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn(),
+    focus: vi.fn(),
+    isDestroyed: () => false,
+    webContents: {},
+  };
+  return {
+    app: { getAppPath: () => '/app' },
+    ipcMain: { handle: vi.fn() },
+    // Large work area: the pin test asserts the uncapped measured constant.
+    screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 4000, height: 4000 } }) },
+    // mockImplementation (not a bare vi.fn()): `new BrowserWindow(...)` must
+    // return the fake window or win.loadFile(...) would throw. A regular
+    // function (not an arrow) so it can be used as a constructor.
+    BrowserWindow: vi.fn().mockImplementation(function () {
+      return fakeWin;
+    }),
+  };
+});
+
+vi.mock('../hardening', () => ({
+  applyWindowHardening: vi.fn(),
+}));
 
 vi.mock('./secrets', () => ({
   setSecret: vi.fn().mockResolvedValue(undefined),
@@ -259,5 +285,37 @@ describe('createSettingsHandlers', () => {
     vi.mocked(d.onProgressReset).mockRejectedValue(new Error('boom'));
     const handlers = createSettingsHandlers(d, () => true);
     await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: false, error: 'reset failed' });
+  });
+});
+
+describe('openSettingsWindow', () => {
+  it('pins the measured content height, useContentSize and fixed-size flags', () => {
+    const deps: SettingsWindowDeps = {
+      stateDir: '/unused',
+      keychainService: 'svc',
+      getSettings: () => ({
+        mode: 'tokens',
+        stripeConnected: false,
+        revenuecatConnected: false,
+        claudeEnabled: false,
+        codexEnabled: false,
+      }),
+      onSettingsChanged: () => {},
+      onProgressReset: vi.fn().mockResolvedValue(undefined),
+      getUsageSources: () => ({
+        claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+        codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+      }),
+      onUsageEnabledChanged: () => {},
+    };
+
+    openSettingsWindow(deps);
+
+    // 713 = 705 px content (CDP worst-case measurement 2026-07-17, see
+    // settings-window.ts) + 8 px buffer; workArea mock is 4000 px, so the
+    // cap does not apply here.
+    expect(BrowserWindow).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 420, height: 713, useContentSize: true, resizable: false }),
+    );
   });
 });
