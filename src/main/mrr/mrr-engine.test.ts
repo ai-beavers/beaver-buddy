@@ -277,4 +277,34 @@ describe('MrrEngine.pollNow', () => {
     await engine.pollNow();
     expect(xp.awarded).toEqual([{ xp: 750, date: '2026-07-13' }]); // (50 + 25) * 10
   });
+
+  it('prevents concurrent polls from awarding twice', async () => {
+    let resolveSecret: ((value: string) => void) | undefined;
+    getSecretMock.mockImplementation(() => new Promise<string>((resolve) => {
+      resolveSecret = resolve;
+    }));
+    const fetchImpl = vi.fn().mockResolvedValue(stripeSubscriptionsResponse(50));
+    const xp = new FakeXp();
+    const engine = new MrrEngine({
+      xpEngine: xp,
+      getMode: () => 'mrr',
+      getSecretStoreDir: () => '/state',
+      getKeychainService: () => 'svc',
+      getConnected: () => ({ stripe: true, revenuecat: false }),
+      fetchImpl,
+      now: () => new Date('2026-07-13T10:00:00'),
+    });
+
+    const first = engine.pollNow();
+    const second = engine.pollNow(); // should return immediately while first is in flight
+
+    expect(xp.awarded).toHaveLength(0);
+    resolveSecret!('sk_test_fake');
+    await first;
+    await second;
+
+    expect(xp.awarded).toHaveLength(1);
+    expect(xp.awarded).toEqual([{ xp: 500, date: '2026-07-13' }]);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
 });
