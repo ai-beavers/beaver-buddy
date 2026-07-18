@@ -52,7 +52,11 @@ export function bakeRecipes(
 
   const frames: Record<string, string[]> = {};
 
-  app.stop();
+  // No app.stop()/start() dance here: the studio pauses playback before
+  // baking, so the ticker never mutates poses mid-bake, and the loop below is
+  // fully synchronous (applyPose → render → blit) — nothing can interleave.
+  // Stopping the ticker previously left the preview dead after the first
+  // bake (play no longer animated) with the last baked frame frozen on stage.
   recipes.forEach((recipe, rowIndex) => {
     const count = frameCount(recipe, BAKE_FPS);
     const dataUrls: string[] = [];

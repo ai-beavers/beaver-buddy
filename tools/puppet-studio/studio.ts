@@ -41,6 +41,28 @@ let session: Session | null = null;
 let playing = false;
 let playTimeS = 0;
 
+// The recipe currently selected in the UI (fallback: the rig's first recipe).
+function selectedRecipe(): AnimRecipe | undefined {
+  if (!session || session.recipes.length === 0) {
+    return undefined;
+  }
+  return session.recipes.find((r) => r.name === animSelect.value) ?? session.recipes[0];
+}
+
+// Re-applies the selected animation's first frame. Runs when the animation
+// changes while paused and after every bake, so a stale pose from another
+// recipe never lingers on stage — the parachute canopy once stayed visible
+// above the beaver because "bake & save" left the last parachute frame frozen.
+function showRestPose(): void {
+  const recipe = selectedRecipe();
+  if (!session || !recipe) {
+    return;
+  }
+  playTimeS = 0;
+  applyPose(session.stage, session.rig, recipe, 0);
+  session.app.render();
+}
+
 async function loadRig(rigName: string): Promise<void> {
   setStatus(`loading rig "${rigName}"…`);
   const response = await fetch(`/rigs/${rigName}.json`);
@@ -114,6 +136,7 @@ async function bakeAndSave(): Promise<void> {
   playButton.textContent = 'play';
   setStatus('baking…');
   const output: BakedOutput = bakeRecipes(session.app, session.rig, session.stage, session.recipes);
+  showRestPose();
   setStatus(`baked ${output.meta.rows.length} rows (${output.meta.sheetWidth}×${output.meta.sheetHeight}) — saving…`);
 
   const response = await fetch('/save', {
@@ -147,6 +170,14 @@ async function main(): Promise<void> {
   playButton.addEventListener('click', () => {
     playing = !playing;
     playButton.textContent = playing ? 'pause' : 'play';
+  });
+  animSelect.addEventListener('change', () => {
+    // While playing, the ticker picks the new recipe up on the next tick;
+    // while paused, the stage must be re-posed explicitly or the previous
+    // animation's last frame (e.g. a visible parachute canopy) stays frozen.
+    if (!playing) {
+      showRestPose();
+    }
   });
   bakeButton.addEventListener('click', () => {
     bakeAndSave().catch((error: unknown) => setStatus(String(error)));
