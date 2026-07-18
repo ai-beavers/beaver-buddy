@@ -74,4 +74,5 @@ today + lifetime token counts per source. Disconnect opts out again.
 ## Supersedes
 
 BL-8's `tokenSpike` pool and `TOKEN_SPIKE_RATE_PER_MIN` detector path. The
-BL-8 verdict doc remains historical evidence for the original quip system.
+BL-8 verdict doc remains historical evidence for the original quip system
+(archived under `design-reviews/archive/`).
