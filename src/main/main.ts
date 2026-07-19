@@ -117,11 +117,16 @@ function parseKeychainService(argv: readonly string[]): string {
 }
 
 function appIconPath(): string {
-  // Opaque 1024² RGB master, no baked squircle (Apple HIG / Icon Composer).
-  // Packaged .app uses assets/beaver-buddy-icon.icns via electron-builder;
-  // system applies the continuous-corner mask. Unpackaged Dock uses
+  // .ico on Windows (multi-resolution, native taskbar sharpness — mirrors the
+  // settings window, #59). macOS/Linux keep the opaque 1024² RGB master, no
+  // baked squircle (Apple HIG / Icon Composer). Packaged .app uses
+  // assets/beaver-buddy-icon.icns via electron-builder; unpackaged Dock uses
   // setUnpackagedDockIcon (masks in-process — dock.setIcon bypasses the system).
-  return path.join(app.getAppPath(), 'assets', 'beaver-buddy-icon.png');
+  return path.join(
+    app.getAppPath(),
+    'assets',
+    process.platform === 'win32' ? 'icon.ico' : 'beaver-buddy-icon.png',
+  );
 }
 
 function createWindow(): BrowserWindow {
