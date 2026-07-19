@@ -217,4 +217,20 @@ describe('discoverPaths — Codex on Windows', () => {
     expect(codexFiles).toHaveLength(1);
     expect(codexFiles[0]).toBe(path.join(localAppData, 'Codex', 'sessions', ...relPath));
   });
+
+  it('ignores empty/whitespace LOCALAPPDATA and APPDATA (never a relative Codex path)', () => {
+    // Review A: path.join('', 'Codex') would resolve to a relative 'Codex'
+    // directory in the process CWD — a real folder there must never be
+    // picked up as a log source.
+    const decoyRoot = path.join(process.cwd(), 'Codex');
+    touch(path.join(decoyRoot, 'sessions', '2026', '07', '13', 'rollout-cwd.jsonl'));
+    try {
+      expect(discoverPaths({ LOCALAPPDATA: '', APPDATA: '' }, home, 'win32').codexFiles).toEqual([]);
+      expect(
+        discoverPaths({ LOCALAPPDATA: '   ', APPDATA: '\t' }, home, 'win32').codexFiles,
+      ).toEqual([]);
+    } finally {
+      fs.rmSync(decoyRoot, { recursive: true, force: true });
+    }
+  });
 });
