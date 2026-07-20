@@ -1,6 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { createRoamState, createSeededRng, defaultRoamInput, tick, type Bounds, type RoamInput, type RoamState } from './roam.js';
-import { BEAVER_TILE_PX, CLICKS_TO_GRAB, CLICK_WINDOW_S, CLIMB_SPEED_PX_S, MAX_DT_S, PET_SCALE, WALK_SPEED_PX_S } from './pet-config.js';
+import {
+  clampRoamStateToBounds,
+  createRoamState,
+  createSeededRng,
+  defaultRoamInput,
+  tick,
+  type Bounds,
+  type RoamInput,
+  type RoamState,
+} from './roam.js';
+import {
+  BEAVER_TILE_PX,
+  CLICKS_TO_GRAB,
+  CLICK_WINDOW_S,
+  CLIMB_SPEED_PX_S,
+  GLIDE_FALL_SPEED_PX_S,
+  GLIDE_ROTATION_MAX_DEG,
+  GLIDE_SWAY_AMP_MAX_PX,
+  GLIDE_SWAY_AMP_MIN_PX,
+  GLIDE_SWAY_SPEED_MAX,
+  GLIDE_SWAY_SPEED_MIN,
+  LANDING_DURATION_S,
+  MAX_DT_S,
+  PET_SCALE,
+  WALK_SPEED_PX_S,
+} from './pet-config.js';
 
 const bounds: Bounds = { width: 800, height: 600 };
 // roam.ts clamps against the on-screen (scaled) footprint, not the raw art
@@ -407,7 +431,277 @@ describe('roam: parachute C1 grab interaction', () => {
     expect(gliding.phase).toBe('gliding');
     expect(gliding.anim).toBe('parachute-wind');
     expect(gliding.x).toBe(250);
-    expect(gliding.y).toBe(250);
+    expect(gliding.y).toBe(262); // 250 + GLIDE_FALL_SPEED_PX_S * 0.1
+  });
+});
+
+describe('roam: parachute C2 glide physics + landing', () => {
+  function enterGliding(
+    rng: () => number,
+    cursorX: number,
+    cursorY: number,
+  ): RoamState {
+    const state = createRoamState(bounds, rng);
+    const grabbed = tick(state, 0.1, bounds, false, rng, {
+      ...defaultRoamInput,
+      clicks: CLICKS_TO_GRAB,
+      cursorX,
+      cursorY,
+    });
+    return tick(grabbed, 0.1, bounds, false, rng, {
+      ...defaultRoamInput,
+      doubleClick: true,
+      cursorX,
+      cursorY,
+    });
+  }
+
+  it('falls at the configured glide speed', () => {
+    const rng = createSeededRng(100);
+    const state: RoamState = {
+      ...createRoamState(bounds, rng),
+      phase: 'gliding',
+      x: 400,
+      y: 100,
+      glideBaseX: 400,
+      glideSwaySpeed: 0,
+      glideSwayAmp: 0,
+      glideRotationAmp: 0,
+    };
+    const next = tick(state, 0.25, bounds, false, rng);
+    expect(next.y - state.y).toBeCloseTo(GLIDE_FALL_SPEED_PX_S * 0.25);
+    expect(next.phase).toBe('gliding');
+  });
+
+  it('seeds sway speed within the configured range', () => {
+    const rng = createSeededRng(101);
+    const state = enterGliding(rng, 400, 100);
+    expect(state.glideSwaySpeed).toBeGreaterThanOrEqual(GLIDE_SWAY_SPEED_MIN);
+    expect(state.glideSwaySpeed).toBeLessThanOrEqual(GLIDE_SWAY_SPEED_MAX);
+  });
+
+  it('seeds sway amplitude within the configured range', () => {
+    const rng = createSeededRng(102);
+    const state = enterGliding(rng, 400, 100);
+    expect(state.glideSwayAmp).toBeGreaterThanOrEqual(GLIDE_SWAY_AMP_MIN_PX);
+    expect(state.glideSwayAmp).toBeLessThanOrEqual(GLIDE_SWAY_AMP_MAX_PX);
+  });
+
+  it('rotation follows the sway sine and stays within the configured max', () => {
+    const rng = createSeededRng(103);
+    const state = enterGliding(rng, 400, 100);
+    const next = tick(state, 0.5, bounds, false, rng);
+    const sway = Math.sin(state.glideSwayT * state.glideSwaySpeed);
+    expect(next.rotation).toBeCloseTo(sway * state.glideRotationAmp);
+    expect(Math.abs(next.rotation)).toBeLessThanOrEqual(GLIDE_ROTATION_MAX_DEG + 1e-9);
+  });
+
+  it('clamps x to the left edge while gliding', () => {
+    const state: RoamState = {
+      ...createRoamState(bounds, createSeededRng(1)),
+      phase: 'gliding',
+      x: 400,
+      y: 100,
+      glideBaseX: 10,
+      glideSwaySpeed: 1,
+      glideSwayAmp: 50,
+      glideSwayT: (3 * Math.PI) / 2, // sin(3π/2) = -1, pushes x left
+      glideRotationAmp: GLIDE_ROTATION_MAX_DEG,
+    };
+    const next = tick(state, 0.1, bounds, false, createSeededRng(1));
+    expect(next.x).toBe(0);
+  });
+
+  it('clamps x to the right edge while gliding', () => {
+    const max = bounds.width - SCALED_TILE_PX;
+    const state: RoamState = {
+      ...createRoamState(bounds, createSeededRng(1)),
+      phase: 'gliding',
+      x: 400,
+      y: 100,
+      glideBaseX: max - 10,
+      glideSwaySpeed: 1,
+      glideSwayAmp: 50,
+      glideSwayT: Math.PI / 2, // sin(π/2) = 1, pushes x right
+      glideRotationAmp: GLIDE_ROTATION_MAX_DEG,
+    };
+    const next = tick(state, 0.1, bounds, false, createSeededRng(1));
+    expect(next.x).toBe(max);
+  });
+
+  it('bounds per-tick displacement even for a huge dt (glide)', () => {
+    const rng = createSeededRng(106);
+    const state = enterGliding(rng, 400, 100);
+    const next = tick(state, 10_000, bounds, false, rng);
+    const dy = Math.abs(next.y - state.y);
+    expect(dy).toBeLessThanOrEqual(GLIDE_FALL_SPEED_PX_S * MAX_DT_S + 1e-9);
+  });
+
+  it('transitions to landing with all fields set correctly when ground is reached', () => {
+    const rng = createSeededRng(107);
+    const ground = bounds.height - SCALED_TILE_PX;
+    const state = enterGliding(rng, 400, ground - 30); // still gliding after release tick
+    expect(state.phase).toBe('gliding');
+    const next = tick(state, 0.25, bounds, false, rng);
+    expect(next.phase).toBe('landing');
+    expect(next.anim).toBe('land');
+    expect(next.y).toBe(ground);
+    expect(next.rotation).toBe(0);
+    expect(next.landingTimer).toBe(LANDING_DURATION_S);
+    expect(next.frameHold).toBe(false);
+  });
+
+  it('decrements the landing timer by dt', () => {
+    const rng = createSeededRng(108);
+    const ground = bounds.height - SCALED_TILE_PX;
+    let state = enterGliding(rng, 400, ground - 30);
+    state = tick(state, 0.25, bounds, false, rng); // enter landing
+    expect(state.phase).toBe('landing');
+    const next = tick(state, 0.25, bounds, false, rng);
+    expect(next.landingTimer).toBeCloseTo(LANDING_DURATION_S - 0.25);
+    expect(next.phase).toBe('landing');
+  });
+
+  it('transitions from landing to idle with a fresh idle pause when the timer expires', () => {
+    const rng = createSeededRng(109);
+    const ground = bounds.height - SCALED_TILE_PX;
+    let state = enterGliding(rng, 400, ground - 30);
+    state = tick(state, 0.25, bounds, false, rng); // enter landing
+    let next = state;
+    for (let i = 0; i < 10; i += 1) {
+      next = tick(next, 0.25, bounds, false, rng);
+      if (next.phase === 'idle') break;
+    }
+    expect(next.phase).toBe('idle');
+    expect(next.anim).toBe('idle');
+    expect(next.y).toBe(ground);
+    expect(next.rotation).toBe(0);
+    expect(next.timer).toBeGreaterThan(0);
+  });
+
+  it('keeps x and y stable during landing', () => {
+    const rng = createSeededRng(110);
+    const ground = bounds.height - SCALED_TILE_PX;
+    let state = enterGliding(rng, 400, ground - 30);
+    state = tick(state, 0.25, bounds, false, rng); // enter landing
+    const next = tick(state, 0.25, bounds, false, rng);
+    expect(next.x).toBe(state.x);
+    expect(next.y).toBe(ground);
+  });
+
+  it('releases at the ground immediately transitions to landing', () => {
+    const rng = createSeededRng(111);
+    const ground = bounds.height - SCALED_TILE_PX;
+    const state = enterGliding(rng, 400, ground);
+    const next = tick(state, 0.1, bounds, false, rng);
+    expect(next.phase).toBe('landing');
+    expect(next.y).toBe(ground);
+  });
+
+  it('ignores clicks while gliding', () => {
+    const rng = createSeededRng(112);
+    const state = enterGliding(rng, 400, 100);
+    const next = tick(state, 0.1, bounds, false, rng, {
+      ...defaultRoamInput,
+      clicks: 3,
+    });
+    expect(next.phase).toBe('gliding');
+    expect(next.clickCount).toBe(0);
+  });
+
+  it('ignores clicks while landing', () => {
+    const rng = createSeededRng(113);
+    const ground = bounds.height - SCALED_TILE_PX;
+    let state = enterGliding(rng, 400, ground - 10);
+    state = tick(state, 0.5, bounds, false, rng); // enter landing
+    const next = tick(state, 0.1, bounds, false, rng, {
+      ...defaultRoamInput,
+      clicks: 3,
+    });
+    expect(next.phase).toBe('landing');
+    expect(next.clickCount).toBe(0);
+  });
+
+  it('freezes position and sway while gliding is paused', () => {
+    const rng = createSeededRng(114);
+    const state = enterGliding(rng, 400, 100);
+    const next = tick(state, 0.5, bounds, true, rng);
+    expect(next.x).toBe(state.x);
+    expect(next.y).toBe(state.y);
+    expect(next.glideSwayT).toBe(state.glideSwayT);
+    expect(next.frameHold).toBe(true);
+  });
+
+  it('freezes landing timer and position while paused', () => {
+    const rng = createSeededRng(115);
+    const ground = bounds.height - SCALED_TILE_PX;
+    let state = enterGliding(rng, 400, ground - 10);
+    state = tick(state, 0.5, bounds, false, rng); // enter landing
+    const next = tick(state, 0.5, bounds, true, rng);
+    expect(next.y).toBe(ground);
+    expect(next.landingTimer).toBe(state.landingTimer);
+    expect(next.frameHold).toBe(true);
+  });
+
+  it('produces identical glide trajectories for the same seed', () => {
+    const dtSequence = [0.1, 0.2, 0.15, 0.3, 0.5, 0.1];
+
+    function run(seed: number): RoamState[] {
+      const rng = createSeededRng(seed);
+      const state = enterGliding(rng, 400, 100);
+      const trace: RoamState[] = [state];
+      for (const dt of dtSequence) {
+        trace.push(tick(trace[trace.length - 1], dt, bounds, false, rng));
+      }
+      return trace;
+    }
+
+    expect(run(200)).toEqual(run(200));
+  });
+
+  it('produces different glide trajectories for different seeds', () => {
+    const dtSequence = [0.1, 0.2, 0.15, 0.3, 0.5, 0.1];
+
+    function run(seed: number): RoamState[] {
+      const rng = createSeededRng(seed);
+      const state = enterGliding(rng, 400, 100);
+      const trace: RoamState[] = [state];
+      for (const dt of dtSequence) {
+        trace.push(tick(trace[trace.length - 1], dt, bounds, false, rng));
+      }
+      return trace;
+    }
+
+    expect(run(201)).not.toEqual(run(202));
+  });
+
+  it('clampRoamStateToBounds keeps gliding y, clamps landing y, and clamps glideBaseX', () => {
+    const ground = bounds.height - SCALED_TILE_PX;
+    const max = bounds.width - SCALED_TILE_PX;
+
+    const gliding: RoamState = {
+      ...createRoamState(bounds, createSeededRng(1)),
+      phase: 'gliding',
+      x: -10,
+      y: 100,
+      glideBaseX: max + 50,
+    };
+    const clampedGliding = clampRoamStateToBounds(gliding, bounds);
+    expect(clampedGliding.y).toBe(100); // not forced to ground
+    expect(clampedGliding.x).toBe(0);
+    expect(clampedGliding.glideBaseX).toBe(max);
+
+    const landing: RoamState = {
+      ...createRoamState(bounds, createSeededRng(1)),
+      phase: 'landing',
+      x: -10,
+      y: 50,
+      glideBaseX: max + 50,
+    };
+    const clampedLanding = clampRoamStateToBounds(landing, bounds);
+    expect(clampedLanding.y).toBe(ground); // forced to ground
+    expect(clampedLanding.x).toBe(0);
+    expect(clampedLanding.glideBaseX).toBe(max);
   });
 });
 

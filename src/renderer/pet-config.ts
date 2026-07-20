@@ -53,6 +53,17 @@ export const TARGET_EPSILON_PX = 1;
 export const ROTATION_LEFT_CLIMB_DEG = 90;
 export const ROTATION_RIGHT_CLIMB_DEG = -90;
 
+// Parachute glide + landing (BL-17 / C2). The beaver falls slowly while
+// swaying side-to-side, then plays a short landing animation before resuming
+// idle roam. All values are in logical pixels / seconds / radians.
+export const GLIDE_FALL_SPEED_PX_S = 120; // ~5x walk speed => 4–8 s glide
+export const GLIDE_SWAY_SPEED_MIN = 1.5; // rad/s
+export const GLIDE_SWAY_SPEED_MAX = 2.5; // rad/s
+export const GLIDE_SWAY_AMP_MIN_PX = 20;
+export const GLIDE_SWAY_AMP_MAX_PX = 45;
+export const GLIDE_ROTATION_MAX_DEG = 12;
+export const LANDING_DURATION_S = 0.8;
+
 // Evolution sequence tuning (shake -> flash -> new stage; BL-11 dropped the
 // trailing celebrate — no react row in the ingested sheets).
 export const EVOLUTION_SHAKE_DURATION_S = 1.2;

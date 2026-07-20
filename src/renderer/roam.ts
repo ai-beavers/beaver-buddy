@@ -33,8 +33,15 @@ import {
   CLIMB_SPEED_PX_S,
   EDGE_TARGET_PROBABILITY,
   EDGE_THRESHOLD_PX,
+  GLIDE_FALL_SPEED_PX_S,
+  GLIDE_ROTATION_MAX_DEG,
+  GLIDE_SWAY_AMP_MAX_PX,
+  GLIDE_SWAY_AMP_MIN_PX,
+  GLIDE_SWAY_SPEED_MAX,
+  GLIDE_SWAY_SPEED_MIN,
   IDLE_PAUSE_MAX_S,
   IDLE_PAUSE_MIN_S,
+  LANDING_DURATION_S,
   MAX_DT_S,
   PET_SCALE,
   ROTATION_LEFT_CLIMB_DEG,
@@ -178,10 +185,35 @@ function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
 export function clampRoamStateToBounds(state: RoamState, bounds: Bounds): RoamState {
   const max = maxX(bounds);
   const ground = groundY(bounds);
+
+  if (state.phase === 'gliding') {
+    // Gliding can be above the ground; clamp the base x so the swayed x stays
+    // on screen, and clamp the visible x as a safety net.
+    return {
+      ...state,
+      x: clamp(state.x, 0, max),
+      glideBaseX: clamp(state.glideBaseX, 0, max),
+      targetX: clamp(state.targetX, 0, max),
+      climbTargetY: Math.min(state.climbTargetY, ground),
+    };
+  }
+
+  if (state.phase === 'landing') {
+    return {
+      ...state,
+      x: clamp(state.x, 0, max),
+      y: ground,
+      glideBaseX: clamp(state.glideBaseX, 0, max),
+      targetX: clamp(state.targetX, 0, max),
+      climbTargetY: Math.min(state.climbTargetY, ground),
+    };
+  }
+
   return {
     ...state,
     x: clamp(state.x, 0, max),
     y: Math.min(state.y, ground),
+    glideBaseX: clamp(state.glideBaseX, 0, max),
     targetX: clamp(state.targetX, 0, max),
     climbTargetY: Math.min(state.climbTargetY, ground),
   };
@@ -225,7 +257,7 @@ function enterGrabbed(state: RoamState, bounds: Bounds, input: RoamInput): RoamS
   };
 }
 
-function releaseToGlide(state: RoamState, bounds: Bounds, input: RoamInput): RoamState {
+function releaseToGlide(state: RoamState, bounds: Bounds, input: RoamInput, rng: Rng): RoamState {
   const x = clamp(input.cursorX, 0, maxX(bounds));
   const y = clamp(input.cursorY, 0, groundY(bounds));
   return {
@@ -234,12 +266,13 @@ function releaseToGlide(state: RoamState, bounds: Bounds, input: RoamInput): Roa
     anim: 'parachute-wind',
     x,
     y,
-    // C2 will seed these from rng; for C1 they are initialized to zero.
+    rotation: 0, // reset climb rotation before gliding
     glideBaseX: x,
     glideSwayT: 0,
-    glideSwaySpeed: 0,
-    glideSwayAmp: 0,
-    glideRotationAmp: 0,
+    // Seed-deterministic order: speed first, then amplitude, then rotation.
+    glideSwaySpeed: lerp(GLIDE_SWAY_SPEED_MIN, GLIDE_SWAY_SPEED_MAX, rng()),
+    glideSwayAmp: lerp(GLIDE_SWAY_AMP_MIN_PX, GLIDE_SWAY_AMP_MAX_PX, rng()),
+    glideRotationAmp: GLIDE_ROTATION_MAX_DEG,
     landingTimer: 0,
     frameHold: false,
   };
@@ -249,10 +282,10 @@ function isRoamingPhase(phase: Phase): boolean {
   return phase === 'idle' || phase === 'walk' || phase === 'climbUp' || phase === 'climbPause' || phase === 'climbDown';
 }
 
-function processInput(state: RoamState, dt: number, bounds: Bounds, input: RoamInput): RoamState {
+function processInput(state: RoamState, dt: number, bounds: Bounds, input: RoamInput, rng: Rng): RoamState {
   if (state.phase === 'grabbed') {
     if (input.doubleClick) {
-      return releaseToGlide(state, bounds, input);
+      return releaseToGlide(state, bounds, input, rng);
     }
     return state;
   }
@@ -301,7 +334,7 @@ export function tick(
   }
 
   const dt = clamp(dtSeconds, 0, MAX_DT_S);
-  const inputState = processInput(state, dt, bounds, input);
+  const inputState = processInput(state, dt, bounds, input, rng);
   const ground = groundY(bounds);
 
   switch (inputState.phase) {
@@ -361,10 +394,50 @@ export function tick(
       };
     }
 
-    case 'gliding':
+    case 'gliding': {
+      const nextY = inputState.y + GLIDE_FALL_SPEED_PX_S * dt;
+      if (nextY >= ground) {
+        return {
+          ...inputState,
+          phase: 'landing',
+          anim: 'land',
+          y: ground,
+          rotation: 0,
+          landingTimer: LANDING_DURATION_S,
+          frameHold: false,
+        };
+      }
+      const sway = Math.sin(inputState.glideSwayT * inputState.glideSwaySpeed);
+      const x = clamp(inputState.glideBaseX + sway * inputState.glideSwayAmp, 0, maxX(bounds));
+      return {
+        ...inputState,
+        x,
+        y: nextY,
+        rotation: sway * inputState.glideRotationAmp,
+        glideSwayT: inputState.glideSwayT + dt,
+        frameHold: false,
+      };
+    }
+
     case 'landing': {
-      // C2/C3 physics and landing timeout will be added here.
-      return { ...inputState, frameHold: false };
+      const landingTimer = inputState.landingTimer - dt;
+      if (landingTimer <= 0) {
+        return {
+          ...inputState,
+          phase: 'idle',
+          anim: 'idle',
+          y: ground,
+          rotation: 0,
+          timer: pickIdlePause(rng),
+          frameHold: false,
+        };
+      }
+      return {
+        ...inputState,
+        y: ground,
+        landingTimer,
+        frameHold: false,
+      };
     }
   }
 }
