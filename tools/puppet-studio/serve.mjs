@@ -155,7 +155,7 @@ const server = http.createServer((req, res) => {
   send(res, 404, 'not found');
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`puppet studio: http://localhost:${PORT}/`);
   console.log('(dev-time tool only — not part of the shipped app, see docs/adr/003-pixijs-authoring.md)');
 });

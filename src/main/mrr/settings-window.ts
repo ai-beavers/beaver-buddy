@@ -293,11 +293,17 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
     if (!win.isDestroyed()) {
       win.destroy();
     }
-    settingsWindow = null;
+    // A late rejection must not clobber a *different*, already-open
+    // replacement window if one was opened before this promise settled.
+    if (settingsWindow === win) {
+      settingsWindow = null;
+    }
   });
 
   win.on('closed', () => {
-    settingsWindow = null;
+    if (settingsWindow === win) {
+      settingsWindow = null;
+    }
   });
 
   settingsWindow = win;
