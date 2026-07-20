@@ -41,6 +41,9 @@ module.exports = [
     plugins: { '@typescript-eslint': tsPlugin },
     rules: {
       ...tsPlugin.configs.recommended.rules,
+      // PixiJS is dev-time authoring tooling only (ADR 003); the shipped
+      // Canvas2D renderer must never import it.
+      'no-restricted-imports': ['error', { paths: [{ name: 'pixi.js', message: 'PixiJS is dev-time tooling only (docs/adr/003-pixijs-authoring.md) — never shipped in the app runtime.' }] }],
     },
   },
   {
