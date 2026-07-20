@@ -10,6 +10,26 @@ export interface WorkAreaInfo {
   readonly taskbarEdge: TaskbarEdge;
 }
 
+export type CaptureMode = 'hover-forward' | 'full-capture';
+
+export function isValidCaptureMode(value: unknown): value is CaptureMode {
+  return value === 'hover-forward' || value === 'full-capture';
+}
+
+/**
+ * Switches the overlay between click-through hover tracking and full input
+ * capture. 'hover-forward' keeps clicks passing through to the desktop while
+ * still receiving mouse-move events; 'full-capture' captures all mouse input
+ * so the pet can be grabbed and dragged.
+ */
+export function setCaptureMode(win: BrowserWindow, mode: CaptureMode): void {
+  if (mode === 'hover-forward') {
+    win.setIgnoreMouseEvents(true, { forward: true });
+  } else {
+    win.setIgnoreMouseEvents(false);
+  }
+}
+
 /**
  * Detects which screen edge hosts the taskbar by comparing the display's
  * full bounds with its work area. When the taskbar is set to auto-hide,

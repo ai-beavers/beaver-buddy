@@ -1,9 +1,10 @@
 import path from 'node:path';
-import { app, BrowserWindow, powerMonitor, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, powerMonitor, screen } from 'electron';
 import { applySessionHardening, applyWindowHardening } from './hardening';
 import {
   BOUNDS_CHANGED_CHANNEL,
   HATCH_START_CHANNEL,
+  INPUT_CAPTURE_MODE_CHANNEL,
   PAUSE_CHANGED_CHANNEL,
   PET_CHANGED_CHANNEL,
   QUIP_CHANGED_CHANNEL,
@@ -11,7 +12,7 @@ import {
 import { loadOnboardingState, saveOnboardingState } from './onboarding';
 import { createPauseState, isPaused, setSystemPause, toggleManualPause, type PauseState } from './pause-state';
 import { createTray, formatPetLabel } from './tray';
-import { configureAlwaysOnTop, fitWindowToWorkArea, getOverlayWindowBounds, getPrimaryWorkAreaInfo, onWorkAreaChanged } from './overlay-adapter';
+import { configureAlwaysOnTop, fitWindowToWorkArea, getOverlayWindowBounds, getPrimaryWorkAreaInfo, onWorkAreaChanged, setCaptureMode, type CaptureMode } from './overlay-adapter';
 import { XpEngine, type PetUpdate } from './xp/engine';
 import { UsageTracker } from './usage/tracker';
 import { todayTotalTokens } from './usage/totals';
@@ -54,6 +55,9 @@ let pauseState: PauseState = createPauseState();
 let mainWindow: BrowserWindow | null = null;
 // Electron has no getter for ignoreMouseEvents, so we track what we set.
 let ignoresMouseEvents = false;
+// Current input-capture mode of the overlay; kept in sync with the
+// ignoreMouseEvents state because Electron has no getter for it.
+let currentCaptureMode: CaptureMode = 'hover-forward';
 let quipSchedulerState: SchedulerState = createSchedulerState();
 // A quip fired before did-finish-load would be dropped by webContents.send
 // yet still burn the scheduler cooldown, silently suppressing the next
@@ -150,7 +154,7 @@ function createWindow(): BrowserWindow {
   });
 
   configureAlwaysOnTop(win);
-  win.setIgnoreMouseEvents(true);
+  setCaptureMode(win, 'hover-forward');
   ignoresMouseEvents = true;
 
   applyWindowHardening(win);
@@ -218,6 +222,20 @@ app.whenReady().then(async () => {
   }
 
   mainWindow = createWindow();
+
+  // Renderer-driven input-capture switching: the overlay starts in hover-
+  // forward (mousemove reaches the renderer, clicks pass through), then
+  // toggles to full-capture when the cursor enters the pet or the pet is
+  // grabbed. Main validates the payload and deduplicates against the
+  // current mode to avoid unnecessary setIgnoreMouseEvents calls.
+  ipcMain.on(INPUT_CAPTURE_MODE_CHANNEL, (_event, mode: unknown) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (mode === currentCaptureMode) return;
+    if (mode !== 'hover-forward' && mode !== 'full-capture') return;
+    setCaptureMode(mainWindow, mode);
+    currentCaptureMode = mode;
+    ignoresMouseEvents = mode === 'hover-forward';
+  });
 
   let lastWorkArea = getPrimaryWorkAreaInfo();
   fitWindowToWorkArea(mainWindow, lastWorkArea);

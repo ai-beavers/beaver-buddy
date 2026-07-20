@@ -10,6 +10,8 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
   let canvas: Record<string, unknown>;
   let ctx: Record<string, ReturnType<typeof vi.fn>>;
   let windowStub: Record<string, unknown>;
+  let beaverBuddy: Record<string, ReturnType<typeof vi.fn>>;
+  let documentStub: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
     vi.resetModules();
@@ -39,7 +41,8 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
     ctx.fillStyle = '';
     ctx.strokeStyle = '';
 
-    const beaverBuddy = {
+    beaverBuddy = {
+      requestCaptureMode: vi.fn(),
       onPausedChanged: vi.fn((cb: (...args: unknown[]) => void) => {
         (listeners.paused ||= []).push(cb);
       }),
@@ -77,10 +80,15 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
     canvas = new MockHTMLCanvasElement();
 
     vi.stubGlobal('HTMLCanvasElement', MockHTMLCanvasElement);
-    vi.stubGlobal('document', {
+    documentStub = {
       getElementById: vi.fn(() => canvas),
       hidden: false,
-    });
+      addEventListener: vi.fn((event: string, handler: () => void) => {
+        (listeners[`document:${event}`] ||= []).push(handler);
+      }),
+    };
+
+    vi.stubGlobal('document', documentStub);
     vi.stubGlobal('window', windowStub);
     vi.stubGlobal('requestAnimationFrame', windowStub.requestAnimationFrame);
     vi.stubGlobal('performance', { now: vi.fn(() => 0) });
@@ -200,6 +208,16 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
     rafCallback(32);
 
     expect(windowStub.__debugPet).toEqual({ level: 1, stage: 'baby', evolving: false });
+  });
+
+  it('exposes requestCaptureMode and registers input-capture listeners', async () => {
+    await import('./renderer.js');
+
+    expect(beaverBuddy.requestCaptureMode).toBeDefined();
+    expect(documentStub.addEventListener).toHaveBeenCalledWith('mousemove', expect.any(Function));
+    expect(documentStub.addEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function));
+    expect(documentStub.addEventListener).toHaveBeenCalledWith('dblclick', expect.any(Function));
+    expect(documentStub.addEventListener).toHaveBeenCalledWith('mouseleave', expect.any(Function));
   });
 
   it('inflates the bubble dirty rect by 1px on all sides including tail bleed', async () => {

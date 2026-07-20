@@ -4,27 +4,33 @@ import { describe, expect, it, vi } from 'vitest';
 const capture = vi.hoisted(() => ({
   exposedApi: undefined as Record<string, unknown> | undefined,
   ipcHandlers: new Map<string, ((...args: unknown[]) => void)[]>(),
+  ipcRenderer: undefined as unknown as { on: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn> },
 }));
 
 function emitIpcEvent(channel: string, ...args: unknown[]): void {
   capture.ipcHandlers.get(channel)?.forEach((handler) => handler(...args));
 }
 
-vi.mock('electron', () => ({
-  contextBridge: {
-    exposeInMainWorld: vi.fn((_apiName: string, api: Record<string, unknown>) => {
-      capture.exposedApi = api;
-    }),
-  },
-  ipcRenderer: {
+vi.mock('electron', () => {
+  const ipcRenderer = {
     on: vi.fn((channel: string, handler: (...args: unknown[]) => void) => {
       if (!capture.ipcHandlers.has(channel)) {
         capture.ipcHandlers.set(channel, []);
       }
       capture.ipcHandlers.get(channel)!.push(handler);
     }),
-  },
-}));
+    send: vi.fn(),
+  };
+  capture.ipcRenderer = ipcRenderer;
+  return {
+    contextBridge: {
+      exposeInMainWorld: vi.fn((_apiName: string, api: Record<string, unknown>) => {
+        capture.exposedApi = api;
+      }),
+    },
+    ipcRenderer,
+  };
+});
 
 // Import preload after mocking electron so the module-level exposeInMainWorld
 // call uses the mocked bridge.
@@ -49,14 +55,24 @@ describe('preload API', () => {
     expect(callback).toHaveBeenCalledWith({ width: 1920, height: 1040 });
   });
 
-  it('onBoundsChanged ignores payloads on other channels', () => {
+  it('requestCaptureMode sends input:capture-mode with a valid payload', () => {
     expect(capture.exposedApi).toBeDefined();
-    const onBoundsChanged = capture.exposedApi!.onBoundsChanged as (callback: (bounds: { width: number; height: number }) => void) => void;
+    const requestCaptureMode = capture.exposedApi!.requestCaptureMode as (mode: 'hover-forward' | 'full-capture') => void;
 
-    const callback = vi.fn();
-    onBoundsChanged(callback);
+    requestCaptureMode('hover-forward');
+    expect(capture.ipcRenderer.send).toHaveBeenCalledWith('input:capture-mode', 'hover-forward');
 
-    emitIpcEvent('state:pet', { level: 1, stage: 'baby' });
-    expect(callback).not.toHaveBeenCalled();
+    requestCaptureMode('full-capture');
+    expect(capture.ipcRenderer.send).toHaveBeenCalledWith('input:capture-mode', 'full-capture');
+  });
+
+  it('requestCaptureMode rejects unknown modes', () => {
+    expect(capture.exposedApi).toBeDefined();
+    const requestCaptureMode = capture.exposedApi!.requestCaptureMode as (mode: unknown) => void;
+
+    capture.ipcRenderer.send.mockClear();
+
+    expect(() => requestCaptureMode('other')).toThrow(/Invalid capture mode/);
+    expect(capture.ipcRenderer.send).not.toHaveBeenCalled();
   });
 });

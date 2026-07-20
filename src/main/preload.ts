@@ -11,6 +11,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+const INPUT_CAPTURE_MODE_CHANNEL = 'input:capture-mode'; // must match src/main/ipc-channels.ts
 const PAUSE_CHANGED_CHANNEL = 'state:paused'; // must match src/main/ipc-channels.ts
 const PET_CHANGED_CHANNEL = 'state:pet'; // must match src/main/ipc-channels.ts
 const HATCH_START_CHANNEL = 'state:hatch'; // must match src/main/ipc-channels.ts
@@ -34,6 +35,12 @@ interface BoundsChangedPayload {
 }
 
 contextBridge.exposeInMainWorld('beaverBuddy', {
+  requestCaptureMode: (mode: 'hover-forward' | 'full-capture'): void => {
+    if (mode !== 'hover-forward' && mode !== 'full-capture') {
+      throw new TypeError(`Invalid capture mode: ${String(mode)}`);
+    }
+    ipcRenderer.send(INPUT_CAPTURE_MODE_CHANNEL, mode);
+  },
   onPausedChanged: (callback: (paused: boolean) => void): void => {
     ipcRenderer.on(PAUSE_CHANGED_CHANNEL, (_event, paused: boolean) => {
       callback(paused);

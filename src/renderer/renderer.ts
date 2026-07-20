@@ -7,6 +7,15 @@
 // something actually changed (dirty flag) and fully skips work while the
 // document is hidden.
 
+import {
+  createInputQueue,
+  updateCursor,
+  recordClickOnPet,
+  recordDoubleClick,
+  consumeInput,
+  determineCaptureMode,
+  type CaptureMode,
+} from './input-capture.js';
 import { clampRoamStateToBounds, createRoamState, tick, type RoamState, type Bounds } from './roam.js';
 import {
   BUBBLE_TAIL_SIZE_PX,
@@ -42,6 +51,7 @@ interface QuipChangedPayload {
 declare global {
   interface Window {
     beaverBuddy: {
+      requestCaptureMode(mode: CaptureMode): void;
       onPausedChanged(callback: (paused: boolean) => void): void;
       onPetChanged(callback: (pet: PetChangedPayload) => void): void;
       onHatchStart(callback: () => void): void;
@@ -132,6 +142,12 @@ let hatchFrameIndex = 0;
 let hatchFrameAccumulatorS = 0;
 let quipState: { text: string; showUntilMs: number } | null = null;
 let forceFullClear = false;
+let inputQueue = createInputQueue();
+let currentCaptureMode: CaptureMode = 'hover-forward';
+// Most recent pet draw position; used by pointerdown hit-testing so the
+// click and the drawn frame never disagree on where the sprite is.
+let currentPetDrawX = 0;
+let currentPetDrawY = 0;
 
 function loadCurrentSheet(): void {
   loadSheet(stage)
@@ -234,6 +250,26 @@ window.beaverBuddy.onBoundsChanged((next) => {
   roamState = clampRoamStateToBounds(roamState, bounds());
 });
 
+// Input-capture layer: these listeners feed the pure input queue that the
+// rAF loop consumes once per frame. No Node/Electron APIs are touched here.
+document.addEventListener('mousemove', (event) => {
+  updateCursor(inputQueue, event.clientX, event.clientY);
+});
+
+document.addEventListener('pointerdown', (event) => {
+  recordClickOnPet(inputQueue, event.clientX, event.clientY, currentPetDrawX, currentPetDrawY);
+});
+
+document.addEventListener('dblclick', () => {
+  recordDoubleClick(inputQueue);
+});
+
+document.addEventListener('mouseleave', () => {
+  // Treat the cursor as outside the pet; this avoids a stale hover-capture
+  // state if the pointer leaves the window while over the beaver.
+  updateCursor(inputQueue, -1, -1);
+});
+
 // onBoundsChanged only fires when the main process detects a work-area change.
 // Windows display scaling can change the DPR without changing the logical
 // window size, so watch for DPR jumps on resize events as well.
@@ -322,7 +358,7 @@ function drawHatch(state: HatchState): void {
   dirtyRect = { x: drawX - pad, y: drawY - pad, width: size, height: size };
 }
 
-function draw(): void {
+function draw(petDrawX: number, petDrawY: number): void {
   if (dirtyRect && !forceFullClear) {
     ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.width, dirtyRect.height);
   } else {
@@ -342,13 +378,7 @@ function draw(): void {
     return;
   }
   const anim = roamState.anim;
-  const shake = evolutionState ? shakeOffset(evolutionState, Math.random) : { dx: 0, dy: 0 };
-  // Integer pixel positions: pixel art must land on whole pixels, and the
-  // rounding also means sub-pixel movement between rAF ticks doesn't count
-  // as "moved" (see the moved check in frame()).
-  const drawX = Math.round(roamState.x + shake.dx);
-  const drawY = Math.round(roamState.y + shake.dy);
-  drawFrame(ctx, sheet, anim, frameIndex, drawX, drawY, {
+  drawFrame(ctx, sheet, anim, frameIndex, petDrawX, petDrawY, {
     mirror: roamState.facing === 'left',
     rotationDeg: roamState.rotation,
     scale: PET_SCALE,
@@ -367,15 +397,15 @@ function draw(): void {
     ctx.save();
     ctx.globalCompositeOperation = 'source-in';
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(drawX - pad, drawY - pad, tile + 2 * pad, tile + 2 * pad);
+    ctx.fillRect(petDrawX - pad, petDrawY - pad, tile + 2 * pad, tile + 2 * pad);
     ctx.restore();
   }
 
   const petSize = tile + 2 * pad;
-  let unionedRect: DirtyRect = { x: drawX - pad, y: drawY - pad, width: petSize, height: petSize };
+  let unionedRect: DirtyRect = { x: petDrawX - pad, y: petDrawY - pad, width: petSize, height: petSize };
 
   if (quipState) {
-    const layout = layoutBubble(quipState.text, drawX, drawY, tile, bounds());
+    const layout = layoutBubble(quipState.text, petDrawX, petDrawY, tile, bounds());
     drawBubble(ctx, layout);
     unionedRect = unionRect(unionedRect, bubbleDirtyRect(layout));
   }
@@ -415,12 +445,24 @@ function frame(timestampMs: number): void {
   const dtSeconds = Math.min((timestampMs - lastTimestampMs) / 1000, MAX_DT_S);
   lastTimestampMs = timestampMs;
 
+  const input = consumeInput(inputQueue);
   const prev = roamState;
   // Roaming freezes locally during an evolution or hatch sequence — this
   // never touches the main-process pause state, so tray Pause stays a pure
   // user control (see evolution.ts).
-  roamState = tick(roamState, dtSeconds, bounds(), paused || evolutionState !== null || hatchState !== null, Math.random);
+  roamState = tick(roamState, dtSeconds, bounds(), paused || evolutionState !== null || hatchState !== null, Math.random, input);
   window.__debugRoam = roamState;
+
+  // Compute the pet's on-screen position once this frame and reuse it for
+  // hit-testing, capture-mode decisions, and drawing. shakeOffset consumes
+  // Math.random, so calling it twice per frame would desync the jitter
+  // between the hit-test and the actual draw.
+  const shake = evolutionState ? shakeOffset(evolutionState, Math.random) : { dx: 0, dy: 0 };
+  const drawX = Math.round(roamState.x + shake.dx);
+  const drawY = Math.round(roamState.y + shake.dy);
+  currentPetDrawX = drawX;
+  currentPetDrawY = drawY;
+
   // Compare rounded positions: the sprite is drawn on whole pixels, so
   // sub-pixel movement between rAF ticks changes nothing on screen — this
   // caps movement-driven redraws at (speed px/s) per second instead of one
@@ -492,8 +534,16 @@ function frame(timestampMs: number): void {
   }
   window.__debugQuip = quipState ? quipState.text : null;
 
+  // Determine overlay input-capture mode from the post-tick state and the
+  // cursor position captured in this frame's input.
+  const desiredMode = determineCaptureMode(roamState, input.cursorX, input.cursorY, drawX, drawY);
+  if (desiredMode !== currentCaptureMode) {
+    window.beaverBuddy.requestCaptureMode(desiredMode);
+    currentCaptureMode = desiredMode;
+  }
+
   if (moved || frameAdvanced || needsDraw || evolutionActive || hatchActive || quipExpired) {
-    draw();
+    draw(drawX, drawY);
     needsDraw = false;
   }
 }

@@ -37,8 +37,38 @@ import {
   fitWindowToWorkArea,
   getOverlayWindowBounds,
   getPrimaryWorkAreaInfo,
+  isValidCaptureMode,
   onWorkAreaChanged,
+  setCaptureMode,
 } from './overlay-adapter';
+
+describe('isValidCaptureMode', () => {
+  it('accepts known capture modes', () => {
+    expect(isValidCaptureMode('hover-forward')).toBe(true);
+    expect(isValidCaptureMode('full-capture')).toBe(true);
+  });
+
+  it('rejects unknown values and non-strings', () => {
+    expect(isValidCaptureMode('other')).toBe(false);
+    expect(isValidCaptureMode(null)).toBe(false);
+    expect(isValidCaptureMode(undefined)).toBe(false);
+    expect(isValidCaptureMode(1)).toBe(false);
+  });
+});
+
+describe('setCaptureMode', () => {
+  it('hover-forward ignores mouse events and forwards mouse moves', () => {
+    const win = { setIgnoreMouseEvents: vi.fn() } as unknown as Electron.BrowserWindow;
+    setCaptureMode(win, 'hover-forward');
+    expect(win.setIgnoreMouseEvents).toHaveBeenCalledWith(true, { forward: true });
+  });
+
+  it('full-capture stops ignoring mouse events', () => {
+    const win = { setIgnoreMouseEvents: vi.fn() } as unknown as Electron.BrowserWindow;
+    setCaptureMode(win, 'full-capture');
+    expect(win.setIgnoreMouseEvents).toHaveBeenCalledWith(false);
+  });
+});
 
 describe('detectTaskbarEdge', () => {
   it('detects a taskbar at the bottom', () => {
