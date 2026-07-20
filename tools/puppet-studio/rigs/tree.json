@@ -1,0 +1,7 @@
+{
+  "name": "tree",
+  "tile": 96,
+  "parts": [
+    { "id": "tree", "src": "tree-stage-2.png", "pivot": [20, 46], "pos": [48, 90], "z": 10, "parent": null }
+  ]
+}

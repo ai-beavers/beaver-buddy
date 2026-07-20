@@ -2,15 +2,19 @@
 
 ## Status
 
-Idea / developer task — **not yet implemented**. This document captures the
-workflow plan so it can be iterated in upcoming sessions.
+Parts-based pipeline is **working end-to-end**: the ComfyUI `PixelArt Parts
+Builder` workflow generates a character's part set in one run, the PixiJS
+puppet studio (`tools/puppet-studio/`, ADR 003) rigs them and bakes
+app-compatible sprite sheets. First real run: `beaver-baby` parts (torso,
+head, tail, legs, eyes, parachute canopy) → idle/walk/parachute sheet. Next:
+more characters/stages and tuning of part conventions.
 
 ## Goal
 
-Create a **developer-facing** asset-generation workflow using ComfyUI to
-produce new character stages, variants, and animations for Beaver Buddy.
-Generated assets are committed to the repo as PNG sprite sheets and consumed
-by the existing sprite system.
+Create a **developer-facing** asset-generation workflow using ComfyUI +
+PixiJS to produce new character stages, variants, and animations for Beaver
+Buddy. Generated assets are committed to the repo as PNG sprite sheets and
+consumed by the existing sprite system.
 
 ## Non-goal
 
@@ -20,69 +24,59 @@ unlocks avatars is tracked separately.
 
 ## Context
 
-- The existing sprite system uses 48×48 source tiles, 16-frame animation sets
-  (`idle`, `walk`, `run`, `sleep`, `react`), rendered at `PET_SCALE` via the
-  canvas renderer.
-- `assets/STYLE.md` pins the 16-color palette, grid, outline rules, and
-  right-facing + mirror convention.
-- A ComfyUI workflow already exists for hamster avatar animations and can
-  serve as the starting point.
-- No API keys or remote services are involved; ComfyUI runs locally and only
-  image files enter the repo.
+- The app's sprite system uses **96×96 native tiles** at `PET_SCALE = 1`
+  (BL-11 ingested art), currently with `idle` / `walk` rows, 8 fps sprite
+  cadence (`SPRITE_FPS = 8`).
+- `assets/STYLE.md` pins the palette, grid, outline rules, and right-facing +
+  mirror convention; imported (AI-generated) sheets are exempt from palette
+  quantization but must still pass the visual design gate.
+- The original hamster-avatar workflow (`PIXEL ART BILDER`) exists in the
+  user's Comfy Cloud workspace and serves as the starting point.
+- No API keys or remote services in the app; only image files enter the repo.
 
-## Proposed workflow
+## The pipeline (parts-based)
 
-1. Author or adapt a ComfyUI workflow locally (hamster workflow as base).
-2. Generate animation frames or sprite sheets.
-3. Convert the output into the repo's existing sprite-sheet format
-   (`scripts/gen-sprites/`).
-4. Validate against `assets/STYLE.md` (palette, grid, silhouette rules).
-5. Commit generated PNG/JSON assets and any workflow metadata needed for
-   reproducibility.
+1. **Parts once**: ComfyUI generates a character's part set (torso, head,
+   limbs, tail, eye open/closed, accessories like a parachute canopy) in one
+   run per character/stage — parts-grid mode of `PixelArt Builder` (next task,
+   see below).
+2. **Rig**: `tools/puppet-studio/rigs/<name>.json` declares each part's image,
+   pivot, rest position, z-order, and parent.
+3. **Recipes**: `tools/puppet-studio/anims/*.ts` — keyframe data (time →
+   rotation/position/scale/visibility per part). A new animation is a small
+   data file, not a new image-gen batch.
+4. **Bake**: the studio samples recipes at 8 fps into 96×96 tiles, one row per
+   animation, emitting exactly the app's sheet format (PNG + meta JSON).
+5. **Review & intake**: inspect baked frames/sheet, then copy into
+   `assets/sprites/` and run the existing `scripts/gen-sprites` checks and the
+   design gate.
 
 ## Animation ideas to explore
 
 ### 1. Parachute drop interaction
 
-- Triple-click the beaver to enter "grab" mode.
-- Drag to a target location on screen.
-- Click again to release; the beaver opens a parachute and glides down to the
+- Triple-click the beaver to enter "grab" mode → drag to a target location →
+  click again to release; the beaver opens a parachute and glides down to the
   bottom screen edge.
-- **Full-sheet animations generated (2026-07-20, owner "Voll ComfyUI"
-  decision):** the three Fallschirm-Drop rows (`struggle`, `parachute-wind`,
-  `land`) were generated as complete 8-frame sheets via the `PixelArt Builder`
-  workflow (one Comfy Cloud run each) and baked with
-  `scripts/gen-sprites/ingest-animation-frames.mjs`. Runtime integration +
-  design gate is Phase 3 · WAVE-2.
+ 
+- **Studio prototype exists**: the `parachute` recipe (canopy pendulum + body
+  hang) bakes a loop. The interactive behavior (grab/drag/release + glide
+  trajectory in `roam.ts`) is a separate app task.
 - Open questions:
-  - Is the parachute part of the beaver sprite sheet, or a separate overlay
-    sprite animated independently?
-  - Can a GIF/animated ComfyUI output be used 1:1, or do we still need
-    frame-by-frame sprite sheets for the existing renderer?
   - How is the falling trajectory integrated with `roam.ts` and the existing
     screen-edge clamping?
+  - Does the canopy need rope lines (a separate thin part) for readability?
 
 ### 2. Growing environment object (e.g. tree)
 
 - A tree grows next to the beaver as it levels up.
-- Must be generatable by the same ComfyUI workflow and stay faithful to the
-  pixel-art style.
+- **Studio prototype exists**: one-part `tree` rig + `sway` recipe; growth
+  stages are separate images (placeholder stages 1–3 generated), the sway
+  recipe is stage-independent.
 - Open questions:
   - Does the tree live on a separate render layer (foreground/background) or
     share the beaver sprite layer?
   - How many growth stages are needed, and how do they map to the level curve?
-  - Does the tree need its own animation states (sway, leaves rustling)?
-
-## Workflow adaptation needs
-
-The existing hamster workflow likely needs changes to support:
-
-- More complex multi-part animations (e.g. beaver + parachute).
-- Consistent 48×48 grid and fixed palette output.
-- Transparent background / correct alpha for overlay rendering.
-- Batch generation of complete animation sets (`idle`, `walk`, `run`, `sleep`,
-  `react`, plus new custom animations).
-- Style consistency with the current warm palette and silhouette rules.
 
 ## Tooling access
 
@@ -102,6 +96,7 @@ or runtime cloud calls are added to the Beaver Buddy codebase.
 |---|---|---|
 | `PIXEL ART BILDER` | `pixel-art-bilder.json` | Original template; generates an 8-frame (4×2) sprite sheet from one reference image via `GeminiNanoBanana2`, removes background with `BiRefNetRMBG`, and exports frames + GIF/WebP animation. |
 | `PixelArt Builder` | `pixelart-builder.json` | Clean copy of the template, created for Beaver Buddy modifications. |
+| `PixelArt Parts Builder` | `pixelart-parts-builder.json` | Parts-grid variant: one run generates 8 separated character parts (4×2 grid) with alpha, named outputs (`parts/<rig>/<part>`). Used for the first `beaver-baby` parts run (2026-07-17). |
 
 ### Key parameters in the current template
 
@@ -112,37 +107,65 @@ or runtime cloud calls are added to the Beaver Buddy codebase.
 - **Frame rate:** 8 fps in the `VHS_VideoCombine` nodes.
 - **Background removal:** `BiRefNet_toonout` with alpha output.
 
+### Parts conventions (first run: beaver-baby)
+
+- **Reference image:** a clean idle frame extracted from
+  `assets/sprites/beaver-baby.png`, uploaded to Comfy Cloud as the
+  `LoadImage` input so generated parts match the shipped character's style.
+- **Part set (cell order):** torso · head · tail · front leg · back leg ·
+  open eye · closed eye · red parachute canopy — one separated part per grid
+  cell, white background, side view facing right.
+- **Intake:** `node tools/puppet-studio/ingest-parts.mjs <runDir> <rigName>`
+  trims each part crop to its alpha bbox and downscales it
+  (premultiplied-alpha area-average) to rig proportions, writing
+  `assets-src/parts/<rig>/`. Rig pivots/positions are then tuned to the
+  printed dimensions.
+
 ## Needed modifications for Beaver Buddy
 
-1. **Grid / tile size:** Move from `32×32` and `4×2` grid to the repo's
-   `48×48` tiles. Depending on the animation, this may become a `4×4` grid
-   (16 frames) to match the existing animation sets (`idle×2, walk×4, run×4,
-   sleep×2, react×4`).
-2. ~~**Prompt / style guide anchoring**~~ **Done** (2026-07-20, Phase-3
-   Fallschirm-Drop): the warm-palette / 1px-outline / right-facing +
-   consistent-character clause is now anchored directly in the `PixelArt
-   Builder` prompt ("warm golden-brown fur with cream belly and 1px dark
-   outline, side view facing right, same baby beaver character and colors as
-   the reference image, consistent proportions in every frame") ahead of the
-   per-animation scene description. Verified against the three baked
-   Fallschirm-Drop rows.
-3. **Transparent background:** The workflow already outputs alpha; verify the
-   exported frames are usable as PNG with transparency for the canvas renderer.
-4. **Batch animation generation:** One run should produce a full animation set
-   for a given stage/character, not just one 8-frame action.
-5. **Multi-part animations:** For the parachute drop, decide whether to render
-   beaver + parachute in one sprite sheet or as separate overlay sprites.
+1. ~~**Parts-grid prompt mode**~~ **Done** (`PixelArt Parts Builder`).
+2. **Prompt / style guide anchoring:** Add explicit references to the warm
+   palette, outline rules, and right-facing mirror convention from
+   `assets/STYLE.md` so generated parts stay consistent with shipped art.
+3. ~~**Transparent background**~~ **Verified:** the workflow outputs clean
+   alpha; parts work directly in the studio.
+4. ~~**Reference image**~~ **Done:** idle frame from the shipped sheet.
+
+## PixiJS puppet studio (parts-based authoring)
+
+Decision recorded in `docs/adr/003-pixijs-authoring.md`: PixiJS is used
+**dev-time only** (the app's Canvas2D renderer stays untouched; ADR 001's
+runtime rejection is reaffirmed). The studio lives in `tools/puppet-studio/`
+and is documented in its own README.
+
+- Run: `npm run studio` → http://localhost:8377/
+  (`npm run studio:parts` regenerates the crude placeholder parts if needed).
+- Rigs: `beaver-baby` (real ComfyUI parts since 2026-07-17), `tree`
+  (placeholders); recipes: `walk`, `idle`, `parachute`, `sway`.
+- Baked output lands in `assets-src/baked/` (gitignored) and goes through the
+  normal intake/review before copying to `assets/sprites/`.
+- Verified end-to-end (headless Chrome): rig loads, bake writes
+  `sheet.png`/`sheet.json` + frames in the app's exact format — with real
+  ComfyUI parts.
 
 ## Open questions / next steps
 
 - [x] Locate and review the current hamster ComfyUI workflow file.
 - [x] Create a clean copy named `PixelArt Builder`.
+- [x] Decide where PixiJS fits: dev-time puppet studio (ADR 003), never the
+      app runtime.
+- [x] Prototype the parachute animation — as a parts-based recipe in the
+      studio (baked sheet; runtime behavior remains a separate app task).
+- [x] Adapt `PixelArt Builder` for **parts-grid generation**
+      (`PixelArt Parts Builder`, first run 2026-07-17).
+- [x] Replace the studio's placeholder parts with the first real ComfyUI parts
+      set and re-bake (idle/walk/parachute sheet verified).
+- [ ] Generate the remaining part sets (beaver teen/adult, tree stages) and
+      document any adjustments to the part conventions.
 - [ ] Decide whether the workflow JSON belongs in the repo (for
       reproducibility) or stays outside as a local developer artifact.
 - [ ] Define palette enforcement in ComfyUI: post-process quantization vs.
       prompt/model-level control.
-- [ ] Prototype the parachute animation using either combined sprite sheets or
-      a separate overlay sprite.
 - [ ] Decide how environment objects (tree) fit into the scene graph and level
       system.
 - [ ] Update `assets/STYLE.md` once new asset types are finalized.

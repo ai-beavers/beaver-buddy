@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Beaver Buddy Puppet Studio</title>
+  <style>
+    body {
+      margin: 0;
+      font: 13px/1.4 ui-monospace, monospace;
+      background: #1c1f24;
+      color: #d8dde3;
+    }
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 14px;
+      background: #262a31;
+      border-bottom: 1px solid #343a43;
+    }
+    select, button {
+      font: inherit;
+      background: #343a43;
+      color: inherit;
+      border: 1px solid #4a525d;
+      border-radius: 4px;
+      padding: 4px 10px;
+      cursor: pointer;
+    }
+    #status { color: #9aa4b0; white-space: pre-wrap; }
+    main { padding: 16px; }
+    #stage-host {
+      display: inline-block;
+      border: 1px solid #343a43;
+      /* checkerboard so alpha is visible during review */
+      background:
+        repeating-conic-gradient(#3a3f47 0% 25%, #2c3037 0% 50%) 0 0 / 16px 16px;
+    }
+  </style>
+  <script type="importmap">
+    { "imports": { "pixi.js": "/node_modules/pixi.js/dist/pixi.mjs" } }
+  </script>
+</head>
+<body>
+  <header>
+    <label>rig <select id="rig-select"></select></label>
+    <label>anim <select id="anim-select"></select></label>
+    <button id="play-button" type="button">play</button>
+    <button id="bake-button" type="button">bake &amp; save</button>
+    <div id="status"></div>
+  </header>
+  <main>
+    <div id="stage-host"></div>
+  </main>
+  <script type="module" src="/dist/studio.js"></script>
+</body>
+</html>

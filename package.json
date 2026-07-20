@@ -11,7 +11,9 @@
   "scripts": {
     "start": "npm run build && electron .",
     "build": "tsc && tsc -p src/renderer/tsconfig.json && node scripts/build-assets.js",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json && tsc --noEmit -p tools/puppet-studio/tsconfig.json",
+    "studio": "tsc -p tools/puppet-studio/tsconfig.json && node tools/puppet-studio/serve.mjs",
+    "studio:parts": "node tools/puppet-studio/gen-placeholder-parts.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "assets:adult-placeholder": "node scripts/gen-sprites/build-adult-placeholder.ts",
@@ -27,6 +29,7 @@
     "electron": "43.1.1",
     "electron-builder": "^26.15.3",
     "eslint": "^10.7.0",
+    "pixi.js": "8.19.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }

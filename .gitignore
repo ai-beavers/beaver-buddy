@@ -8,10 +8,14 @@ release/
 .worktrees/
 .context/
 
-# User-supplied source images for scripts/gen-sprites/ingest-images.mjs.
-# Originals live outside the repo; only the ingested sheets under
-# assets/sprites/ are committed (CLAUDE.md: no raw image-gen intermediates).
-assets-src/
+# Asset sources & intermediates. Committed as source assets: rig-ready
+# character parts (assets-src/parts/) and curated reference images
+# (assets-src/reference/) — the material new figures are built from.
+# Local-only: raw ComfyUI dumps (comfyui/), pre-review bakes (baked/),
+# user-supplied originals (e.g. beaver/) — see CLAUDE.md "Assets".
+assets-src/*
+!assets-src/parts/
+!assets-src/reference/
 
 # Local /fp-new-projekt slash-command template files. Imported for local
 # scaffolding only; never committed.
@@ -21,3 +25,15 @@ assets-src/
 # CI certs live in GitHub Actions secrets (docs/code-signing.md).
 *.pfx
 *.p12
+
+# Flightplan planning state — local-only, never committed (linked from
+# CLAUDE.md/AGENTS.md). Anchored to the repo root so the pattern can never
+# swallow repo files of the same name at deeper paths.
+/.flightplan/
+
+# Agent tooling stays maintainer-local: Flightplan fp-* skills/commands/agents
+# are workflow scaffolding, not project content. The vendored PixiJS skills
+# under .agents/skills/pixijs* ARE committed (pinned by skills-lock.json).
+/.claude/
+/.agents/skills/*
+!/.agents/skills/pixijs*/
