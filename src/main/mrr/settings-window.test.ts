@@ -289,6 +289,66 @@ describe('createSettingsHandlers', () => {
 });
 
 describe('openSettingsWindow', () => {
+  it('destroys the window and resets the reference when the page fails to load', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failingWin = {
+      loadFile: vi.fn().mockRejectedValue(new Error('load failed')),
+      on: vi.fn(),
+      focus: vi.fn(),
+      isDestroyed: () => false,
+      destroy: vi.fn(),
+      webContents: {},
+    };
+    const replacementWin = {
+      loadFile: vi.fn().mockResolvedValue(undefined),
+      on: vi.fn(),
+      focus: vi.fn(),
+      isDestroyed: () => false,
+      destroy: vi.fn(),
+      webContents: {},
+    };
+    vi.mocked(BrowserWindow).mockImplementationOnce(function () {
+      return failingWin;
+    });
+    vi.mocked(BrowserWindow).mockImplementationOnce(function () {
+      return replacementWin;
+    });
+
+    const deps: SettingsWindowDeps = {
+      stateDir: '/unused',
+      keychainService: 'svc',
+      getSettings: () => ({
+        mode: 'tokens',
+        stripeConnected: false,
+        revenuecatConnected: false,
+        claudeEnabled: false,
+        codexEnabled: false,
+      }),
+      onSettingsChanged: () => {},
+      onProgressReset: vi.fn().mockResolvedValue(undefined),
+      getUsageSources: () => ({
+        claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+        codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+      }),
+      onUsageEnabledChanged: () => {},
+    };
+
+    openSettingsWindow(deps);
+    // Wait for the loadFile rejection to propagate into the code's catch handler.
+    await expect(failingWin.loadFile.mock.results[0].value).rejects.toThrow('load failed');
+
+    expect(errorSpy).toHaveBeenCalledWith('Failed to load settings window:', expect.any(Error));
+    expect(failingWin.destroy).toHaveBeenCalledTimes(1);
+
+    // A second open should create a new BrowserWindow because the reference
+    // was reset to null, and the new window should load its page normally.
+    openSettingsWindow(deps);
+    expect(BrowserWindow).toHaveBeenCalledTimes(2);
+    expect(replacementWin.loadFile).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
   it('pins the measured content height, useContentSize, fixed-size flags, and platform icon', () => {
     const deps: SettingsWindowDeps = {
       stateDir: '/unused',

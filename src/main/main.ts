@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { app, BrowserWindow, powerMonitor, screen } from 'electron';
 import { applySessionHardening, applyWindowHardening } from './hardening';
+import { parseInjectXp, parseKeychainService, parseQuipFlags, hasMrrPollNowFlag } from './flags';
 import {
   BOUNDS_CHANGED_CHANNEL,
   HATCH_START_CHANNEL,
@@ -17,22 +18,15 @@ import { UsageTracker } from './usage/tracker';
 import { todayTotalTokens } from './usage/totals';
 import { createDetectorState, detectEvents } from './quips/detectors';
 import { QUIP_DISPLAY_DURATION_MS } from './quips/quip-config';
-import { QUIP_POOLS, type QuipTrigger } from './quips/quips';
+import { type QuipTrigger } from './quips/quips';
 import { createSchedulerState, schedule, type SchedulerState } from './quips/scheduler';
 import type { Stage } from './xp/curve';
-import { isValidKeychainService } from './mrr/keychain';
-import { DEFAULT_KEYCHAIN_SERVICE } from './mrr/mrr-config';
 import { MrrEngine } from './mrr/mrr-engine';
 import { loadSettingsState, saveSettingsState, type SettingsState } from './mrr/settings-store';
 import { openSettingsWindow } from './mrr/settings-window';
 import { setUnpackagedDockIcon } from './app-icon';
 
 const SMOKE_DELAY_MS = 3000;
-const INJECT_XP_FLAG_PREFIX = '--inject-xp=';
-const QUIP_FLAG = '--quip';
-const KEYCHAIN_SERVICE_FLAG = '--keychain-service';
-const MRR_POLL_NOW_FLAG = '--mrr-poll-now';
-const QUIP_TRIGGERS = Object.keys(QUIP_POOLS) as readonly QuipTrigger[];
 
 // Enforce a single running instance. A second launch terminates immediately
 // and, on Windows, asks the first instance to surface its window.
@@ -75,45 +69,6 @@ function fireQuip(trigger: QuipTrigger, evolvedStage?: Stage): void {
   if (result.text) {
     mainWindow?.webContents.send(QUIP_CHANGED_CHANNEL, { text: result.text, durationMs: QUIP_DISPLAY_DURATION_MS });
   }
-}
-
-function isQuipTrigger(value: string | undefined): value is QuipTrigger {
-  return QUIP_TRIGGERS.includes(value as QuipTrigger);
-}
-
-// Dev acceptance flag: --quip <trigger> [--quip <trigger> ...] fires each
-// named trigger through the real scheduler after window load — the
-// scriptable acceptance mechanism, mirroring --inject-xp. Multiple
-// occurrences let a single launch demonstrate the cooldown suppressing a
-// second trigger fired immediately after the first.
-function parseQuipFlags(argv: readonly string[]): QuipTrigger[] {
-  const triggers: QuipTrigger[] = [];
-  argv.forEach((arg, i) => {
-    if (arg === QUIP_FLAG && isQuipTrigger(argv[i + 1])) {
-      triggers.push(argv[i + 1] as QuipTrigger);
-    }
-  });
-  return triggers;
-}
-
-// Dev acceptance flag: --inject-xp=N adds N XP once at launch, through
-// the real engine (see xp/engine.ts injectXp) — not a bypass.
-// Stays in the shipped binary: harmless, local-only, no security surface.
-function parseInjectXp(argv: readonly string[]): number | null {
-  const arg = argv.find((a) => a.startsWith(INJECT_XP_FLAG_PREFIX));
-  if (!arg) return null;
-  const value = Number(arg.slice(INJECT_XP_FLAG_PREFIX.length));
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
-
-// Dev flag: --keychain-service <name> overrides the Keychain service name
-// (space-separated, like --quip) so QA never touches the real entries.
-// A name failing isValidKeychainService (leading '-', stray charset,
-// oversize) falls back to the default rather than reaching `security` argv.
-function parseKeychainService(argv: readonly string[]): string {
-  const i = argv.indexOf(KEYCHAIN_SERVICE_FLAG);
-  const value = i !== -1 ? argv[i + 1] : undefined;
-  return value && isValidKeychainService(value) ? value : DEFAULT_KEYCHAIN_SERVICE;
 }
 
 function appIconPath(): string {
@@ -247,7 +202,7 @@ app.whenReady().then(async () => {
   const xpEngine = new XpEngine(stateDir);
 
   const keychainService = parseKeychainService(process.argv);
-  const mrrPollNowOnModeSwitch = process.argv.includes(MRR_POLL_NOW_FLAG);
+  const mrrPollNowOnModeSwitch = hasMrrPollNowFlag(process.argv);
   let growthSettings: SettingsState = loadSettingsState(stateDir);
   xpEngine.setMode(growthSettings.mode);
 

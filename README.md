@@ -27,14 +27,12 @@ burn AI tokens** — a Tamagotchi for people who live in Claude Code and Codex.
 - **Grows on your token burn** — reads your **local** Claude Code / Codex usage logs
   (`~/.claude`, `~/.codex`), turns them into XP, and evolves the beaver through life
   stages: **baby → teen → adult**. Reading is read-only, offline, and never leaves
-  your machine — only derived token counts, never prompt contents. On Windows
-  only Claude Code logs are tracked for now (see [Windows usage tracking](#windows-usage-tracking)
+  your machine — only derived token counts, never prompt contents. On Windows both
+  sources are tracked (Claude Code XDG + legacy, Codex union — see [Windows usage tracking](#windows-usage-tracking)
   below).
 - **Optional MRR mode** — instead of tokens, drive XP from Stripe / RevenueCat
   (read-only keys stored in the platform's secure storage). Off by default.
-  **Not available on Windows yet** — Windows secret-store integration is still
-  pending an administrator decision (see [Windows usage tracking](#windows-usage-tracking)
-  below).
+  Available on Windows once a Stripe or RevenueCat key is saved.
 - **Respects you** — no telemetry, no auto-update, no phone-home. Pause anytime from
   the tray; animation pauses on display sleep.
 - **Single instance** — starting the app a second time does not open another beaver;
@@ -127,11 +125,9 @@ paths are scanned and results are merged, deduplicated by relative session path
 creates an empty `%APPDATA%\Codex` folder that would otherwise hide CLI sessions
 under `~/.codex`.
 
-**MRR mode is not available on Windows yet.** It relies on a platform-specific
-secret store. macOS uses the Keychain via the `security` CLI; the Windows
-secret-store backend (Windows Credential Manager vs. `electron.safeStorage` +
-encrypted JSON in `userData`) requires a project-administrator decision and has
-therefore been deferred. The rest of the app works fully on Windows without it.
+**MRR mode on Windows** uses `electron.safeStorage` (DPAPI-backed) to store Stripe
+and RevenueCat read-only keys locally. Once a key is saved, the tray's Growth menu
+and the Settings window let you switch from tokens to MRR.
 
 **WSL-based Claude Code / Codex installations** use Linux-native paths under
 `\\wsl$\<distro>\...`, which are invisible to the native Windows process. If you
