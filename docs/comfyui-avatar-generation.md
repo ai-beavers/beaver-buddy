@@ -48,6 +48,12 @@ unlocks avatars is tracked separately.
 - Drag to a target location on screen.
 - Click again to release; the beaver opens a parachute and glides down to the
   bottom screen edge.
+- **Full-sheet animations generated (2026-07-20, owner "Voll ComfyUI"
+  decision):** the three Fallschirm-Drop rows (`struggle`, `parachute-wind`,
+  `land`) were generated as complete 8-frame sheets via the `PixelArt Builder`
+  workflow (one Comfy Cloud run each) and baked with
+  `scripts/gen-sprites/ingest-animation-frames.mjs`. Runtime integration +
+  design gate is Phase 3 · WAVE-2.
 - Open questions:
   - Is the parachute part of the beaver sprite sheet, or a separate overlay
     sprite animated independently?
@@ -112,9 +118,14 @@ or runtime cloud calls are added to the Beaver Buddy codebase.
    `48×48` tiles. Depending on the animation, this may become a `4×4` grid
    (16 frames) to match the existing animation sets (`idle×2, walk×4, run×4,
    sleep×2, react×4`).
-2. **Prompt / style guide anchoring:** Add explicit references to the warm
-   palette, outline rules, and right-facing mirror convention from
-   `assets/STYLE.md` so generated frames stay consistent.
+2. ~~**Prompt / style guide anchoring**~~ **Done** (2026-07-20, Phase-3
+   Fallschirm-Drop): the warm-palette / 1px-outline / right-facing +
+   consistent-character clause is now anchored directly in the `PixelArt
+   Builder` prompt ("warm golden-brown fur with cream belly and 1px dark
+   outline, side view facing right, same baby beaver character and colors as
+   the reference image, consistent proportions in every frame") ahead of the
+   per-animation scene description. Verified against the three baked
+   Fallschirm-Drop rows.
 3. **Transparent background:** The workflow already outputs alpha; verify the
    exported frames are usable as PNG with transparency for the canvas renderer.
 4. **Batch animation generation:** One run should produce a full animation set

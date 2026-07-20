@@ -31,7 +31,7 @@ import {
   type PetChangedPayload,
 } from './evolution.js';
 import { hatchShakeOffset, sparkOffsets, startHatch, tickHatch, type HatchState } from './hatch.js';
-import { drawBubble, layoutBubble } from './bubble.js';
+import { drawBubble, layoutBubble, type BubbleLayout } from './bubble.js';
 import { applyDpr } from './canvas-dpr.js';
 
 interface QuipChangedPayload {
@@ -59,7 +59,7 @@ declare global {
 // x/y/width/height rather than a square (roam/evolution/hatch draws) since
 // the quip bubble is wider than it is tall and needs to union with the pet's
 // square dirty rect.
-interface DirtyRect {
+export interface DirtyRect {
   readonly x: number;
   readonly y: number;
   readonly width: number;
@@ -72,6 +72,22 @@ function unionRect(a: DirtyRect, b: DirtyRect): DirtyRect {
   const right = Math.max(a.x + a.width, b.x + b.width);
   const bottom = Math.max(a.y + a.height, b.y + b.height);
   return { x, y, width: right - x, height: bottom - y };
+}
+
+// Returns the bubble's contribution to the dirty rect, inflated 1 logical
+// pixel on all sides. A 1px stroke can land on a device-pixel just outside
+// the integer logical layout after DPR rounding, so this catches the stray
+// outline pixel without regressing the sprite-sized damage-rect discipline.
+// The tail triangle extends BUBBLE_TAIL_SIZE_PX below the box, and the
+// 1px outline stroke on its +0.5 pixel center bleeds one more pixel past
+// the fill, hence the extra +1 in the height.
+export function bubbleDirtyRect(layout: BubbleLayout): DirtyRect {
+  return {
+    x: layout.x - 1,
+    y: layout.y - 1,
+    width: layout.width + 2,
+    height: layout.height + BUBBLE_TAIL_SIZE_PX + 3,
+  };
 }
 
 const canvasEl = document.getElementById('stage');
@@ -115,6 +131,7 @@ let lodgeSheet: Sheet | null = null;
 let hatchFrameIndex = 0;
 let hatchFrameAccumulatorS = 0;
 let quipState: { text: string; showUntilMs: number } | null = null;
+let forceFullClear = false;
 
 function loadCurrentSheet(): void {
   loadSheet(stage)
@@ -179,6 +196,10 @@ window.beaverBuddy.onPetChanged((pet) => {
 
 window.beaverBuddy.onQuip((quip) => {
   quipState = { text: quip.text, showUntilMs: performance.now() + quip.durationMs };
+  // A brand-new quip may replace stale content in a previously drawn bubble
+  // region; clear the whole canvas once so no old outline/text residue
+  // survives outside the new bubble's dirty rect.
+  forceFullClear = true;
   needsDraw = true;
 });
 
@@ -302,13 +323,16 @@ function drawHatch(state: HatchState): void {
 }
 
 function draw(): void {
-  if (dirtyRect) {
+  if (dirtyRect && !forceFullClear) {
     ctx.clearRect(dirtyRect.x, dirtyRect.y, dirtyRect.width, dirtyRect.height);
   } else {
     // Clear in logical coordinates: the context is scaled by DPR, so this
     // covers the entire physical canvas without using canvas.width/height.
     ctx.clearRect(0, 0, bounds().width, bounds().height);
   }
+  // Reset the one-shot flag so subsequent frames return to the sprite-sized
+  // damage-rect discipline.
+  forceFullClear = false;
   if (hatchState) {
     drawHatch(hatchState);
     return;
@@ -353,16 +377,7 @@ function draw(): void {
   if (quipState) {
     const layout = layoutBubble(quipState.text, drawX, drawY, tile, bounds());
     drawBubble(ctx, layout);
-    unionedRect = unionRect(unionedRect, {
-      x: layout.x,
-      y: layout.y,
-      width: layout.width,
-      // + tail + 1: the tail triangle draws BUBBLE_TAIL_SIZE_PX below the
-      // bubble's bottom edge, and its 1px outline stroke (drawn on the +0.5
-      // pixel center) bleeds one more pixel past the fill — without the +1
-      // the clear pass leaves a stroke-residue line behind.
-      height: layout.height + BUBBLE_TAIL_SIZE_PX + 1,
-    });
+    unionedRect = unionRect(unionedRect, bubbleDirtyRect(layout));
   }
   dirtyRect = unionedRect;
 }
@@ -391,6 +406,10 @@ function frame(timestampMs: number): void {
   }
 
   if (lastTimestampMs === null) {
+    // After a document.hidden skip the overlay may have missed bounds or quip
+    // changes; clear the whole canvas once so no stale pixels from the old
+    // state survive.
+    forceFullClear = true;
     lastTimestampMs = timestampMs;
   }
   const dtSeconds = Math.min((timestampMs - lastTimestampMs) / 1000, MAX_DT_S);
@@ -465,6 +484,10 @@ function frame(timestampMs: number): void {
   let quipExpired = false;
   if (quipState && timestampMs >= quipState.showUntilMs) {
     quipState = null;
+    // The bubble's outline may have drawn outside the pet's normal dirty
+    // rect; clear the whole canvas once so the tail and any stray pixels are
+    // gone.
+    forceFullClear = true;
     quipExpired = true;
   }
   window.__debugQuip = quipState ? quipState.text : null;

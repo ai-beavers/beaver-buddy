@@ -23,6 +23,8 @@
 
 import {
   BEAVER_TILE_PX,
+  CLICKS_TO_GRAB,
+  CLICK_WINDOW_S,
   CLIMB_HEIGHT_MAX_PX,
   CLIMB_HEIGHT_MIN_PX,
   CLIMB_PAUSE_MAX_S,
@@ -46,9 +48,9 @@ export interface Bounds {
   readonly height: number;
 }
 
-export type AnimName = 'idle' | 'walk';
+export type AnimName = 'idle' | 'walk' | 'struggle' | 'parachute-wind' | 'land';
 export type Facing = 'left' | 'right';
-type Phase = 'idle' | 'walk' | 'climbUp' | 'climbPause' | 'climbDown';
+type Phase = 'idle' | 'walk' | 'climbUp' | 'climbPause' | 'climbDown' | 'grabbed' | 'gliding' | 'landing';
 
 export type Rng = () => number; // uniform [0, 1)
 
@@ -63,7 +65,30 @@ export interface RoamState {
   readonly rotation: number;
   readonly anim: AnimName;
   readonly frameHold: boolean;
+  readonly clickCount: number;
+  readonly clickWindowRemaining: number;
+  // C2 placeholders: parachute glide physics will be driven from these fields.
+  readonly glideBaseX: number;
+  readonly glideSwayT: number;
+  readonly glideSwaySpeed: number;
+  readonly glideSwayAmp: number;
+  readonly glideRotationAmp: number;
+  readonly landingTimer: number;
 }
+
+export interface RoamInput {
+  readonly cursorX: number;
+  readonly cursorY: number;
+  readonly clicks: number;
+  readonly doubleClick: boolean;
+}
+
+export const defaultRoamInput: RoamInput = {
+  cursorX: 0,
+  cursorY: 0,
+  clicks: 0,
+  doubleClick: false,
+};
 
 // mulberry32 — tiny deterministic PRNG for seeded tests / reproducible runs.
 // Not cryptographic; not needed to be.
@@ -176,62 +201,170 @@ export function createRoamState(bounds: Bounds, rng: Rng): RoamState {
     rotation: 0,
     anim: 'idle',
     frameHold: false,
+    clickCount: 0,
+    clickWindowRemaining: 0,
+    glideBaseX: 0,
+    glideSwayT: 0,
+    glideSwaySpeed: 0,
+    glideSwayAmp: 0,
+    glideRotationAmp: 0,
+    landingTimer: 0,
   };
 }
 
-export function tick(state: RoamState, dtSeconds: number, bounds: Bounds, paused: boolean, rng: Rng): RoamState {
+function enterGrabbed(state: RoamState, bounds: Bounds, input: RoamInput): RoamState {
+  return {
+    ...state,
+    phase: 'grabbed',
+    anim: 'struggle',
+    x: clamp(input.cursorX, 0, maxX(bounds)),
+    y: clamp(input.cursorY, 0, groundY(bounds)),
+    clickCount: 0,
+    clickWindowRemaining: 0,
+    frameHold: false,
+  };
+}
+
+function releaseToGlide(state: RoamState, bounds: Bounds, input: RoamInput): RoamState {
+  const x = clamp(input.cursorX, 0, maxX(bounds));
+  const y = clamp(input.cursorY, 0, groundY(bounds));
+  return {
+    ...state,
+    phase: 'gliding',
+    anim: 'parachute-wind',
+    x,
+    y,
+    // C2 will seed these from rng; for C1 they are initialized to zero.
+    glideBaseX: x,
+    glideSwayT: 0,
+    glideSwaySpeed: 0,
+    glideSwayAmp: 0,
+    glideRotationAmp: 0,
+    landingTimer: 0,
+    frameHold: false,
+  };
+}
+
+function isRoamingPhase(phase: Phase): boolean {
+  return phase === 'idle' || phase === 'walk' || phase === 'climbUp' || phase === 'climbPause' || phase === 'climbDown';
+}
+
+function processInput(state: RoamState, dt: number, bounds: Bounds, input: RoamInput): RoamState {
+  if (state.phase === 'grabbed') {
+    if (input.doubleClick) {
+      return releaseToGlide(state, bounds, input);
+    }
+    return state;
+  }
+
+  if (!isRoamingPhase(state.phase)) {
+    return state;
+  }
+
+  // Decay the click window first, regardless of whether a click happens this
+  // tick, so the window is measured in real elapsed time from the first click.
+  let clickCount = state.clickCount;
+  let clickWindowRemaining = state.clickWindowRemaining - dt;
+  if (clickWindowRemaining <= 0) {
+    clickCount = 0;
+    clickWindowRemaining = 0;
+  }
+
+  if (input.clicks > 0) {
+    // The window opens on click 1 and lasts 4 seconds total; subsequent clicks
+    // inside the window do not extend it.
+    if (clickCount === 0) {
+      clickWindowRemaining = CLICK_WINDOW_S;
+    }
+    clickCount += input.clicks;
+
+    const next = { ...state, clickCount, clickWindowRemaining };
+    if (clickCount >= CLICKS_TO_GRAB) {
+      return enterGrabbed(next, bounds, input);
+    }
+    return next;
+  }
+
+  return { ...state, clickCount, clickWindowRemaining };
+}
+
+export function tick(
+  state: RoamState,
+  dtSeconds: number,
+  bounds: Bounds,
+  paused: boolean,
+  rng: Rng,
+  input: RoamInput = defaultRoamInput,
+): RoamState {
   if (paused) {
     return { ...state, frameHold: true };
   }
 
   const dt = clamp(dtSeconds, 0, MAX_DT_S);
+  const inputState = processInput(state, dt, bounds, input);
   const ground = groundY(bounds);
 
-  switch (state.phase) {
+  switch (inputState.phase) {
     case 'idle': {
-      const timer = state.timer - dt;
+      const timer = inputState.timer - dt;
       if (timer > 0) {
-        return { ...state, timer, frameHold: false };
+        return { ...inputState, timer, frameHold: false };
       }
-      return decideNext({ ...state, y: ground }, bounds, rng);
+      return decideNext({ ...inputState, y: ground }, bounds, rng);
     }
 
     case 'walk': {
-      const remaining = state.targetX - state.x;
+      const remaining = inputState.targetX - inputState.x;
       const step = Math.min(Math.abs(remaining), WALK_SPEED_PX_S * dt);
-      const x = clamp(state.x + Math.sign(remaining) * step, 0, maxX(bounds));
-      if (Math.abs(state.targetX - x) <= TARGET_EPSILON_PX) {
-        return { ...state, x, y: ground, phase: 'idle', anim: 'idle', timer: pickIdlePause(rng), frameHold: false };
+      const x = clamp(inputState.x + Math.sign(remaining) * step, 0, maxX(bounds));
+      if (Math.abs(inputState.targetX - x) <= TARGET_EPSILON_PX) {
+        return { ...inputState, x, y: ground, phase: 'idle', anim: 'idle', timer: pickIdlePause(rng), frameHold: false };
       }
-      return { ...state, x, y: ground, frameHold: false };
+      return { ...inputState, x, y: ground, frameHold: false };
     }
 
     case 'climbUp': {
-      const remaining = state.y - state.climbTargetY;
+      const remaining = inputState.y - inputState.climbTargetY;
       const step = Math.min(Math.max(remaining, 0), CLIMB_SPEED_PX_S * dt);
-      const y = state.y - step;
-      if (y <= state.climbTargetY + TARGET_EPSILON_PX) {
-        return { ...state, y: state.climbTargetY, phase: 'climbPause', anim: 'idle', timer: pickClimbPause(rng), frameHold: false };
+      const y = inputState.y - step;
+      if (y <= inputState.climbTargetY + TARGET_EPSILON_PX) {
+        return { ...inputState, y: inputState.climbTargetY, phase: 'climbPause', anim: 'idle', timer: pickClimbPause(rng), frameHold: false };
       }
-      return { ...state, y, frameHold: false };
+      return { ...inputState, y, frameHold: false };
     }
 
     case 'climbPause': {
-      const timer = state.timer - dt;
+      const timer = inputState.timer - dt;
       if (timer > 0) {
-        return { ...state, timer, frameHold: false };
+        return { ...inputState, timer, frameHold: false };
       }
-      return { ...state, phase: 'climbDown', anim: 'walk', frameHold: false };
+      return { ...inputState, phase: 'climbDown', anim: 'walk', frameHold: false };
     }
 
     case 'climbDown': {
-      const remaining = ground - state.y;
+      const remaining = ground - inputState.y;
       const step = Math.min(Math.max(remaining, 0), CLIMB_SPEED_PX_S * dt);
-      const y = state.y + step;
+      const y = inputState.y + step;
       if (y >= ground - TARGET_EPSILON_PX) {
-        return { ...state, y: ground, phase: 'idle', anim: 'idle', rotation: 0, timer: pickIdlePause(rng), frameHold: false };
+        return { ...inputState, y: ground, phase: 'idle', anim: 'idle', rotation: 0, timer: pickIdlePause(rng), frameHold: false };
       }
-      return { ...state, y, frameHold: false };
+      return { ...inputState, y, frameHold: false };
+    }
+
+    case 'grabbed': {
+      return {
+        ...inputState,
+        x: clamp(input.cursorX, 0, maxX(bounds)),
+        y: clamp(input.cursorY, 0, ground),
+        anim: 'struggle',
+        frameHold: false,
+      };
+    }
+
+    case 'gliding':
+    case 'landing': {
+      // C2/C3 physics and landing timeout will be added here.
+      return { ...inputState, frameHold: false };
     }
   }
 }

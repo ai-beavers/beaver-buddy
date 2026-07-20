@@ -1,4 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { layoutBubble } from './bubble.js';
+import { BUBBLE_TAIL_SIZE_PX } from './pet-config.js';
 
 // renderer.ts executes DOM side effects at module load time, so we stub the
 // required globals before dynamically importing it in each test.
@@ -198,5 +200,16 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
     rafCallback(32);
 
     expect(windowStub.__debugPet).toEqual({ level: 1, stage: 'baby', evolving: false });
+  });
+
+  it('inflates the bubble dirty rect by 1px on all sides including tail bleed', async () => {
+    const { bubbleDirtyRect } = await import('./renderer.js');
+    const layout = layoutBubble('dam', 100, 100, 32, { width: 2000, height: 2000 });
+    const rect = bubbleDirtyRect(layout);
+
+    expect(rect.x).toBe(layout.x - 1);
+    expect(rect.y).toBe(layout.y - 1);
+    expect(rect.width).toBe(layout.width + 2);
+    expect(rect.height).toBe(layout.height + BUBBLE_TAIL_SIZE_PX + 3);
   });
 });
