@@ -66,18 +66,35 @@ extended.
 
 ## Usage-log paths
 
-- On Windows, Claude Code logs are discovered only under `%USERPROFILE%\.claude`.
-  The XDG path `~/.config/claude` is ignored on Windows.
-- On macOS and Linux, both `~/.config/claude` (XDG) and `~/.claude` (legacy) are
-  checked.
-- `CLAUDE_CONFIG_DIR` is the override with highest priority on all platforms. It
-  accepts comma-separated paths everywhere; on Windows it also accepts semicolons
-  as separators. Colons are intentionally not treated as separators on Windows
-  because they would conflict with drive letters (`C:\`).
-- Codex usage logs on Windows are discovered in this priority:
-  `CODEX_HOME` (override) > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` >
-  `~/.codex` (legacy). The first existing path is used. On macOS/Linux, logs are
-  read from `~/.codex` only.
+Discovery differs per platform — Windows and macOS/Linux are documented
+separately below. The source of truth is `src/main/usage/paths.ts`; keep this
+section in sync with it.
+
+### Windows
+
+- Claude Code: Union of `%USERPROFILE%\.claude` (legacy) and
+  `%USERPROFILE%\.config\claude` (XDG) — every existing location is scanned
+  and merged (users who migrated or use WSL toolchains may have data in
+  either spot).
+- Codex: Union across all existing candidates — `%LOCALAPPDATA%\Codex`,
+  `%APPDATA%\Codex`, `~/.codex` (legacy) — merged and deduplicated by relative
+  session path (earliest candidate wins on collision; within one root,
+  `sessions/` beats `archived_sessions/`).
+
+### macOS / Linux
+
+- Claude Code: Union of `~/.config/claude` (XDG) and `~/.claude` (legacy) —
+  every existing location is scanned.
+- Codex: `~/.codex` only.
+
+### All platforms
+
+- `CLAUDE_CONFIG_DIR` overrides Claude Code discovery with highest priority.
+  It accepts comma-separated paths on all platforms; semicolons are
+  additionally accepted (the conventional PATH separator on Windows). Colons
+  are intentionally not treated as separators on Windows because they would
+  conflict with drive letters (`C:\`).
+- `CODEX_HOME` overrides Codex discovery with a single directory.
 
 ## Overlay etiquette
 
@@ -115,8 +132,25 @@ extended.
 - All sprites follow `assets/STYLE.md` (palette, grid, outline rules) — created by
   the first asset item, then binding. Off-palette colors or mixed pixel densities
   fail the design gate.
-- Commit final PNGs + the style guide. STYLE.md records provenance (generator, date,
-  human cleanup); raw image-gen intermediates stay out of the repo.
+- Commit final PNGs + the style guide. STYLE.md records provenance (generator,
+  date, human cleanup). Rig-ready character parts (`assets-src/parts/<figure>/`)
+  and curated reference images (`assets-src/reference/`) are committed as
+  source assets — they are what new figures and animations are built from. Raw
+  ComfyUI dumps (`assets-src/comfyui/`) and pre-review bakes
+  (`assets-src/baked/`) stay out of the repo: only assets that are actually
+  used get committed.
+
+## Dev-time asset authoring (PixiJS studio)
+
+- `tools/puppet-studio/` rigs ComfyUI-generated character parts and bakes
+  app-compatible sprite sheets (ADR 003). It is **dev-time tooling only**:
+  `pixi.js` is a devDependency, the studio is not part of `npm run build`, and
+  an eslint `no-restricted-imports` rule blocks any `pixi.js` import under
+  `src/` — the shipped renderer stays plain Canvas2D (ADR 001).
+- Run: `npm run studio:parts` (placeholder parts) → `npm run studio`
+  → http://localhost:8377/. Baked output goes to `assets-src/baked/`
+  (gitignored) and passes the normal asset review before landing in
+  `assets/sprites/`.
 
 ## Definition of done (every autonomous item)
 
@@ -160,3 +194,21 @@ fixed or documented as known limitations.
   Auto-decisions, move on.
 - ADRs (`docs/adr/NNN-title.md`) are for costly or hard-to-reverse cross-cutting
   decisions (renderer approach, state schema, asset pipeline) — not every choice.
+
+## Planning & Flightplan (local-only)
+
+Detailed planning lives in **local, gitignored files** — linked here so every
+agent session can find them. They exist on the maintainer's machine only; never
+`git add` them, and never copy their contents into committed docs or PRs.
+
+- `.fp-new-projekt/windows-native-flight-plan.md` — the detailed item plan
+  (Windows port #1–#62 done; next: #26 MRR mode, #8–#18 animations, #7 final
+  adult art).
+- Flightplan state lives under `.flightplan/` (one directory, gitignored):
+  `STATE.md` (digest: Now/Next), `ROADMAP.md` (milestones/phases),
+  `HANDOFF.md` (session resume), `NOTE.md` (idea/task inbox), plus the
+  `Planning/` (Milestone/Phase/Wave) and `Debugging/` templates.
+- The Flightplan workflow runs via `/fp-status`, `/fp-note`, `/fp-pause`,
+  `/fp-resume`. The skills live locally under `.claude/skills/` and
+  `.agents/skills/` (gitignored agent tooling, not project content) and are
+  also installed globally on the maintainer's machine.

@@ -106,3 +106,8 @@ export const BUBBLE_TAIL_SIZE_PX = 5;
 // Gap between the pet tile's top edge and the bubble's bottom edge (the tail
 // occupies part of this gap).
 export const BUBBLE_OFFSET_ABOVE_PET_PX = 8;
+
+// Grab interaction: number of clicks inside the window needed to grab the
+// beaver, and the duration of that window in seconds.
+export const CLICKS_TO_GRAB = 3;
+export const CLICK_WINDOW_S = 4;

@@ -69,9 +69,9 @@ Windows packaging produces:
 - `release/Beaver Buddy Setup 0.1.0.exe` — NSIS installer
 - `release/Beaver Buddy 0.1.0.exe` — portable executable
 
-> **Note:** The installer and portable executable are currently unsigned, so
-> Windows Defender SmartScreen may show a warning on first run. Code-signing is
-> planned for a later phase.
+> **Note:** CI and dev builds are self-signed (see
+> [docs/code-signing.md](docs/code-signing.md)). Windows Defender SmartScreen
+> may still show a warning on first run until a trusted certificate is used.
 
 ### Windows overlay & tray behavior
 
@@ -142,7 +142,19 @@ usage logs.
 - `src/renderer/` — the pet itself: canvas sprite rendering, roaming, quip bubbles,
   hatch/evolution animations (sandboxed, no Node access).
 - `assets/` — committed PNG sprite sheets + `STYLE.md` (palette/grid rules).
+  Every figure is cataloged in [`docs/asset-gallery.md`](docs/asset-gallery.md).
 - `scripts/gen-sprites/` — the asset-generation pipeline.
+- `tools/puppet-studio/` — dev-time PixiJS authoring studio (ADR 003): rigs
+  ComfyUI-generated parts and bakes app-compatible sprite sheets. Never shipped;
+  run with `npm run studio` (see `tools/puppet-studio/README.md`).
+- `docs/` — ADRs, design reviews, asset gallery, pipeline docs (index:
+  [`docs/README.md`](docs/README.md)).
+- `scripts/` — build + QA helpers (`build-assets.js`, `usage-cli.js`, CDP
+  screenshots, code-signing scripts).
+- `.github/` — CI workflows + PR template.
+- `.agents/skills/` — vendored PixiJS agent skills (pinned by
+  `skills-lock.json`). Flightplan planning/tooling is maintainer-local
+  (gitignored `.flightplan/`, `.claude/`).
 
 ## Troubleshooting
 
@@ -196,10 +208,10 @@ usage logs.
 
 ## Contributing
 
-Contributions are welcome. This repo is executed largely by autonomous build items, so
-the guardrails are strict and enforced in review — please read
-[`CLAUDE.md`](CLAUDE.md) (the full guardrails) and [`PRD.md`](PRD.md) (the product
-source of truth) before opening a PR.
+Contributions are welcome — read the full step-by-step guide in
+[`CONTRIBUTING.md`](CONTRIBUTING.md). This repo is executed largely by
+autonomous build items, so the guardrails are strict and enforced in review —
+please read [`PRD.md`](PRD.md) (the product source of truth) before opening a PR.
 
 The essentials:
 

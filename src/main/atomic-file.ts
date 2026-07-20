@@ -8,7 +8,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-// Three attempts: immediate, 10 ms, 50 ms, 100 ms. Total worst-case ~160 ms.
+// Four attempts: immediate, 10 ms, 50 ms, 100 ms. Total worst-case ~160 ms.
 const RETRY_DELAYS_MS = [0, 10, 50, 100];
 
 function isRetriableError(error: unknown): boolean {

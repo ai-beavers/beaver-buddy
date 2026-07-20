@@ -46,9 +46,11 @@ limitation are communicated as known follow-ups.
   `applyDpr` scales the backing store, and `clearRect` uses logical coordinates.
 - **Build verification:** `npm run typecheck`, `npm run lint`, `npm test`,
   `npm run build` and `npx electron-builder --win --publish never` all pass.
-- **Screenshots:** not captured in this CLI-only environment. The verdict is
-  provisional until real Windows screenshots at 100 %/125 %/150 %/200 % scaling
-  and light/dark taskbar backgrounds can be added to this folder.
+- **Screenshots:** runtime captures live in this folder (`idle.png`,
+  `quip-bubble.png`, `hatch.png`, `evolution-flash.png`). The verdict stays
+  provisional for the full HiDPI matrix — real Windows screenshots at
+  100 %/125 %/150 %/200 % scaling on light/dark taskbar backgrounds are still
+  pending.
 
 ---
 

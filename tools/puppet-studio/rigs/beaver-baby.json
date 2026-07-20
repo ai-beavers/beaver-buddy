@@ -1,0 +1,14 @@
+{
+  "name": "beaver-baby",
+  "tile": 96,
+  "parts": [
+    { "id": "tail", "src": "tail.png", "pivot": [19, 8], "pos": [36, 74], "z": 10, "parent": null },
+    { "id": "legBack", "src": "leg-back.png", "pivot": [6, 2], "pos": [42, 78], "z": 20, "parent": null },
+    { "id": "body", "src": "body.png", "pivot": [14, 15], "pos": [48, 66], "z": 30, "parent": null },
+    { "id": "legFront", "src": "leg-front.png", "pivot": [7, 2], "pos": [55, 78], "z": 40, "parent": null },
+    { "id": "head", "src": "head.png", "pivot": [12, 20], "pos": [10, -12], "z": 50, "parent": "body" },
+    { "id": "eyeOpen", "src": "eye-open.png", "pivot": [3, 3], "pos": [8, -8], "z": 60, "parent": "head" },
+    { "id": "eyeClosed", "src": "eye-closed.png", "pivot": [4, 3], "pos": [8, -8], "z": 60, "parent": "head", "visibleByDefault": false },
+    { "id": "canopy", "src": "canopy.png", "pivot": [27, 24], "pos": [48, 26], "z": 70, "parent": null, "visibleByDefault": false }
+  ]
+}
