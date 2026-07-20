@@ -290,6 +290,10 @@ export function openSettingsWindow(deps: SettingsWindowDeps): void {
 
   win.loadFile(path.join(app.getAppPath(), 'dist', 'main', 'mrr', 'settings.html')).catch((error: unknown) => {
     console.error('Failed to load settings window:', error);
+    if (!win.isDestroyed()) {
+      win.destroy();
+    }
+    settingsWindow = null;
   });
 
   win.on('closed', () => {
