@@ -312,7 +312,16 @@ export function computeStageScale(bboxes, tile, targetContentHeightPx) {
 //
 // Baby is built by ingest-animation-frames.mjs (parachute drop / BL-17);
 // it is intentionally absent from this list so the still-frame ingest only
-// rebuilds teen.
+// rebuilds teen and adult.
+//
+// beaver-adult (BL-18): golden generated art, same {stage}-idle-right.png /
+// {stage}-to-right-{1,2}.png naming as teen so it shares this same srcDir and
+// the BL-12 row-assignment regression lock below — the source frames arrive
+// as ComfyUI dumps (assets-src/comfyui/adult-idle|adult-walk/frame_0N.png)
+// and are copied/renamed into assets-src/beaver/ before running this. idle
+// and walk share one computeStageScale lock (no size pulsing between them);
+// struggle/parachute-wind/land are appended separately by
+// ingest-animation-frames.mjs, each with their own locked scale.
 export const STAGE_SPECS = [
   {
     name: 'beaver-teen',
@@ -322,6 +331,16 @@ export const STAGE_SPECS = [
     rows: [
       { name: 'idle', files: ['teen-idle-right.png'] },
       { name: 'walk', files: ['teen-to-right-1.png', 'teen-to-right-2.png'] },
+    ],
+  },
+  {
+    name: 'beaver-adult',
+    tile: TILE,
+    fps: FPS,
+    targetContentHeightPx: 92,
+    rows: [
+      { name: 'idle', files: ['adult-idle-right.png'] },
+      { name: 'walk', files: ['adult-to-right-1.png', 'adult-to-right-2.png'] },
     ],
   },
 ];
@@ -385,7 +404,16 @@ if (isMain) {
     throw new Error(`missing ${srcDir} — copy the source images there first (gitignored, not part of the repo)`);
   }
 
-  for (const stageSpec of STAGE_SPECS) {
+  // Optional stage-name filter (e.g. `beaver-adult`) so one stage can be
+  // rebuilt without every other stage's source images also being present in
+  // srcDir — mirrors ingest-animation-frames.mjs's stage arg.
+  const nameFilter = process.argv[2];
+  const specs = nameFilter ? STAGE_SPECS.filter((s) => s.name === nameFilter) : STAGE_SPECS;
+  if (nameFilter && specs.length === 0) {
+    throw new Error(`unknown stage "${nameFilter}" (expected one of: ${STAGE_SPECS.map((s) => s.name).join(', ')})`);
+  }
+
+  for (const stageSpec of specs) {
     const { png, meta, scale } = ingestStage(stageSpec, srcDir);
     const pngPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.png`);
     const metaPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.json`);

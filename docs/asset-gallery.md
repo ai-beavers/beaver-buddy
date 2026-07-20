@@ -52,14 +52,16 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 192×192 sheet, 96×96
-  tiles, fps hint 8
-- **Animations:** `idle` (1 frame), `walk` (2 frames)
-- **Provenance:** **placeholder** — mechanically derived from the teen sheet
-  (crop to content bbox + nearest-neighbor upscale) by
-  `scripts/gen-sprites/build-adult-placeholder.ts` (`npm run
-  assets:adult-placeholder`); byte-deterministic
-- **Status:** placeholder — final adult art is still open (flight-plan #7)
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×480 sheet,
+  96×96 tiles, fps hint 8
+- **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
+  (8), `land` (8)
+- **Provenance:** golden generated art (BL-18). `idle`/`walk` ingested via
+  `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:ingest-adult`);
+  `struggle`/`parachute-wind`/`land` appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
+  assets:adult-anims`)
+- **Status:** final
 
 ### Hatch lodge
 

@@ -1,5 +1,6 @@
 import { BEAVER_TILE_PX, PET_SCALE } from './pet-config.js';
 import type { RoamInput, RoamState } from './roam.js';
+import type { Stage } from './sprites.js';
 
 export type CaptureMode = 'hover-forward' | 'full-capture';
 
@@ -48,6 +49,13 @@ export function isPointOverPet(x: number, y: number, petX: number, petY: number)
   return x >= petX && x < petX + size && y >= petY && y < petY + size;
 }
 
+// BL-17/BL-18: the parachute interaction needs struggle/parachute-wind/land
+// rows, which only baby and adult sheets ship — teen's sheet lacks them
+// (sprites.ts frameRect throws on a missing row).
+export function stageHasInteraction(stage: Stage): boolean {
+  return stage === 'baby' || stage === 'adult';
+}
+
 export function determineCaptureMode(
   roamState: RoamState,
   cursorX: number,
@@ -56,9 +64,9 @@ export function determineCaptureMode(
   petY: number,
   interactionEnabled: boolean = true,
 ): CaptureMode {
-  // BL-17: the parachute interaction is only available in the baby stage.
-  // When interaction is disabled, the overlay must stay click-through
-  // even while the cursor is over the pet.
+  // interactionEnabled gates by stage (see stageHasInteraction) — when
+  // disabled, the overlay must stay click-through even while the cursor is
+  // over the pet.
   if (!interactionEnabled) return 'hover-forward';
   if (roamState.phase === 'grabbed') return 'full-capture';
   // Spec (docs/interaction-model.md): during gliding/landing the overlay is

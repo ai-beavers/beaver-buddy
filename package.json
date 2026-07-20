@@ -16,11 +16,12 @@
     "studio:parts": "node tools/puppet-studio/gen-placeholder-parts.mjs",
     "lint": "eslint .",
     "test": "vitest run",
-    "assets:adult-placeholder": "node scripts/gen-sprites/build-adult-placeholder.ts",
     "assets:build": "node scripts/gen-sprites/build.ts",
     "assets:icons": "node scripts/gen-sprites/build-icons.ts",
     "assets:ingest": "node scripts/gen-sprites/ingest-images.mjs",
-    "assets:parachute": "node scripts/gen-sprites/ingest-animation-frames.mjs",
+    "assets:ingest-adult": "node scripts/gen-sprites/ingest-images.mjs beaver-adult",
+    "assets:parachute": "node scripts/gen-sprites/ingest-animation-frames.mjs baby",
+    "assets:adult-anims": "node scripts/gen-sprites/ingest-animation-frames.mjs adult",
     "usage:cli": "npm run build && node scripts/usage-cli.js"
   },
   "devDependencies": {

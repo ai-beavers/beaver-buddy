@@ -14,6 +14,7 @@ import {
   recordDoubleClick,
   consumeInput,
   determineCaptureMode,
+  stageHasInteraction,
   type CaptureMode,
 } from './input-capture.js';
 import { clampRoamStateToBounds, createRoamState, tick, type RoamState, type Bounds } from './roam.js';
@@ -540,7 +541,14 @@ function frame(timestampMs: number): void {
   // cursor position captured in this frame's input. The parachute interaction
   // is only active during the baby stage; in all other stages the overlay
   // stays fully click-through.
-  const desiredMode = determineCaptureMode(roamState, input.cursorX, input.cursorY, drawX, drawY, stage === 'baby');
+  const desiredMode = determineCaptureMode(
+    roamState,
+    input.cursorX,
+    input.cursorY,
+    drawX,
+    drawY,
+    stageHasInteraction(stage),
+  );
   if (desiredMode !== currentCaptureMode) {
     window.beaverBuddy.requestCaptureMode(desiredMode);
     currentCaptureMode = desiredMode;
