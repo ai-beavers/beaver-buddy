@@ -58,6 +58,7 @@ unlocks avatars is tracked separately.
 - Triple-click the beaver to enter "grab" mode → drag to a target location →
   click again to release; the beaver opens a parachute and glides down to the
   bottom screen edge.
+ 
 - **Studio prototype exists**: the `parachute` recipe (canopy pendulum + body
   hang) bakes a loop. The interactive behavior (grab/drag/release + glide
   trajectory in `roam.ts`) is a separate app task.
