@@ -160,8 +160,10 @@ function codexHomes(env: PathEnv, home: string, platform: Platform): string[] {
   }
 
   if (platform === 'win32') {
-    const localAppData = env.LOCALAPPDATA;
-    const appData = env.APPDATA;
+    // Guard against set-but-empty (or whitespace-only) env vars:
+    // path.join('', 'Codex') would resolve relative to the process CWD.
+    const localAppData = env.LOCALAPPDATA?.trim();
+    const appData = env.APPDATA?.trim();
     return [
       localAppData ? path.join(localAppData, 'Codex') : '',
       appData ? path.join(appData, 'Codex') : '',

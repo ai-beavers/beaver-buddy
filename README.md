@@ -71,9 +71,9 @@ Windows packaging produces:
 - `release/Beaver Buddy Setup 0.1.0.exe` — NSIS installer
 - `release/Beaver Buddy 0.1.0.exe` — portable executable
 
-> **Note:** The installer and portable executable are currently unsigned, so
-> Windows Defender SmartScreen may show a warning on first run. Code-signing is
-> planned for a later phase.
+> **Note:** CI and dev builds are self-signed (see
+> [docs/code-signing.md](docs/code-signing.md)). Windows Defender SmartScreen
+> may still show a warning on first run until a trusted certificate is used.
 
 ### Windows overlay & tray behavior
 
