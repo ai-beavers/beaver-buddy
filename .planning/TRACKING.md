@@ -1,5 +1,15 @@
 # Tracking
 
+- **2026-07-22** — Vorhaben: Umstieg Fork → Direktarbeit auf ai-beavers/beaver-buddy:
+  letzten Fork-only-Commit (`1c86e57`, animation-authoring) als Branch + PR zu upstream
+  bringen, PR #40 abwarten/mergen, Remotes umbenennen (upstream→origin, origin→fork),
+  main auf origin/main tracken, Tag `docs/animation-authoring` zu origin pushen,
+  Fork archivieren. Kein Rewrite, strikte Reihenfolge (erst PRs mergen, dann Remote-Umbau).
+  Status: **teilweise umgesetzt — blockiert auf Review** (Branch `docs/animation-authoring`
+  zu ai-beavers gepusht, PR #41 geöffnet, Merge-Recht geklärt: `maintain`, aber Branch
+  Protection verlangt Review; Reviews bei Gw3i + jurij angefragt für PR #40 + #41).
+  Remote-Umbau/main-Sync/Fork-Archivierung (Schritte 3–5) folgen nach den Merges.
+
 - **2026-07-19** — Vorhaben: Kurze Contributor-Doku `docs/animation-authoring.md`
   zur Animations-Erstellung (ComfyUI + PixiJS, macOS & Windows, inkl. PixiJS-/
   comfy-skills und Comfy-Cloud-MCP-Einrichtung) für menschliche Contributors und
