@@ -26,7 +26,7 @@ export interface SheetMeta {
   readonly fps: number;
   readonly sheetWidth: number;
   readonly sheetHeight: number;
-  readonly rows: readonly { readonly name: string; readonly frames: number }[];
+  readonly rows: readonly { readonly name: string; readonly frames: number; readonly height?: number }[];
 }
 
 export interface IngestResult {
@@ -43,7 +43,7 @@ export function decodePng(buf: Buffer): DecodedImage;
 export function removeBackground(img: DecodedImage): DecodedImage;
 export function cropToBbox(img: DecodedImage): DecodedImage;
 export function resizeAreaAverage(img: DecodedImage, destW: number, destH: number): DecodedImage;
-export function placeOnTile(img: DecodedImage, tile: number): DecodedImage;
+export function placeOnTile(img: DecodedImage, tileW: number, tileH?: number): DecodedImage;
 export function computeStageScale(
   bboxes: readonly { width: number; height: number }[],
   tile: number,

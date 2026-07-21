@@ -273,22 +273,25 @@ export function resizeAreaAverage(img, destW, destH) {
   return { width: destW, height: destH, data: out };
 }
 
-// Step 4: composite onto a TILE×TILE canvas, feet on the tile bottom,
-// horizontally centered. Defensively clips to the tile (never spills into a
-// neighboring sheet column) — computeStageScale's width term keeps this a
-// no-op for every frame we actually ship.
-export function placeOnTile(img, tile) {
-  const out = new Uint8ClampedArray(tile * tile * 4);
-  const w = Math.min(img.width, tile);
-  const h = Math.min(img.height, tile);
-  const destX = Math.floor((tile - w) / 2);
-  const destY = tile - h;
+// Step 4: composite onto a tileW×tileH canvas, feet on the canvas bottom,
+// horizontally centered. Defensively clips to the canvas (never spills into
+// a neighboring sheet column/row) — computeStageScale's width term keeps
+// this a no-op for every frame we actually ship. tileH defaults to tileW so
+// every square-tile caller (baby/teen still frames) is unaffected; a taller
+// canvas (BL-19: adult parachute-wind) lets one animation row render taller
+// than the base tile instead of shrinking its content to fit a square.
+export function placeOnTile(img, tileW, tileH = tileW) {
+  const out = new Uint8ClampedArray(tileW * tileH * 4);
+  const w = Math.min(img.width, tileW);
+  const h = Math.min(img.height, tileH);
+  const destX = Math.floor((tileW - w) / 2);
+  const destY = tileH - h;
   for (let y = 0; y < h; y += 1) {
     const srcStart = y * img.width * 4;
-    const destStart = ((destY + y) * tile + destX) * 4;
+    const destStart = ((destY + y) * tileW + destX) * 4;
     out.set(img.data.subarray(srcStart, srcStart + w * 4), destStart);
   }
-  return { width: tile, height: tile, data: out };
+  return { width: tileW, height: tileH, data: out };
 }
 
 // One scale factor per stage, applied to every frame (spec: "lock from the

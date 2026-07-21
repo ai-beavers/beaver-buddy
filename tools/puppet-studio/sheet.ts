@@ -47,16 +47,21 @@ export function layoutSheet(rows: readonly BakedRow[], tile: number, fps: number
 export interface FrameCell {
   readonly sx: number;
   readonly sy: number;
-  readonly size: number;
+  readonly sw: number;
+  readonly sh: number;
 }
 
-// Mirrors sprites.ts's frameRect exactly (column wrap included), so baked
-// sheets and app-loaded sheets can never drift apart in addressing.
+// Mirrors sprites.ts's frameRect exactly (column wrap + the {sx,sy,sw,sh}
+// shape, BL-19), so baked sheets and app-loaded sheets can never drift apart
+// in addressing. The studio only ever bakes uniform square tiles (BakedRow
+// has no per-row height), so this reduces to sw === sh === tile and
+// sy === rowIndex * tile every time — same as frameRect's own backward-
+// compat case for a sheet with no `height` field anywhere.
 export function frameCell(layout: SheetLayout, rowIndex: number, frameIndex: number): FrameCell {
   const row = layout.rows[rowIndex];
   if (!row) {
     throw new Error(`unknown row index: ${rowIndex}`);
   }
   const frame = ((frameIndex % row.frames) + row.frames) % row.frames;
-  return { sx: frame * layout.tile, sy: rowIndex * layout.tile, size: layout.tile };
+  return { sx: frame * layout.tile, sy: rowIndex * layout.tile, sw: layout.tile, sh: layout.tile };
 }

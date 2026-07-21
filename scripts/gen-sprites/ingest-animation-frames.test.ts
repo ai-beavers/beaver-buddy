@@ -100,44 +100,52 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
   const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
 
-  it('has the expected row names and frame counts', () => {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { rows: readonly { name: string; frames: number }[] };
+  it('has the expected row names, frame counts, and the taller parachute-wind row', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
       { name: 'struggle', frames: 8 },
-      { name: 'parachute-wind', frames: 8 },
+      { name: 'parachute-wind', frames: 8, height: 128 },
       { name: 'land', frames: 8 },
     ]);
   });
 
-  it('is a 768x480 sheet (5 rows x 8 cols at the 96px tile)', () => {
+  // 5 rows at the 96px base tile, except parachute-wind at 128px (BL-19):
+  // 96*4 + 128 = 512. Width stays a flat 8-col grid at the 96px tile — only
+  // row height varies, never column width.
+  it('is a 768x512 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(480);
+    expect(decoded.height).toBe(512);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(480);
+    expect(meta.sheetHeight).toBe(512);
   });
 
-  it('has non-empty frames in every row', () => {
+  it('has non-empty frames in every row, at each row cumulative y-offset', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
       tile: number;
-      rows: readonly { name: string; frames: number }[];
+      rows: readonly { name: string; frames: number; height?: number }[];
     };
     const decoded = decodePng(fs.readFileSync(pngPath));
 
-    meta.rows.forEach((row, rowIndex) => {
+    let originY = 0;
+    meta.rows.forEach((row) => {
+      const rowHeight = row.height ?? meta.tile;
       for (let frame = 0; frame < row.frames; frame += 1) {
         let opaqueCount = 0;
-        for (let y = 0; y < meta.tile; y += 1) {
+        for (let y = 0; y < rowHeight; y += 1) {
           for (let x = 0; x < meta.tile; x += 1) {
-            const alpha = decoded.data[((rowIndex * meta.tile + y) * decoded.width + frame * meta.tile + x) * 4 + 3];
+            const alpha = decoded.data[((originY + y) * decoded.width + frame * meta.tile + x) * 4 + 3];
             if (alpha > 0) opaqueCount += 1;
           }
         }
         expect(opaqueCount, `${row.name}[${frame}] is empty`).toBeGreaterThan(0);
       }
+      originY += rowHeight;
     });
   });
 });

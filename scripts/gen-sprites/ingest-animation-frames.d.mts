@@ -14,6 +14,7 @@ export interface StageAnimSpec {
   readonly name: string;
   readonly run: string;
   readonly targetContentHeightPx: number;
+  readonly tileHeight?: number;
 }
 
 export interface StageAnimConfig {

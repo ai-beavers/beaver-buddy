@@ -57,12 +57,22 @@ export const BABY = {
 // own heights to read as the same size beaver — computeStageScale's width
 // term remains the clipping guard (see ingest-images.mjs) if a height gets
 // bumped further.
+//
+// parachute-wind carries its own tileHeight (BL-19): sharing the square 96px
+// tile forced the beaver's body to shrink so the canopy above it would also
+// fit, reading noticeably smaller than idle. A taller tile lets the canopy
+// extend upward past the base tile (drawFrame in sprites.ts bottom-anchors
+// every row to the same ground line) while the beaver's body renders
+// full-size. targetContentHeightPx is raised to match — computeStageScale's
+// width term (still keyed off the base 96px tile, see bakeAnimation) is the
+// only thing capping content width, so a taller target just fills the taller
+// tile instead of clipping.
 export const ADULT = {
   shippedPng: 'beaver-adult.png',
   bakedDirName: 'beaver-adult',
   animations: [
     { name: 'struggle', run: 'adult-struggle', targetContentHeightPx: 96 },
-    { name: 'parachute-wind', run: 'adult-parachute-wind', targetContentHeightPx: 96 },
+    { name: 'parachute-wind', run: 'adult-parachute-wind', targetContentHeightPx: 128, tileHeight: 128, preKeyed: true },
     { name: 'land', run: 'adult-land', targetContentHeightPx: 90 },
   ],
 };
@@ -82,18 +92,27 @@ function extractTile(sheet, col, row) {
 }
 
 // Bakes one animation's 8 frames into 8 tiles at a single locked scale.
-function bakeAnimation(runDir, targetContentHeightPx) {
+// tileHeight (default TILE) sets the composited canvas height only — the
+// width cap passed to computeStageScale stays the base TILE (96) so a taller
+// row still never clips horizontally into the next sheet column.
+// preKeyed frames already ship a transparent background (chroma-keyed at
+// authoring time). removeBackground's border flood-fill also treats near-white
+// as background, so running it on a pre-keyed frame eats any white detail that
+// touches the transparent edge (e.g. the parachute's white canopy stripes) —
+// skip it and just crop to the alpha bbox.
+function bakeAnimation(runDir, targetContentHeightPx, tileHeight = TILE, preKeyed = false) {
   const cropped = [];
   for (let i = 1; i <= FRAME_COUNT; i += 1) {
     const file = path.join(runDir, `frame_${String(i).padStart(2, '0')}.png`);
     const buf = fs.readFileSync(file);
-    cropped.push(cropToBbox(removeBackground(decodePng(buf))));
+    const decoded = decodePng(buf);
+    cropped.push(cropToBbox(preKeyed ? decoded : removeBackground(decoded)));
   }
   const scale = computeStageScale(cropped, TILE, targetContentHeightPx);
   const tiles = cropped.map((img) => {
     const destW = Math.max(1, Math.round(img.width * scale));
     const destH = Math.max(1, Math.round(img.height * scale));
-    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE);
+    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE, tileHeight);
   });
   return { tiles, scale };
 }
@@ -105,43 +124,54 @@ export function buildStageSheet(repoRoot, config) {
   const shippedPng = path.join(repoRoot, 'assets', 'sprites', config.shippedPng);
   const shipped = decodePng(fs.readFileSync(shippedPng));
 
-  // Preserve idle (row0 col0) + walk (row1 col0/col1) exactly.
+  // Preserve idle (row0 col0) + walk (row1 col0/col1) exactly. Both come
+  // from extractTile, which is always TILE×TILE — height defaults to TILE.
   const rows = [
-    { name: 'idle', tiles: [extractTile(shipped, 0, 0)] },
-    { name: 'walk', tiles: [extractTile(shipped, 0, 1), extractTile(shipped, 1, 1)] },
+    { name: 'idle', tiles: [extractTile(shipped, 0, 0)], height: TILE },
+    { name: 'walk', tiles: [extractTile(shipped, 0, 1), extractTile(shipped, 1, 1)], height: TILE },
   ];
 
   const scales = {};
   for (const anim of config.animations) {
     const runDir = path.join(repoRoot, 'assets-src', 'comfyui', anim.run);
-    const { tiles, scale } = bakeAnimation(runDir, anim.targetContentHeightPx);
-    rows.push({ name: anim.name, tiles });
+    const tileHeight = anim.tileHeight ?? TILE;
+    const { tiles, scale } = bakeAnimation(runDir, anim.targetContentHeightPx, tileHeight, anim.preKeyed ?? false);
+    rows.push({ name: anim.name, tiles, height: tileHeight });
     scales[anim.name] = scale;
   }
 
+  // Rows stack at cumulative y-offsets, not rowIndex*TILE — a row can be
+  // taller than TILE (BL-19: adult parachute-wind), so every row after it
+  // shifts down by the extra height. Width stays a flat maxFrames*TILE grid:
+  // only row height varies, never column width.
   const maxFrames = Math.max(...rows.map((r) => r.tiles.length));
   const width = maxFrames * TILE;
-  const height = rows.length * TILE;
+  const height = rows.reduce((sum, r) => sum + r.height, 0);
   const data = new Uint8ClampedArray(width * height * 4);
 
-  rows.forEach((row, rowIndex) => {
+  let originY = 0;
+  for (const row of rows) {
     row.tiles.forEach((tile, frameIndex) => {
       const originX = frameIndex * TILE;
-      const originY = rowIndex * TILE;
-      for (let y = 0; y < TILE; y += 1) {
+      for (let y = 0; y < row.height; y += 1) {
         const srcStart = y * TILE * 4;
         const destStart = ((originY + y) * width + originX) * 4;
         data.set(tile.data.subarray(srcStart, srcStart + TILE * 4), destStart);
       }
     });
-  });
+    originY += row.height;
+  }
 
   const meta = {
     tile: TILE,
     fps: FPS,
     sheetWidth: width,
     sheetHeight: height,
-    rows: rows.map((r) => ({ name: r.name, frames: r.tiles.length })),
+    rows: rows.map((r) => ({
+      name: r.name,
+      frames: r.tiles.length,
+      ...(r.height !== TILE ? { height: r.height } : {}),
+    })),
   };
   return { png: encodeRgbaPng({ width, height, data }), meta, scales };
 }

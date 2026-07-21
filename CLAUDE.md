@@ -4,6 +4,12 @@ Read first, every session. `PRD.md` is the product source of truth; this file is
 guardrails. Most work here is executed by autonomous /build items — these rules are
 written to be enforceable without a human in the loop.
 
+Before touching the sprite pipeline, the grab/parachute interaction, or
+generating animation art, skim [`docs/dev-guardrails.md`](docs/dev-guardrails.md)
+— hard-won gotchas from past sessions (stage-gating, ComfyUI reference
+generation, chroma-key/ingest traps, tile geometry, Windows/macOS verification)
+so they are not rediscovered the hard way.
+
 ## What this is
 
 A pixel-art desktop beaver for macOS and Windows: transparent Electron overlay,

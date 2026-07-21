@@ -31,7 +31,7 @@ import {
   PET_SCALE,
   SPRITE_FPS,
 } from './pet-config.js';
-import { loadSheet, loadLodgeSheet, drawFrame, type Sheet, type Stage } from './sprites.js';
+import { loadSheet, loadLodgeSheet, drawFrame, frameRect, type Sheet, type Stage } from './sprites.js';
 import {
   isFlashVisible,
   shakeOffset,
@@ -392,6 +392,14 @@ function draw(petDrawX: number, petDrawY: number): void {
   // drawn (scaled) tile, not the raw art tile.
   const tile = sheet.meta.tile * PET_SCALE;
   const pad = Math.ceil(tile / 2) + EVOLUTION_SHAKE_JITTER_PX;
+  // A row can be taller than the base tile (BL-19, e.g. adult
+  // parachute-wind) — drawFrame anchors it bottom-first, so the extra
+  // height extends upward past petDrawY. Compute the current frame's actual
+  // drawn top/height so the dirty rect still covers it; square frames
+  // (frameSh === meta.tile) reduce to the old petDrawY/tile values exactly.
+  const frameSh = frameRect(sheet.meta, anim, frameIndex).sh;
+  const frameTop = petDrawY - (frameSh - sheet.meta.tile) * PET_SCALE;
+  const frameHeight = frameSh * PET_SCALE;
   if (evolutionState && isFlashVisible(evolutionState)) {
     // White-silhouette blink: 'source-in' keeps the fill only where the
     // sprite we just drew was opaque, and clears everything else within
@@ -400,12 +408,13 @@ function draw(petDrawX: number, petDrawY: number): void {
     ctx.save();
     ctx.globalCompositeOperation = 'source-in';
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(petDrawX - pad, petDrawY - pad, tile + 2 * pad, tile + 2 * pad);
+    ctx.fillRect(petDrawX - pad, frameTop - pad, tile + 2 * pad, frameHeight + 2 * pad);
     ctx.restore();
   }
 
-  const petSize = tile + 2 * pad;
-  let unionedRect: DirtyRect = { x: petDrawX - pad, y: petDrawY - pad, width: petSize, height: petSize };
+  const petWidth = tile + 2 * pad;
+  const petHeight = frameHeight + 2 * pad;
+  let unionedRect: DirtyRect = { x: petDrawX - pad, y: frameTop - pad, width: petWidth, height: petHeight };
 
   if (quipState) {
     const layout = layoutBubble(quipState.text, petDrawX, petDrawY, tile, bounds());
