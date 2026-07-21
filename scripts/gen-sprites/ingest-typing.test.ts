@@ -17,18 +17,19 @@ interface Meta {
   fps: number;
   sheetWidth: number;
   sheetHeight: number;
-  rows: readonly { name: string; frames: number }[];
+  rows: readonly { name: string; frames: number; height?: number }[];
 }
 
 describe('ingest-typing committed sheet', () => {
   const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as Meta;
+  // The type row is the last row and is one TILE tall, so it sits at the very
+  // bottom of the sheet — that top edge is correct even though earlier rows
+  // (parachute-wind) are taller than the base tile.
+  const typeTopY = meta.sheetHeight - meta.tile;
 
-  it('appends a type row of 8 frames after idle/walk', () => {
-    expect(meta.rows).toEqual([
-      { name: 'idle', frames: 1 },
-      { name: 'walk', frames: 2 },
-      { name: 'type', frames: 8 },
-    ]);
+  it('appends a type row of 8 frames to the golden adult sheet', () => {
+    expect(meta.rows.map((row) => row.name)).toEqual(['idle', 'walk', 'struggle', 'parachute-wind', 'land', 'type']);
+    expect(meta.rows[meta.rows.length - 1]).toMatchObject({ name: 'type', frames: 8 });
   });
 
   it('sheet dimensions match the meta', () => {
@@ -40,15 +41,13 @@ describe('ingest-typing committed sheet', () => {
   it('every type frame has content and is grounded (touches the tile bottom)', () => {
     const decoded = decodePng(fs.readFileSync(pngPath));
     const { tile } = meta;
-    const typeRow = meta.rows.length - 1;
     for (let frame = 0; frame < 8; frame += 1) {
       const originX = frame * tile;
-      const originY = typeRow * tile;
       let opaque = 0;
       let bottomOpaque = false;
       for (let y = 0; y < tile; y += 1) {
         for (let x = 0; x < tile; x += 1) {
-          const alpha = decoded.data[((originY + y) * decoded.width + originX + x) * 4 + 3];
+          const alpha = decoded.data[((typeTopY + y) * decoded.width + originX + x) * 4 + 3];
           if (alpha > 0) {
             opaque += 1;
             if (y === tile - 1) bottomOpaque = true;
@@ -63,11 +62,10 @@ describe('ingest-typing committed sheet', () => {
   it('keys out the green screen: no pure-green pixels survive in the type row', () => {
     const decoded = decodePng(fs.readFileSync(pngPath));
     const { tile } = meta;
-    const typeRow = meta.rows.length - 1;
     for (let frame = 0; frame < 8; frame += 1) {
       for (let y = 0; y < tile; y += 1) {
         for (let x = 0; x < tile; x += 1) {
-          const i = ((typeRow * tile + y) * decoded.width + frame * tile + x) * 4;
+          const i = ((typeTopY + y) * decoded.width + frame * tile + x) * 4;
           if (decoded.data[i + 3] === 0) continue;
           const r = decoded.data[i];
           const g = decoded.data[i + 1];

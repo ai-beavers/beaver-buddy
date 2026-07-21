@@ -1,4 +1,5 @@
-// Bakes the "typing on a laptop" animation row into the beaver-adult sheet.
+// Appends the "typing on a laptop" animation row to the committed beaver-adult
+// sheet (the golden BL-18 adult beaver).
 //
 // Source: one Comfy Cloud run (prompt_id b99d59bf) — the beaver alone, holding
 // a small laptop, typing, on a solid #00FF00 chroma-key background. The model
@@ -7,16 +8,16 @@
 // calm face) from the top two rows. Raw sheet stays local in the gitignored
 // assets-src/comfyui/adult-type/sheet.png (asset rule: only baked art ships).
 //
-// Same mechanical discipline as the other sprite ingests (never retouch a
-// pixel): chroma-key the green out, crop to content, area-average downscale to
-// one locked scale, composite bottom-aligned + centered onto a 96px tile. The
-// idle + walk tiles are copied byte-for-byte out of the existing adult sheet so
-// the shipped stills are untouched; only the `type` row is appended.
+// This ingest runs AFTER the golden adult sheet is built (its own source frames
+// are gitignored and can't be regenerated on every machine), so it reads the
+// committed beaver-adult.png and appends a new `type` row at the bottom — every
+// existing row (idle/walk/struggle/parachute-wind/land, including the taller
+// parachute tile) is preserved byte-for-byte. Idempotent: a pre-existing `type`
+// row is stripped and rebuilt, so re-running is deterministic.
 //
-// PROVISIONAL: the adult sheet is still the teen-derived placeholder
-// (build-adult-placeholder.ts; flight-plan #7 owns final adult art). This row
-// rides on that placeholder and is expected to be regenerated against the final
-// adult beaver — the committed record is this script + prompt recipe.
+// Same mechanical discipline as the other ingests (never retouch a pixel):
+// chroma-key the green out, crop to content, area-average downscale to one
+// locked scale, composite bottom-aligned + centered onto a 96px tile.
 //
 // CLI: `node scripts/gen-sprites/ingest-typing.mjs` (Node 24 type-stripping).
 
@@ -25,7 +26,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   TILE,
-  FPS,
   decodePng,
   cropToBbox,
   resizeAreaAverage,
@@ -33,12 +33,13 @@ import {
   computeStageScale,
 } from './ingest-images.mjs';
 import { encodeRgbaPng } from './png.ts';
-import { buildAdultPlaceholder } from './build-adult-placeholder.ts';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SRC_SHEET = path.join(repoRoot, 'assets-src', 'comfyui', 'adult-type', 'sheet.png');
 const ADULT_PNG = path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.png');
 const ADULT_JSON = path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.json');
+
+const TYPE_ROW = 'type';
 
 // The generated grid is 6 columns x 4 rows. The 8 loop frames are the top two
 // rows in reading order — the most uniform poses (laptop held, typing, eyes
@@ -50,9 +51,9 @@ const FRAMES = [
   [4, 0], [5, 0], [0, 1], [1, 1],
 ];
 
-// Sitting-and-typing is a wide pose; give it the same content height budget as
-// the other adult frames. computeStageScale's width term keeps the laptop from
-// spilling past the tile.
+// Sitting-and-typing is a wide pose; give it a content-height budget in line
+// with the other adult frames. computeStageScale's width term keeps the laptop
+// from spilling past the tile.
 const TARGET_CONTENT_HEIGHT_PX = 84;
 
 // A pixel belongs to the green screen if green clearly dominates red and blue.
@@ -92,25 +93,12 @@ function extractCell(sheet, col, row) {
   return { width: w, height: h, data: out };
 }
 
-// Pull one existing TILE tile (col,row) out of the current adult sheet so idle
-// and walk survive untouched.
-function extractTile(sheet, col, row) {
-  const out = new Uint8ClampedArray(TILE * TILE * 4);
-  for (let y = 0; y < TILE; y += 1) {
-    const srcStart = ((row * TILE + y) * sheet.width + col * TILE) * 4;
-    out.set(sheet.data.subarray(srcStart, srcStart + TILE * 4), y * TILE * 4);
-  }
-  return { width: TILE, height: TILE, data: out };
-}
-
-function blit(dst, dstW, tile, col, row) {
-  for (let y = 0; y < TILE; y += 1) {
-    const dstStart = ((row * TILE + y) * dstW + col * TILE) * 4;
-    dst.set(tile.data.subarray(y * TILE * 4, (y + 1) * TILE * 4), dstStart);
-  }
+function rowHeight(row) {
+  return row.height ?? TILE;
 }
 
 export function buildAdultTypeSheet() {
+  // Bake the 8 typing tiles from the green source.
   const src = decodePng(fs.readFileSync(SRC_SHEET));
   const cropped = FRAMES.map(([c, r]) => cropToBbox(chromaKeyGreen(extractCell(src, c, r))));
   const scale = computeStageScale(cropped, TILE, TARGET_CONTENT_HEIGHT_PX);
@@ -120,36 +108,33 @@ export function buildAdultTypeSheet() {
     return placeOnTile(resizeAreaAverage(img, destW, destH), TILE);
   });
 
-  // idle + walk come from the placeholder generator itself (not the committed
-  // png), so this stays a pure function of the teen sheet + green source and
-  // doesn't depend on the current on-disk adult sheet.
-  const adult = decodePng(buildAdultPlaceholder().png);
-  const idle = extractTile(adult, 0, 0);
-  const walk0 = extractTile(adult, 0, 1);
-  const walk1 = extractTile(adult, 1, 1);
+  // Read the committed golden sheet and drop any existing type row, so this is
+  // idempotent (re-running appends onto the same base, not on top of itself).
+  const golden = decodePng(fs.readFileSync(ADULT_PNG));
+  const goldenMeta = JSON.parse(fs.readFileSync(ADULT_JSON, 'utf8'));
+  const baseRows = goldenMeta.rows.filter((row) => row.name !== TYPE_ROW);
+  const baseHeight = baseRows.reduce((sum, row) => sum + rowHeight(row), 0);
+  const width = goldenMeta.sheetWidth;
+  const newHeight = baseHeight + TILE;
 
-  // Sheet grows to hold the 8-frame type row: 8 cols wide, 3 rows tall.
-  const cols = FRAMES.length;
-  const rows = 3;
-  const width = cols * TILE;
-  const height = rows * TILE;
-  const data = new Uint8ClampedArray(width * height * 4);
-  blit(data, width, idle, 0, 0);
-  blit(data, width, walk0, 0, 1);
-  blit(data, width, walk1, 1, 1);
-  typeTiles.forEach((tile, i) => blit(data, width, tile, i, 2));
+  const data = new Uint8ClampedArray(width * newHeight * 4);
+  // Copy the base rows (everything except type) byte-for-byte.
+  data.set(golden.data.subarray(0, width * baseHeight * 4), 0);
+  // Blit the 8 type tiles into the new bottom row (width is 8 tiles wide).
+  typeTiles.forEach((tile, i) => {
+    for (let y = 0; y < TILE; y += 1) {
+      const dstStart = ((baseHeight + y) * width + i * TILE) * 4;
+      data.set(tile.data.subarray(y * TILE * 4, (y + 1) * TILE * 4), dstStart);
+    }
+  });
 
-  const png = encodeRgbaPng({ width, height, data });
+  const png = encodeRgbaPng({ width, height: newHeight, data });
   const meta = {
-    tile: TILE,
-    fps: FPS,
+    tile: goldenMeta.tile,
+    fps: goldenMeta.fps,
     sheetWidth: width,
-    sheetHeight: height,
-    rows: [
-      { name: 'idle', frames: 1 },
-      { name: 'walk', frames: 2 },
-      { name: 'type', frames: cols },
-    ],
+    sheetHeight: newHeight,
+    rows: [...baseRows, { name: TYPE_ROW, frames: FRAMES.length }],
   };
   return { png, meta, scale };
 }
@@ -158,5 +143,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const { png, meta, scale } = buildAdultTypeSheet();
   fs.writeFileSync(ADULT_PNG, png);
   fs.writeFileSync(ADULT_JSON, `${JSON.stringify(meta, null, 2)}\n`);
-  console.log(`baked beaver-adult type row (${meta.sheetWidth}x${meta.sheetHeight}, scale ${scale.toFixed(4)})`);
+  console.log(`appended beaver-adult type row (${meta.sheetWidth}x${meta.sheetHeight}, scale ${scale.toFixed(4)})`);
 }

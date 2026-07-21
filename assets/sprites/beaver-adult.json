@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 512,
+  "sheetHeight": 608,
   "rows": [
     {
       "name": "idle",
@@ -23,6 +23,10 @@
     },
     {
       "name": "land",
+      "frames": 8
+    },
+    {
+      "name": "type",
       "frames": 8
     }
   ]

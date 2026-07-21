@@ -104,25 +104,28 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
       rows: readonly { name: string; frames: number; height?: number }[];
     };
+    // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; the
+    // trailing `type` row is appended by ingest-typing.mjs (see ingest-typing).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
       { name: 'struggle', frames: 8 },
       { name: 'parachute-wind', frames: 8, height: 128 },
       { name: 'land', frames: 8 },
+      { name: 'type', frames: 8 },
     ]);
   });
 
-  // 5 rows at the 96px base tile, except parachute-wind at 128px (BL-19):
-  // 96*4 + 128 = 512. Width stays a flat 8-col grid at the 96px tile — only
-  // row height varies, never column width.
-  it('is a 768x512 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96)', () => {
+  // Golden rows: 96*4 + 128(parachute-wind) = 512; ingest-typing appends a
+  // 96px `type` row → 608. Width stays a flat 8-col grid at the 96px tile —
+  // only row height varies, never column width.
+  it('is a 768x608 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(512);
+    expect(decoded.height).toBe(608);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(512);
+    expect(meta.sheetHeight).toBe(608);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -159,13 +162,29 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
     expect(a.meta).toEqual(b.meta);
   }, 15_000);
 
-  it('committed adult sheet matches the build output byte-for-byte and matches its JSON', () => {
+  // The committed sheet is the golden build (this) with a `type` row appended
+  // by ingest-typing.mjs, so the golden block must match byte-for-byte at the
+  // top of the committed sheet and its rows must be the committed sheet's
+  // leading rows. The appended type row itself is covered by ingest-typing.test.
+  it('committed adult sheet (golden block) matches the build output byte-for-byte and matches its JSON', () => {
     const { png, meta } = buildStageSheet(repoRoot, ADULT);
-    const committedPng = fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url));
-    const committedMeta = JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'));
+    const golden = decodePng(png);
+    const committed = decodePng(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)));
+    const committedMeta = JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8')) as {
+      rows: readonly unknown[];
+    };
 
-    expect(committedPng.equals(png)).toBe(true);
-    expect(committedMeta).toEqual(meta);
+    // Golden block is the top of the committed sheet (same width).
+    expect(committed.width).toBe(golden.width);
+    const goldenBytes = Buffer.from(golden.data.buffer, golden.data.byteOffset, golden.data.length);
+    const committedBlock = Buffer.from(
+      committed.data.buffer,
+      committed.data.byteOffset,
+      golden.width * golden.height * 4,
+    );
+    expect(committedBlock.equals(goldenBytes)).toBe(true);
+    expect(committedMeta.rows.slice(0, meta.rows.length)).toEqual(meta.rows);
+    expect(committedMeta.rows[committedMeta.rows.length - 1]).toMatchObject({ name: 'type', frames: 8 });
   }, 15_000);
 });
 

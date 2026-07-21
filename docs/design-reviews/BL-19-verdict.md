@@ -1,7 +1,7 @@
 # BL-19 design-review verdict — "sit and type on a laptop" animation
 
 Date: 2026-07-21
-Verdict: **PASS with documented visual limitations**
+Verdict: **PASS with one documented limitation**
 
 ## Scope
 
@@ -59,39 +59,44 @@ Pipeline per type frame:
    locked scale (0.2270; content ~84px tall, laptop kept inside the tile).
 5. **Place** on a 96×96 tile, bottom-aligned, horizontally centered.
 
+The `type` row is **appended** to the committed golden BL-18 adult sheet by
+`ingest-typing.mjs` (`npm run assets:typing`; `npm run assets:adult` rebuilds
+the golden sheet then appends). Every golden row (idle/walk/struggle/parachute-
+wind/land, including the taller 128px parachute tile) is preserved byte-for-
+byte; the append is idempotent (a pre-existing `type` row is stripped and
+rebuilt). The golden adult beaver is the same brown Nano-Banana character as the
+typing frames, so the row reads as one consistent beaver.
+
 ### Sheets shipped
 
-| File | Rows | Frames | Tile | fps hint |
-|---|---|---|---|---|
-| `assets/sprites/beaver-adult.png` (768×288) | idle, walk, type | 1, 2, 8 | 96 | 8 |
+| File | Rows | Frames | fps hint |
+|---|---|---|---|
+| `assets/sprites/beaver-adult.png` (768×608) | idle, walk, struggle, parachute-wind, land, **type** | 1, 2, 8, 8, 8, 8 | 8 |
 
-SHA-256 of the committed sheet (for stale-asset diagnosis):
+Row heights: 96/96/96/**128**/96/96 (parachute-wind is taller). SHA-256 of the
+committed sheet (for stale-asset diagnosis):
 ```
-30312c04f0b964b69140022b87b3c2f864a03974dea85f837cc723332133d59f  assets/sprites/beaver-adult.png
+4c576322876feeeb19937254cbbe954ead468569d98f039a41372657f9e97c6a  assets/sprites/beaver-adult.png
 ```
 
 ## Contact sheet
 
-`docs/design-reviews/BL-19-contact.png` — all three adult rows at 6×
-nearest-neighbor on a clean light checkerboard. The type row is grounded (every
-frame touches the tile bottom), the green screen is fully keyed (no fringe), and
-the character reads consistently across all 8 frames with the laptop present.
+`docs/design-reviews/BL-19-contact.png` — all six adult rows at 4×
+nearest-neighbor on a clean light checkerboard (variable row heights handled).
+The type row is grounded (every frame touches the tile bottom), the green screen
+is fully keyed (no fringe), and the typing beaver matches the golden idle/walk/
+parachute rows.
 
-## Verdict: PASS — known limitations
+## Verdict: PASS — one known limitation
 
-1. **Style pop (provisional).** The adult sheet is still the teen-derived
-   placeholder; the generated type art (rounder Nano-Banana style) doesn't
-   match the idle/walk stills. Both read clearly as "the beaver," but the pop is
-   visible on the idle→type→idle transition. Expected to resolve when final
-   adult art lands (flight-plan #7), at which point the type row is regenerated
-   against it. Feet stay on the ground line, so there's no vertical jump.
-2. **Gentle, not frantic.** The 8 frames vary only subtly frame-to-frame, so at
-   8 fps the loop reads as calm typing rather than the frantic typing-cat meme.
-   Acceptable for MVP; a "more frantic" pass (frames with larger paw travel, or
-   transition frames) is follow-up.
+**Gentle, not frantic.** The 8 frames vary only subtly frame-to-frame, so at
+8 fps the loop reads as calm typing rather than the frantic typing-cat meme.
+Acceptable for now; a "more frantic" pass (frames with larger paw travel, or
+sit/open/close/stand transition frames) is follow-up.
 
-Neither blocks the feature; both are logged for the flight-plan #7 / animation
-polish items.
+(The earlier "style pop" limitation is resolved: the type row now sits on the
+golden BL-18 adult sheet, not the teen-derived placeholder, so the style
+matches.)
 
 ## Manual trigger (settings button)
 

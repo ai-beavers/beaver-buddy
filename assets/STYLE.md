@@ -91,9 +91,10 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
 
 - **Beaver stages**: `idle(1), walk(N)` for teen; baby/adult additionally
   carry `struggle(8), parachute-wind(8), land(8)` for the parachute-drop
-  sequence (BL-17/BL-18). `beaver-baby.png`/`beaver-teen.png`/
-  `beaver-adult.png`: walk×2. fps hint: 8. The idle pose never appears in a
-  walk row — walk cycles are step frames only.
+  sequence (BL-17/BL-18). Adult also carries `type(8)` — the "sit and type on a
+  laptop" loop for `roam.ts`'s `working` state. `beaver-baby.png`/
+  `beaver-teen.png`/`beaver-adult.png`: walk×2. fps hint: 8. The idle pose never
+  appears in a walk row — walk cycles are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
   frames are 8×8 particles centered in the 48×48 tile (rows/cols 20–27, also
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
@@ -106,7 +107,11 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   off-model and reverted. `struggle`/`parachute-wind`/`land` are appended
   via `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`) and are reference-matched to this same darker
-  placeholder adult, not the rejected golden art.
+  placeholder adult, not the rejected golden art. `type(8)` is appended on top
+  by `scripts/gen-sprites/ingest-typing.mjs` (`npm run assets:typing`) — it
+  preserves every earlier row byte-for-byte and adds a 96px `type` row at the
+  bottom (sheet grows to 768×608). Its source is a green chroma-key Comfy run
+  (prompt_id `b99d59bf`); see Provenance.
 
 ## Provenance
 
