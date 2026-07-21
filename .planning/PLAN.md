@@ -8,9 +8,9 @@
 > **Team (3 Contributors):**
 > - **Rodgi (Owner)** — überall dabei; Schwerpunkt: Features mit aufbauen, bei Animationen
 >   mithelfen, **genaue Definition der State-Logik**; Gesamt-Review & Owner-Entscheide
-> - **Vady** — **Sprite-Animationen** (steuert Claude Code/ComfyUI-Generierung, Asset-Review)
+> - **Vlady** — **Sprite-Animationen** (steuert Claude Code/ComfyUI-Generierung, Asset-Review)
 > - **Jurij** — **Event-Logik & hart Technisches** (State Machine, Tracking, IPC, Architektur)
-> - **Agenten-Regel (verbindlich): pi = nur Rodgi** · **Claude Code = Vady & Jurij, überall**
+> - **Agenten-Regel (verbindlich): pi = nur Rodgi** · **Claude Code = Vlady & Jurij, überall**
 >   (nicht nur Assets; weiterhin einziger Agent mit Comfy-Cloud-MCP)
 >
 > Aufgaben werden so verteilt, dass sich die Arbeit nicht überschneidet:
@@ -68,10 +68,10 @@ wird im Walkthrough finalisiert) — mit Team-Zuordnung:**
 | # | Milestone | Kern | Accountable | Agent | Zyklus |
 |---|---|---|---|---|---|
 | M1 | Windows-native App ✅ | done | Rodgi | pi | Z1 (erledigt) |
-| M2 | Asset-Pipeline & Animationen | P1/P2 ✅ · **P3 Fallschirm pausiert** | Vady + Rodgi | Claude Code (+ pi) | laufend |
+| M2 | Asset-Pipeline & Animationen | P1/P2 ✅ · **P3 Fallschirm pausiert** | Vlady + Rodgi | Claude Code (+ pi) | laufend |
 | M3 | Recording Agent & Benachrichtigungen | Zentrales Z1-Feature: Event-Erkennung (Agent fertig/Input nötig), Event↔Animation strikt getrennt, Sicherheitsmechanismus; Darstellung zunächst via Bubble/Quip | **Jurij** | Claude Code | Z1 |
 | M4 | Level-, XP- & Profil-System | Token-Tracking (aggregiert/pro Modell), XP-Prototyp, Level-Tabelle 1–32, State-Logik der Stufen, Character-Map-JSON, lokale Persistenz, Namensgebung, Achievements | **Rodgi** (Jurij berät Datenmodell) | pi | Z1 |
-| M5 | Animationen (Rest) | ehem. M2 P4–P15 — „eine Animation pro Phase“; WAVE-1 Assets = Vady + Claude Code, WAVE-2 Runtime = Rodgi + pi | **Vady** | Claude Code | Z1 (gestaffelt) |
+| M5 | Animationen (Rest) | ehem. M2 P4–P15 — „eine Animation pro Phase“; WAVE-1 Assets = Vlady + Claude Code, WAVE-2 Runtime = Rodgi + pi | **Vlady** | Claude Code | Z1 (gestaffelt) |
 | M6 | Contribution-Readiness & Release | Contributor-/API-/Asset-Builder-Doku, Settings/Tray, QA-Gates, Release-Pipeline → **Z1-Exit** | **Rodgi** (alle reviewen) | pi | Z1 |
 | — | Post-Zyklus 1 | Auth/Account, Prestige, Monetarisierung, MRR #26, Quips/State-Machine-Erweiterungen, Owner-Entscheide #3/#4b/#63/#64 | — | — | post |
 
@@ -82,9 +82,9 @@ wird im Walkthrough finalisiert) — mit Team-Zuordnung:**
 3. **Zeitschätzung:** pro Phase grobe Größe (S/M/L + Tage-Schätzung), Milestone-Dauer
    daraus aggregiert; Realitäts-Check gegen Z1-Zeithorizont (~2 Monate laut Meeting).
 4. **Team-Matrix (verbindlich):** siehe Tabelle — Jurij = M3, Rodgi = M4 + M6,
-   Vady = M5. Regeln: genau ein Accountable pro Phase; Rodgi hilft überall mit,
+   Vlady = M5. Regeln: genau ein Accountable pro Phase; Rodgi hilft überall mit,
    ist aber nie versteckter Zweit-Owner. **Agenten-Regel: pi nutzt ausschließlich
-   Rodgi; Vady & Jurij arbeiten in allen Milestones mit Claude Code.** Agenten
+   Rodgi; Vlady & Jurij arbeiten in allen Milestones mit Claude Code.** Agenten
    arbeiten nur auf Anweisung des jeweiligen Phase-Owners.
 5. **Blocker-/Abhängigkeits-Dokumentation (Pflicht, direkt in Flightplan):**
    - Jede `PHASE.md` bekommt Pflichtfeld **`Blocked by:`** (Phasen-Liste oder „none“, mit Grund).
