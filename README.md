@@ -235,6 +235,8 @@ The essentials:
 - **Security & privacy are non-negotiable** — no secrets in the repo, no telemetry,
   and never log or commit real prompts, repo paths, usernames, or account identifiers.
   See [`SECURITY.md`](SECURITY.md) to report a vulnerability privately.
+- **Animation authoring** — see [docs/animation-authoring.md](docs/animation-authoring.md)
+  for the ComfyUI + PixiJS puppet studio workflow.
 
 New to the project? Good first areas are quips (`src/main/quips/`) and sprite/animation
 polish (`assets/`, `src/renderer/`).
