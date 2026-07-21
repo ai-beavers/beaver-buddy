@@ -19,6 +19,7 @@
 - [ ] Phase 2 — Einstellungen & Tray: Settings-Fenster (#33), Tray-Menü (#34), persistente Einstellungen (#35), Autostart (#36) · **Blocked by:** none
 - [ ] Phase 3 — QA & Design-Gates: HiDPI-Screenshots (#37), Design-Gates (#38), Performance (#39), E2E (#40), manuelle Akzeptanz (#41) · **Blocked by:** M5 Z1-Umfang (P1–P5)
 - [ ] Phase 4 — Release-Pipeline & Distribution: Pipeline (#42), Version 0.2.0 (#43), Changelog (#44), Update-Mechanismus (#45), Download-Tracking · **Blocked by:** none → **Z1-Exit**
+  - **Multiplattform (Teambeschluss 2026-07-21):** Installer für **Windows UND macOS** nativ aus einer Codebasis (electron-builder); macOS-Signing/Notarisierung (Apple-Developer-Zertifikat, Budget-Entscheid) + macOS-CI-Runner
 
 ## Success
 Release 0.2.0 öffentlich downloadbar; ein externer Contributor schafft den Einstieg nur

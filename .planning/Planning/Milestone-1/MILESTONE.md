@@ -33,6 +33,12 @@
 > Original-Datei: `docs/adr/002-cross-platform-scope.md` (entfernt).
 
 **Status:** Accepted · **Date:** 2026-07-15
+**Update 2026-07-21 (Teambesprechung):** macOS wird von „preserved, not actively
+extended" auf **aktiv ausgeliefert** hochgestuft — Beaver Buddy wird als
+**Multiplattform-App nativ für Windows UND macOS** ausgeliefert (Electron macht
+dieselbe Codebasis auf beiden OS möglich). Konsequenz: Release-Pipeline (M6/P4)
+baut + signiert beide Plattformen; macOS-Signing/Notarisierung braucht Apple-
+Developer-Zertifikat (Budget-Entscheid analog #4b).
 
 ### Context
 

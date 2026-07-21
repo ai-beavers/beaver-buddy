@@ -9,6 +9,7 @@
 **Next:** Team-Start: **M3/P1 (Jurij) ∥ M4/P1 (Rodgi) ∥ M5/P1-Assets (Vady)** — alle „Blocked by: none", sofort startbar. Detail-Definition der ersten Phasen zu Phasenbeginn mit dem jeweiligen Owner. Danach: M2/P3-Resume einplanen (Claude Code: WAVE-3/P1+P3a; pi: P2/P4/P3b).
 
 ## Recent decisions
+- **Multiplattform Windows + macOS nativ** (Teambesprechung 2026-07-21): eine Electron-Codebasis, Installer für beide OS; ADR-002-Update in M1/MILESTONE.md; Release-Pipeline (M6/P4) baut + signiert beide Plattformen; macOS-Signing = Budget-Entscheid analog #4b — 2026-07-21
 - **Herdr für Agent-Erkennung:** M3 nutzt das Open-Source-Terminal-Tool Herdr als Event-Quelle (kein eigener Detektor); TokScale-**Logik** 1:1 für alle Harnesses (Claude Code, Codex, pi) — 2026-07-21
 - **5 Lebenszyklen:** Baby 1–4 · junges Baby 5–8 · Jugendlicher 9–16 · älterer Jugendlicher 17–24 · Erwachsener 25–32 → M5/P12 = Stufen-Art-Paket, in Z1 gezogen — 2026-07-21
 - **Modell-Gewichtung:** Intelligence Index (artificialanalysis.ai), Seed-Tabelle 26 Modelle (REF=45), **γ=2 quadratisch** (Top 1,78× / Floor 0,5×; Anreiz für Modell-Qualität); Wert = Intelligenz, nicht Preis — 2026-07-21
