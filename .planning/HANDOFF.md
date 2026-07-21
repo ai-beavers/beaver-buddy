@@ -45,11 +45,12 @@ offen; Branch `feature/animation-authoring-docs` (`3bb1892`) ohne PR. Suite: 500
    M5/P1-Assets (Vady). Detail-Definition jeder Phase zu Phasenbeginn mit Owner.
 2. **M2/P3-Resume einplanen** (Claude Code: WAVE-3/P1 Weiß-Artefakte + P3a struggle-b/c;
    pi/Rodgi: P2 Glide-Scale, P4 Wind-Drift, P3b Zufallsplayer; Spec: `Milestone-2/Phase-3/Waves/WAVE-3.md`)
-3. **Org-Admin:** PR #28/#29/#33 mergen; danach Fork-main syncen
-4. PR für `feature/animation-authoring-docs` erstellen; Gallery-Re-Apply sobald #28–#30 gemergt
-5. Geparkt: BL-7-Verdict; Owner-Entscheide #3/#4b/#63/#64; #26 MRR (post-Z1)
+3. ~~Org-Admin: PR #28/#29/#33 mergen~~ ✅ erledigt (gemergt, Stand 2026-07-21); **PR #40 (Planning) wartet auf CI + Review/Merge**
+4. PR für `feature/animation-authoring-docs` erstellen (Branch prüfen: Inhalte ggf. schon via upstream drin)
+5. **M5/P2 Coding-Animation neu definieren:** Upstream hat BL-18/BL-19 (Typing/Working-Animation + Settings-Trigger) bereits gebaut — Scope-Abgleich zu Phasenbeginn mit Rodgi + Vady
 
 ## decisions (Owner, verbatim) — neue oben
+- „Contributor-Zugang da → auf main pushen/mergen versuchen“ → Ergebnis: Branch-Protection erzwingt PR + CI; Workflow jetzt: Branch direkt auf `upstream` pushen + PR gegen `ai-beavers/main` (kein Fork-Umweg mehr nötig) — 2026-07-21
 - „pi = nur ich; Vady & Jurij überall mit Claude Code" — 2026-07-21
 - „Blocker direkt in der Flightplan-Doku notieren, welche Phase welche blockiert" — 2026-07-21
 - Zyklus-1-Priorisierung: Recording Agent (zentral) → XP/Level → Animationen gestaffelt → Release — 2026-07-21
