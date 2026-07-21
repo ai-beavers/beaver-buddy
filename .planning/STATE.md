@@ -6,7 +6,7 @@
 **Progress:** M1 ✅ · M2 P1/P2 ✅ (P3 pausiert) · M3–M6 geplant, nicht gestartet · Zyklus-1-Exit-Kriterien: App downloadbar · 100 Downloads · 7 Contributors (aktuell 3: Rodgi, Vady, Jurij)
 **Blockers:** none
 **Last:** Session 2026-07-21 (2/2): **Contributor-Zugang zu ai-beavers ✅** — Direct-Push auf main scheitert an Branch-Protection (PR + CI-Check erforderlich) → **PR #40** (vendored skills + Zyklus-1-Planning) gegen upstream offen, CI läuft. Fork-main gesynct (`a12b6ca`). **Upstream hat sich bewegt:** PR #28/#29/#33 gemergt ✅ (Fallschirm C1–C4 drin) + **BL-18/BL-19: Typing/Working-Animation mit Settings-Trigger bereits gebaut** ⚠️ (Overlap mit M5/P2 — Phase zu Phasenbeginn neu definieren). Merge-Konflikte (package.json Union, AGENTS.md Guardrails+.planning) sauber aufgelöst, 573 Tests ✓
-**Next:** Team-Start: **M3/P1 (Jurij) ∥ M4/P1 (Rodgi) ∥ M5/P1-Assets (Vady)** — alle „Blocked by: none", sofort startbar. Detail-Definition der ersten Phasen zu Phasenbeginn mit dem jeweiligen Owner. Danach: M2/P3-Resume einplanen (Claude Code: WAVE-3/P1+P3a; pi: P2/P4/P3b).
+**Next:** ① Review für PR #40 anfragen (CI grün, REVIEW_REQUIRED) → ② nach Merge: Team-Dispatch (Prompts in KICKOFF-AGENT-PROMPTS.md) → ③ Team-Start: **M3/P1 (Jurij) ∥ M4/P1 (Rodgi) ∥ M5/P1-Assets (Vady)** — alle „Blocked by: none". Offene Owner-Entscheide: Apple-Account, Mac-Testhardware, macOS-Z1-Priorität (NOTE.md).
 
 ## Recent decisions
 - **Multiplattform Windows + macOS nativ** (Teambesprechung 2026-07-21): eine Electron-Codebasis, Installer für beide OS; ADR-002-Update in M1/MILESTONE.md; Release-Pipeline (M6/P4) baut + signiert beide Plattformen; macOS-Signing = Budget-Entscheid analog #4b — 2026-07-21

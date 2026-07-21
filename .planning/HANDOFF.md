@@ -3,7 +3,17 @@
 > Full resume context. Written by `/fp-pause`, read by `/fp-resume`. `STATE.md` is the short digest;
 > this file is the complete picture so the next session loses no context.
 
-**Last updated:** 2026-07-21 (pi-Session: Re-Onboarding & Zyklus-1-Neuplanung abgeschlossen; M2/P3-Fallschirm offiziell pausiert)
+**Last updated:** 2026-07-21 (pi-Session Ende: Re-Onboarding + Zyklus-1-Planung komplett,
+Contributor-Workflow etabliert, PR #40 CI-grün → wartet auf Review)
+
+## 🏁 Session-Abschluss-Status
+- **PR #40** (vendored skills + Zyklus-1-Planning → ai-beavers/main): **CI ubuntu + windows GRÜN ✅**,
+  aber `REVIEW_REQUIRED` — **Review/Merge durch Gw3i oder Org-Admin nötig** (Rodgi kann nicht
+  selbst approven). Team kann schon jetzt vom Branch `chore/zyklus1-planning` lesen.
+- **Multiplattform-Beschluss** (Windows + macOS nativ) eingearbeitet (ADR-002-Update, M6/P4).
+- **KICKOFF-AGENT-PROMPTS.md** erstellt: ready-to-paste Start-Prompts für Vady (M5/P1),
+  Jurij (M3/P1), Rodgi (M4/P1) — Rodgi schickt sie dem Team.
+- Fork-main gesynct (`3724c7f`+).
 
 ## ⚡ Rollen-Split (Owner-Beschluss 2026-07-21, aktualisiert)
 
@@ -62,8 +72,11 @@ none — Hinweise: Comfy-Cloud-MCP nur in Claude Code; `npx` in pi geblockt → 
 `./node_modules/.bin/`-Binaries; CDP-Live-Screenshots hingen in pi → manuell durch Owner.
 
 ## next_action
-**Team-Kickoff Zyklus 1:** Jurij definiert M3/P1 (Event-Erkennung), Rodgi definiert
-M4/P1 (Token-Tracking), Vady startet M5/P1-Assets (Baum) mit Claude Code.
-Bei pi-Resume (Rodgi): M4/P1 Detail-Definition → Waves anlegen.
-Bei Claude-Code-Resume (Vady): entweder M5/P1-Assets oder M2/P3-WAVE-3 (Weiß-Artefakte
-+ struggle-Strips) — Owner-Priorität: M5/P1.
+1. **Rodgi:** Review für PR #40 anfragen (Gw3i/Org-Admin) → nach Merge: Team-Dispatch
+   (Prompts aus `KICKOFF-AGENT-PROMPTS.md` an Vady + Jurij schicken)
+2. **Team-Kickoff Zyklus 1:** Jurij = M3/P1 (Herdr), Rodgi = M4/P1 (Log-Reader),
+   Vady = M5/P1-Assets (Baum) — alle „Blocked by: none"
+3. **Offene Owner-Entscheide (NOTE.md):** Apple-Developer-Account (~99 $/Jahr)?
+   macOS-Testhardware im Team? macOS-Installer gleichwertig zum Z1-Launch?
+4. **Später:** M2/P3-WAVE-3-Resume (Fallschirm-Polish, Claude Code); M5/P2-Scope
+   gegen BL-18/19 abgleichen; `feature/animation-authoring-docs`-PR prüfen
