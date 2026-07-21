@@ -1,0 +1,72 @@
+{
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [0, 0],
+      "size": [270, 120],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": [1] },
+        { "name": "MASK", "type": "MASK", "slot_index": 1, "links": null }
+      ],
+      "properties": {},
+      "widgets_values": ["REPLACE-WITH-YOUR-REFERENCE.png"]
+    },
+    {
+      "id": 2,
+      "type": "GeminiImage2Node",
+      "pos": [400, 0],
+      "size": [270, 120],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        { "name": "images", "type": "IMAGE", "link": 1 },
+        { "name": "files", "type": "GEMINI_INPUT_FILES", "link": null }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "slot_index": 0, "links": [2] },
+        { "name": "STRING", "type": "STRING", "slot_index": 1, "links": null }
+      ],
+      "properties": {},
+      "widgets_values": [
+        "Use the character in the provided reference image as the EXACT character. Output a 2D game sprite sheet of 8 frames in a 4-column by 2-row grid on a SOLID PURE GREEN background (#00FF00). <describe the animation here — e.g. parachuting with both arms raised gripping the straps, beaver LARGE in the lower two-thirds of each cell, a wide shallow red-and-white canopy close above the paws, gentle sway per frame>. Only intended white detail is part of the character/props; the background is pure green.",
+        "gemini-3-pro-image-preview",
+        47,
+        "fixed",
+        "16:9",
+        "2K",
+        "IMAGE"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "SaveImage",
+      "pos": [800, 0],
+      "size": [270, 120],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [{ "name": "images", "type": "IMAGE", "link": 2 }],
+      "outputs": [{ "name": "images", "type": "IMAGE", "slot_index": 0, "links": null }],
+      "properties": {},
+      "widgets_values": ["beaver-animation"]
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 0, "IMAGE"],
+    [2, 2, 0, 3, 0, "IMAGE"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "note": "Beaver Buddy animation-generation template. See tools/comfy-workflows/README.md. Runs on Comfy Cloud (Nano Banana Pro is a paid Gemini API node)."
+  },
+  "version": 0.4,
+  "last_node_id": 3,
+  "last_link_id": 2
+}

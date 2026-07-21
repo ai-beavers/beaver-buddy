@@ -32,7 +32,10 @@ Authoritative specs live elsewhere ([`interaction-model.md`](interaction-model.m
 
 The parts-based/puppet-studio pipeline in `comfyui-avatar-generation.md` was
 reverted by owner decision; shipped animation frames are **full-character
-ComfyUI runs ingested mechanically**. When generating:
+ComfyUI runs ingested mechanically**. Reusable, drag-loadable Comfy Cloud
+workflow templates are committed in
+[`tools/comfy-workflows/`](../tools/comfy-workflows/README.md) — start there for
+a new animation. When generating:
 
 - **Match an existing character with a REFERENCE IMAGE.** Text-only prompts
   invent a new generic character. Feed the actual committed sprite as a
