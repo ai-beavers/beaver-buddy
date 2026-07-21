@@ -72,7 +72,7 @@ export const ADULT = {
   bakedDirName: 'beaver-adult',
   animations: [
     { name: 'struggle', run: 'adult-struggle', targetContentHeightPx: 96 },
-    { name: 'parachute-wind', run: 'adult-parachute-wind', targetContentHeightPx: 128, tileHeight: 128 },
+    { name: 'parachute-wind', run: 'adult-parachute-wind', targetContentHeightPx: 128, tileHeight: 128, preKeyed: true },
     { name: 'land', run: 'adult-land', targetContentHeightPx: 90 },
   ],
 };
@@ -95,12 +95,18 @@ function extractTile(sheet, col, row) {
 // tileHeight (default TILE) sets the composited canvas height only — the
 // width cap passed to computeStageScale stays the base TILE (96) so a taller
 // row still never clips horizontally into the next sheet column.
-function bakeAnimation(runDir, targetContentHeightPx, tileHeight = TILE) {
+// preKeyed frames already ship a transparent background (chroma-keyed at
+// authoring time). removeBackground's border flood-fill also treats near-white
+// as background, so running it on a pre-keyed frame eats any white detail that
+// touches the transparent edge (e.g. the parachute's white canopy stripes) —
+// skip it and just crop to the alpha bbox.
+function bakeAnimation(runDir, targetContentHeightPx, tileHeight = TILE, preKeyed = false) {
   const cropped = [];
   for (let i = 1; i <= FRAME_COUNT; i += 1) {
     const file = path.join(runDir, `frame_${String(i).padStart(2, '0')}.png`);
     const buf = fs.readFileSync(file);
-    cropped.push(cropToBbox(removeBackground(decodePng(buf))));
+    const decoded = decodePng(buf);
+    cropped.push(cropToBbox(preKeyed ? decoded : removeBackground(decoded)));
   }
   const scale = computeStageScale(cropped, TILE, targetContentHeightPx);
   const tiles = cropped.map((img) => {
@@ -129,7 +135,7 @@ export function buildStageSheet(repoRoot, config) {
   for (const anim of config.animations) {
     const runDir = path.join(repoRoot, 'assets-src', 'comfyui', anim.run);
     const tileHeight = anim.tileHeight ?? TILE;
-    const { tiles, scale } = bakeAnimation(runDir, anim.targetContentHeightPx, tileHeight);
+    const { tiles, scale } = bakeAnimation(runDir, anim.targetContentHeightPx, tileHeight, anim.preKeyed ?? false);
     rows.push({ name: anim.name, tiles, height: tileHeight });
     scales[anim.name] = scale;
   }
