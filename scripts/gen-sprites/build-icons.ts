@@ -34,8 +34,6 @@ interface SheetMetaJson {
   readonly rows: readonly { readonly name: string; readonly frames: number }[];
 }
 
-// Exported for build-adult-placeholder.ts, which reuses the same tile
-// slicing on the teen sheet.
 export function extractTile(sheet: DecodedImage, tile: number, frame: number, row: number): DecodedImage {
   if ((frame + 1) * tile > sheet.width || (row + 1) * tile > sheet.height) {
     throw new Error(`tile (frame=${frame}, row=${row}) outside ${sheet.width}x${sheet.height} sheet`);
@@ -50,8 +48,7 @@ export function extractTile(sheet: DecodedImage, tile: number, frame: number, ro
 
 // Nearest-neighbor scale for upscaling (the 256px entry comes from ~92px
 // content): chunky art stays chunky. Lives here, not in ingest-images.mjs,
-// because that pipeline only ever downscales. Exported for
-// build-adult-placeholder.ts, which also only upscales.
+// because that pipeline only ever downscales.
 export function resizeNearest(img: DecodedImage, destW: number, destH: number): DecodedImage {
   const out = new Uint8ClampedArray(destW * destH * 4);
   for (let dy = 0; dy < destH; dy += 1) {

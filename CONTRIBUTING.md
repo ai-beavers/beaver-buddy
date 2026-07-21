@@ -105,6 +105,25 @@ and add a short verdict note under `docs/design-reviews/`. Windows-specific
 visual changes need to be checked on Windows at 100 % and at least one HiDPI
 scaling (preferably 200 %).
 
+**Animation changes need a frame contact sheet in the PR.** If your change adds
+or edits a sprite animation — new/retimed/resized frames, or a new animated
+stage (any row of `assets/sprites/*.png`) — include an image in the PR that
+shows **every frame of the affected animation(s), laid out in order**, so
+reviewers can judge the motion, sizing and consistency directly in the PR
+without building the app. Guidelines:
+
+- Show each affected row frame-by-frame. For a **new stage**, include the whole
+  sheet so `idle`/`walk` and the animated rows read as the **same character at
+  the same size** (a common defect: animation frames that don't match the
+  resting sprite).
+- Render at an integer nearest-neighbor upscale (~3–8×) so pixels stay crisp,
+  on a **contrasting background** — a dark or magenta backdrop makes stray
+  transparency obvious (e.g. holes in white detail like the parachute canopy).
+- Drag-and-drop the image into the PR description so it previews inline, and
+  commit it beside the verdict note under `docs/design-reviews/`.
+  `scripts/gen-sprites/contact-sheet.ts` builds labeled per-frame contact sheets
+  and is a good starting point.
+
 ## 6. Open the pull request
 
 - Use **conventional commit prefixes**: `feat:`, `fix:`, `docs:`, `chore:`.

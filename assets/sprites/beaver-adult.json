@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 288,
+  "sheetHeight": 512,
   "rows": [
     {
       "name": "idle",
@@ -13,7 +13,16 @@
       "frames": 2
     },
     {
-      "name": "type",
+      "name": "struggle",
+      "frames": 8
+    },
+    {
+      "name": "parachute-wind",
+      "frames": 8,
+      "height": 128
+    },
+    {
+      "name": "land",
       "frames": 8
     }
   ]

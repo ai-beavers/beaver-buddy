@@ -8,6 +8,11 @@ export type Stage = 'baby' | 'teen' | 'adult';
 export interface SheetRow {
   readonly name: string;
   readonly frames: number;
+  // Per-row tile height in px; absent means meta.tile (uniform sheet). Lets
+  // one animation (e.g. the adult parachute-wind glide, BL-19) render taller
+  // than the base tile — the canopy extends upward instead of the beaver
+  // shrinking to share the square tile. Width is always meta.tile.
+  readonly height?: number;
 }
 
 export interface SheetMeta {
@@ -41,9 +46,7 @@ async function loadMeta(src: string): Promise<SheetMeta> {
 }
 
 export async function loadSheet(stage: Stage): Promise<Sheet> {
-  // Every stage ships its own sheet — the adult sheet is a derived
-  // placeholder until final art lands (flight-plan #7; see
-  // scripts/gen-sprites/build-adult-placeholder.ts and assets/STYLE.md).
+  // Every stage ships its own sheet (see assets/STYLE.md for provenance).
   const base = `assets/sprites/beaver-${stage}`;
   const [image, meta] = await Promise.all([loadImage(`${base}.png`), loadMeta(`${base}.json`)]);
   return { image, meta };
@@ -61,11 +64,17 @@ export async function loadLodgeSheet(): Promise<Sheet> {
 export interface FrameRect {
   readonly sx: number;
   readonly sy: number;
-  readonly size: number;
+  readonly sw: number;
+  readonly sh: number;
 }
 
 // Pure geometry: row lookup by animation name + column wrap by frame index.
 // Non-trivial enough (per the plan) to carry its own vitest coverage.
+//
+// sy is the cumulative sum of every preceding row's height (row.height ??
+// meta.tile), not rowIndex*meta.tile — rows can be taller than the base
+// tile (BL-19), so a later row's y-offset has to account for that. Width is
+// always meta.tile; only height varies per row.
 export function frameRect(meta: SheetMeta, anim: string, frameIndex: number): FrameRect {
   const rowIndex = meta.rows.findIndex((row) => row.name === anim);
   if (rowIndex === -1) {
@@ -73,7 +82,11 @@ export function frameRect(meta: SheetMeta, anim: string, frameIndex: number): Fr
   }
   const row = meta.rows[rowIndex];
   const frame = ((frameIndex % row.frames) + row.frames) % row.frames;
-  return { sx: frame * meta.tile, sy: rowIndex * meta.tile, size: meta.tile };
+  let sy = 0;
+  for (let i = 0; i < rowIndex; i += 1) {
+    sy += meta.rows[i].height ?? meta.tile;
+  }
+  return { sx: frame * meta.tile, sy, sw: meta.tile, sh: row.height ?? meta.tile };
 }
 
 export interface DrawOptions {
@@ -97,12 +110,20 @@ export function drawFrame(
   y: number,
   opts: DrawOptions,
 ): void {
-  const { sx, sy, size } = frameRect(sheet.meta, anim, frameIndex);
+  const { sx, sy, sw, sh } = frameRect(sheet.meta, anim, frameIndex);
   // Destination is blown up by opts.scale; source sampling stays at the
   // native tile size — that's what keeps nearest-neighbor scaling crisp.
-  const destSize = size * opts.scale;
-  const cx = x + destSize / 2;
-  const cy = y + destSize / 2;
+  //
+  // Bottom-anchored to the *base* tile (meta.tile), not the frame's own
+  // height: (x, y) is the top-left of the base tile box, so a taller frame
+  // (sh > meta.tile) extends upward past y while its feet stay on the same
+  // ground line as a square frame — no jump between animations that share a
+  // row transition. Reduces to the old centered-in-tile math exactly when
+  // sw === sh === meta.tile.
+  const destW = sw * opts.scale;
+  const destH = sh * opts.scale;
+  const cx = x + (sheet.meta.tile * opts.scale) / 2;
+  const cy = y + sheet.meta.tile * opts.scale - destH / 2;
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -111,6 +132,6 @@ export function drawFrame(
   } else if (opts.mirror) {
     ctx.scale(-1, 1);
   }
-  ctx.drawImage(sheet.image, sx, sy, size, size, -destSize / 2, -destSize / 2, destSize, destSize);
+  ctx.drawImage(sheet.image, sx, sy, sw, sh, -destW / 2, -destH / 2, destW, destH);
   ctx.restore();
 }

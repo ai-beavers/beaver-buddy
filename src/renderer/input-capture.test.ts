@@ -7,6 +7,7 @@ import {
   isPointOverPet,
   recordClickOnPet,
   recordDoubleClick,
+  stageHasInteraction,
   updateCursor,
 } from './input-capture.js';
 import { createRoamState } from './roam.js';
@@ -53,6 +54,17 @@ describe('input-capture queue', () => {
     expect(queue.doubleClick).toBe(false);
     expect(queue.cursorX).toBe(10);
     expect(queue.cursorY).toBe(20);
+  });
+});
+
+describe('stageHasInteraction', () => {
+  it('is enabled for baby and adult (they ship the struggle/parachute-wind/land rows)', () => {
+    expect(stageHasInteraction('baby')).toBe(true);
+    expect(stageHasInteraction('adult')).toBe(true);
+  });
+
+  it('is disabled for teen (its sheet lacks the rows)', () => {
+    expect(stageHasInteraction('teen')).toBe(false);
   });
 });
 
