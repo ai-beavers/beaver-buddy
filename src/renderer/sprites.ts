@@ -41,9 +41,7 @@ async function loadMeta(src: string): Promise<SheetMeta> {
 }
 
 export async function loadSheet(stage: Stage): Promise<Sheet> {
-  // Every stage ships its own sheet — the adult sheet is a derived
-  // placeholder until final art lands (flight-plan #7; see
-  // scripts/gen-sprites/build-adult-placeholder.ts and assets/STYLE.md).
+  // Every stage ships its own sheet (see assets/STYLE.md for provenance).
   const base = `assets/sprites/beaver-${stage}`;
   const [image, meta] = await Promise.all([loadImage(`${base}.png`), loadMeta(`${base}.json`)]);
   return { image, meta };

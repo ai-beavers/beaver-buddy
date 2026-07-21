@@ -14,6 +14,7 @@ import {
   recordDoubleClick,
   consumeInput,
   determineCaptureMode,
+  stageHasInteraction,
   type CaptureMode,
 } from './input-capture.js';
 import { clampRoamStateToBounds, createRoamState, tick, type RoamState, type Bounds } from './roam.js';
@@ -257,12 +258,12 @@ document.addEventListener('mousemove', (event) => {
 });
 
 document.addEventListener('pointerdown', (event) => {
-  if (stage !== 'baby') return;
+  if (!stageHasInteraction(stage)) return;
   recordClickOnPet(inputQueue, event.clientX, event.clientY, currentPetDrawX, currentPetDrawY);
 });
 
 document.addEventListener('dblclick', () => {
-  if (stage !== 'baby') return;
+  if (!stageHasInteraction(stage)) return;
   recordDoubleClick(inputQueue);
 });
 
@@ -538,9 +539,16 @@ function frame(timestampMs: number): void {
 
   // Determine overlay input-capture mode from the post-tick state and the
   // cursor position captured in this frame's input. The parachute interaction
-  // is only active during the baby stage; in all other stages the overlay
-  // stays fully click-through.
-  const desiredMode = determineCaptureMode(roamState, input.cursorX, input.cursorY, drawX, drawY, stage === 'baby');
+  // is active for stages with the required anim rows (baby + adult; see
+  // stageHasInteraction); teen stays fully click-through.
+  const desiredMode = determineCaptureMode(
+    roamState,
+    input.cursorX,
+    input.cursorY,
+    drawX,
+    drawY,
+    stageHasInteraction(stage),
+  );
   if (desiredMode !== currentCaptureMode) {
     window.beaverBuddy.requestCaptureMode(desiredMode);
     currentCaptureMode = desiredMode;

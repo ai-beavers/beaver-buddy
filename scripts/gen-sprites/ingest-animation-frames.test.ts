@@ -1,11 +1,17 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildBabySheet } from './ingest-animation-frames.mjs';
+import { ADULT, BABY, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
-const hasComfyui = fs.existsSync(new URL('../../assets-src/comfyui', import.meta.url));
+// Gated per-stage (not just "does assets-src/comfyui exist at all"): a
+// clone can have one stage's raw ComfyUI dumps without the other's, and
+// buildStageSheet throws ENOENT rather than skipping when a run dir is
+// missing — checking each stage's first run dir keeps these opt-in
+// pipeline tests from false-failing on a partial local checkout.
+const hasBabyComfyui = fs.existsSync(new URL(`../../assets-src/comfyui/${BABY.animations[0].run}`, import.meta.url));
+const hasAdultComfyui = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT.animations[0].run}`, import.meta.url));
 const hasSourceBeaver = fs.existsSync(new URL('../../assets-src/beaver', import.meta.url));
 
 function extractTile(sheet: { width: number; height: number; data: Uint8ClampedArray }, col: number, row: number, tile: number): Uint8ClampedArray {
@@ -61,7 +67,7 @@ describe('ingest-animation-frames committed sheet', () => {
 
 // These assertions need the ComfyUI run dumps that are gitignored (and
 // therefore absent on a fresh clone). They skip gracefully rather than fail.
-describe.skipIf(!hasComfyui)('ingest-animation-frames pipeline', () => {
+describe.skipIf(!hasBabyComfyui)('ingest-animation-frames pipeline (baby)', () => {
   it('is deterministic: re-running buildBabySheet is byte-identical', () => {
     const a = buildBabySheet(repoRoot);
     const b = buildBabySheet(repoRoot);
@@ -87,10 +93,78 @@ describe.skipIf(!hasComfyui)('ingest-animation-frames pipeline', () => {
   }, 15_000);
 });
 
+// Committed-sheet assertions for the adult stage (BL-18), mirroring the baby
+// block above: these run against the shipped beaver-adult.png/.json, so they
+// validate the promoted artifact even without the ComfyUI source dumps.
+describe('ingest-animation-frames committed sheet (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has the expected row names and frame counts', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { rows: readonly { name: string; frames: number }[] };
+    expect(meta.rows).toEqual([
+      { name: 'idle', frames: 1 },
+      { name: 'walk', frames: 2 },
+      { name: 'struggle', frames: 8 },
+      { name: 'parachute-wind', frames: 8 },
+      { name: 'land', frames: 8 },
+    ]);
+  });
+
+  it('is a 768x480 sheet (5 rows x 8 cols at the 96px tile)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    expect(decoded.width).toBe(768);
+    expect(decoded.height).toBe(480);
+    expect(meta.sheetWidth).toBe(768);
+    expect(meta.sheetHeight).toBe(480);
+  });
+
+  it('has non-empty frames in every row', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+
+    meta.rows.forEach((row, rowIndex) => {
+      for (let frame = 0; frame < row.frames; frame += 1) {
+        let opaqueCount = 0;
+        for (let y = 0; y < meta.tile; y += 1) {
+          for (let x = 0; x < meta.tile; x += 1) {
+            const alpha = decoded.data[((rowIndex * meta.tile + y) * decoded.width + frame * meta.tile + x) * 4 + 3];
+            if (alpha > 0) opaqueCount += 1;
+          }
+        }
+        expect(opaqueCount, `${row.name}[${frame}] is empty`).toBeGreaterThan(0);
+      }
+    });
+  });
+});
+
+// Same pipeline coverage as baby, gated on the adult run dirs specifically.
+describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', () => {
+  it('is deterministic: re-running buildStageSheet(ADULT) is byte-identical', () => {
+    const a = buildStageSheet(repoRoot, ADULT);
+    const b = buildStageSheet(repoRoot, ADULT);
+    expect(a.png.equals(b.png)).toBe(true);
+    expect(a.meta).toEqual(b.meta);
+  }, 15_000);
+
+  it('committed adult sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildStageSheet(repoRoot, ADULT);
+    const committedPng = fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url));
+    const committedMeta = JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'));
+
+    expect(committedPng.equals(png)).toBe(true);
+    expect(committedMeta).toEqual(meta);
+  }, 15_000);
+});
+
 // Lock: the new parachute sheet preserves idle/walk byte-for-byte from the
 // old still-frame pipeline. This only runs when the original source images
 // are present, because the comparison is against the old still-frame build.
-describe.skipIf(!hasSourceBeaver || !hasComfyui)('ingest-animation-frames idle/walk preservation', () => {
+describe.skipIf(!hasSourceBeaver || !hasBabyComfyui)('ingest-animation-frames idle/walk preservation', () => {
   it('idle and walk tiles are byte-identical to the old beaver-baby build', () => {
     const { png: newPng } = buildBabySheet(repoRoot);
     const newSheet = decodePng(newPng);

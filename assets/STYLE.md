@@ -39,9 +39,9 @@ keys (and the lodge pixel map that references some of them) don't churn.
 ## Grid & tiles
 
 - **Beaver stages** (`beaver-{baby,teen,adult}.png`): 96×96 transparent RGBA
-  tiles. Baby/teen are ingested from the user's own images at their native
-  chunky-pixel resolution; adult is a placeholder derived from the teen
-  sheet (no 1-art-pixel-per-sheet-pixel rule — see Provenance).
+  tiles, all three stages ingested from generated art at their native
+  chunky-pixel resolution (no 1-art-pixel-per-sheet-pixel rule — see
+  Provenance).
   Renderer draws at `PET_SCALE = 1` (`src/renderer/pet-config.ts`): 96px
   native tile → 96px on screen, integer nearest-neighbor blit.
 - **Lodge + particles** (`lodge.png`): unchanged, 48×48 indexed-palette
@@ -89,44 +89,58 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
 
 ## Sheet row order & timing
 
-- **Beaver stages**: `idle(1), walk(N)` — no run/sleep/react (BL-11 slimmed
-  the animation set to match `roam.ts`'s idle/walk-only state machine).
-  `beaver-baby.png`: walk×2. `beaver-teen.png`: walk×2. `beaver-adult.png`:
-  walk×2 (placeholder derived from teen — see Provenance). fps hint: 8. The
-  idle pose never appears in a walk row — walk cycles are step frames only.
+- **Beaver stages**: `idle(1), walk(N)` for teen; baby/adult additionally
+  carry `struggle(8), parachute-wind(8), land(8)` for the parachute-drop
+  sequence (BL-17/BL-18). `beaver-baby.png`/`beaver-teen.png`/
+  `beaver-adult.png`: walk×2. fps hint: 8. The idle pose never appears in a
+  walk row — walk cycles are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
   frames are 8×8 particles centered in the 48×48 tile (rows/cols 20–27, also
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
   `SPRITE_FPS` constant is 8 — see `src/renderer/pet-config.ts` for why that
   mismatch is cosmetic, not a bug).
-- Adult stage art is provisional: `beaver-adult.png/.json` is mechanically
-  derived from the committed teen sheet by
-  `scripts/gen-sprites/build-adult-placeholder.ts` (`npm run
-  assets:adult-placeholder`) — per frame a crop to the content bbox plus a
-  nearest-neighbor upscale to the full 96px tile height, so the adult reads
-  as a larger teen. Final adult art stays open on flight-plan #7.
+- Adult stage art: `idle`/`walk` are the placeholder derived from the
+  committed teen sheet (`scripts/gen-sprites/build-adult-placeholder.ts`,
+  `npm run assets:adult-placeholder`) — a first BL-18 attempt at replacing
+  these with golden generated art was rejected by the owner as generic/
+  off-model and reverted. `struggle`/`parachute-wind`/`land` are appended
+  via `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
+  assets:adult-anims`) and are reference-matched to this same darker
+  placeholder adult, not the rejected golden art.
 
 ## Provenance
 
 **Beaver stages** (`beaver-baby.png`, `beaver-teen.png`, `beaver-adult.png`):
-baby/teen are user-generated images (external image-gen, owner-supplied),
-ingested via
-`scripts/gen-sprites/ingest-images.mjs` — background removal (flood-fill
-transparency from the borders over near-white/near-black/already-transparent
-pixels, then a hard alpha threshold), crop to content bbox, premultiplied-
-alpha area-average downscale to a scale factor locked per stage, composited
-onto a 96×96 tile bottom-aligned and horizontally centered. Colors ship as
-generated — the 16-color palette rule above is waived for these sheets by
-owner decision, 2026-07-14. Source images live in the gitignored
-`assets-src/beaver/` (not committed — no raw image-gen intermediates in the
-repo, same rule as everywhere else); only the ingested sheets are committed.
-Right-facing frames only — the user's left-facing images are unused (see
-Facing & mirroring above). The adult sheet is not ingested from source
-images — no authored adult art exists yet (flight-plan #7); it is a
-placeholder derived from the committed teen sheet (per-frame crop to the
-content bbox + nearest-neighbor upscale to the full tile height) by
-`scripts/gen-sprites/build-adult-placeholder.ts`, committed like the other
-sheets and byte-deterministic.
+`idle`/`walk` rows for baby and teen are generated images (external
+image-gen, owner-supplied) ingested via `scripts/gen-sprites/ingest-images.mjs`
+— background removal (flood-fill transparency from the borders over
+near-white/near-black/already-transparent pixels, then a hard alpha
+threshold), crop to content bbox, premultiplied-alpha area-average downscale
+to a scale factor locked per stage, composited onto a 96×96 tile
+bottom-aligned and horizontally centered. Colors ship as generated — the
+16-color palette rule above is waived for these sheets by owner decision,
+2026-07-14. Source images live in the gitignored `assets-src/beaver/` (not
+committed — no raw image-gen intermediates in the repo, same rule as
+everywhere else); only the ingested sheets are committed. Right-facing
+frames only — the user's left-facing images are unused (see Facing &
+mirroring above).
+
+Adult `idle`/`walk` are not independently generated: they're a mechanical
+nearest-neighbor upscale of the committed teen sheet
+(`scripts/gen-sprites/build-adult-placeholder.ts`) so the adult reads as a
+bigger beaver with zero authored pixels — the same placeholder used before
+BL-18. A first BL-18 pass replaced this with golden Comfy-generated idle/walk
+art; the owner rejected it as generic and off-model, so it was reverted and
+the placeholder restored.
+
+`struggle`/`parachute-wind`/`land` rows for baby and adult are appended
+separately by `scripts/gen-sprites/ingest-animation-frames.mjs` from Comfy
+Cloud run dumps (gitignored `assets-src/comfyui/<run>/`) — same mechanical
+pipeline, one scale lock per animation row (see Sheet row order & timing
+above). The adult anim rows (BL-18) are reference-matched to the previous
+(darker, teen-upscale) adult: generated via Comfy Cloud Nano Banana Pro,
+using the prior adult sprite as a reference image so the new poses stay one
+consistent beaver with the restored idle/walk rows above.
 
 **Lodge** (`lodge.png`): pixel maps authored by OpenAI Codex (vision-guided
 from a user-supplied reference image), iterated through visual design-review
