@@ -2,7 +2,7 @@
 
 > Where the project stands now. Update after every meaningful action.
 
-**Now:** **Zyklus 1 komplett geplant, Team startklar** · PR #40 (Planning → ai-beavers/main): CI grün, **wartet auf Review** · M2/P3 Fallschirm pausiert (WAVE-3 offen)
+**Now:** **Zyklus 1 komplett geplant, Team startklar** · PR #40 + #41: CI grün, **warten auf Review** (Vlady prüft 2026-07-22) · **M4/P1 WAVE-1 gestartet:** Cloud-Agent analysiert TokScale + baut Log-Reader (Brief: `Milestone-4/Phase-1/AGENT-BRIEF.md`) · M2/P3 Fallschirm pausiert (WAVE-3 offen)
 **Progress:** M1 ✅ · M2 P1/P2 ✅ (P3 pausiert) · M3–M6 geplant, nicht gestartet · Zyklus-1-Exit-Kriterien: App downloadbar · 100 Downloads · 7 Contributors (aktuell 3: Rodgi, Vlady, Jurij)
 **Blockers:** PR #40 — REVIEW_REQUIRED (Approval Gw3i/Org-Admin nötig; kein Code-Blocker)
 **Last:** Session 2026-07-21: Re-Onboarding + Zyklus-1 komplett (XP-Spec γ=2, 5 Lebenszyklen, Herdr, TokScale-Logik, Multiplattform Win+macOS) · Contributor-Workflow (PR #40, CI grün, REVIEW_REQUIRED) · KICKOFF + Agent-Prompts · Namensfix Vlady · fp-pause
