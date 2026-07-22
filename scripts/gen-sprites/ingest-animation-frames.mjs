@@ -55,11 +55,11 @@ export const BABY = {
 };
 
 // Adult frames are the same 3 poses on a bigger, wider-limbed rig (BL-18).
-// Restored idle/walk (build-adult-placeholder.ts) upscale teen content to
-// fill the full 96px tile, so the anim rows are targeted taller than baby's
-// own heights to read as the same size beaver — computeStageScale's width
-// term remains the clipping guard (see ingest-images.mjs) if a height gets
-// bumped further.
+// idle/walk are now final art (BL-6/T3, replacing the earlier teen-upscale
+// placeholder), sized to fill the full 96px tile, so the anim rows are
+// targeted taller than baby's own heights to read as the same size beaver —
+// computeStageScale's width term remains the clipping guard (see
+// ingest-images.mjs) if a height gets bumped further.
 //
 // parachute-wind carries its own tileHeight (BL-19): sharing the square 96px
 // tile forced the beaver's body to shrink so the canopy above it would also

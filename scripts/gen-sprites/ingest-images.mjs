@@ -496,8 +496,12 @@ export function ingestStage(stageSpec, srcDir) {
 
 // Optional CLI arg picks one stage by name (e.g. `assets:young-baby` ==
 // `ingest-images.mjs beaver-young-baby`) so a new figure's script doesn't
-// require every OTHER stage's source frames to also exist locally; omitting
-// the arg (`assets:ingest`) keeps the original "rebuild everything" behavior.
+// require every OTHER stage's source frames to also exist locally; that
+// explicit-arg path still fails loudly (raw ENOENT) if ITS OWN source frames
+// are missing. Omitting the arg (`assets:ingest`) rebuilds every stage but
+// skips (with a one-line notice) any stage whose source frames aren't
+// present locally, since it's normal for only one stage's gitignored
+// assets-src/beaver/ frames to exist on a given machine (BL-11 norm).
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = path.join(import.meta.dirname, '..', '..');
@@ -513,6 +517,15 @@ if (isMain) {
   }
 
   for (const stageSpec of stageSpecs) {
+    if (!stageArg) {
+      const missingFile = [...new Set(stageSpec.rows.flatMap((row) => row.files))].find(
+        (file) => !fs.existsSync(path.join(srcDir, file)),
+      );
+      if (missingFile) {
+        console.log(`skipping ${stageSpec.name}: assets-src/beaver/${missingFile} not found`);
+        continue;
+      }
+    }
     const { png, meta, scale } = ingestStage(stageSpec, srcDir);
     const pngPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.png`);
     const metaPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.json`);

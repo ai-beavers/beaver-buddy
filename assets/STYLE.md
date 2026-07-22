@@ -102,14 +102,19 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
   `SPRITE_FPS` constant is 8 — see `src/renderer/pet-config.ts` for why that
   mismatch is cosmetic, not a bug).
-- Adult stage art: `idle`/`walk` are the placeholder derived from the
-  committed teen sheet (`scripts/gen-sprites/build-adult-placeholder.ts`,
-  `npm run assets:adult-placeholder`) — a first BL-18 attempt at replacing
-  these with golden generated art was rejected by the owner as generic/
-  off-model and reverted. `struggle`/`parachute-wind`/`land` are appended
-  via `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
-  assets:adult-anims`) and are reference-matched to this same darker
-  placeholder adult, not the rejected golden art. `type(8)` is appended on top
+- Adult stage art: `idle`/`walk` are final generated art (BL-6/T3,
+  reference-conditioned on the adult sheet's own already-shipped rows — see
+  Provenance), replacing the earlier placeholder derived from the committed
+  teen sheet (`scripts/gen-sprites/build-adult-placeholder.ts`, `npm run
+  assets:adult-placeholder`; a first BL-18 attempt at golden generated art
+  was rejected by the owner as generic/off-model and reverted to that
+  placeholder before BL-6/T3 replaced it for good). `struggle`/
+  `parachute-wind`/`land` are appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
+  assets:adult-anims`) and remain reference-matched to the former
+  teen-upscale placeholder's look, not the rejected golden art — the BL-6/T3
+  final art was itself generated to preserve that same look, so these rows
+  stay visually consistent with idle/walk. `type(8)` is appended on top
   by `scripts/gen-sprites/ingest-typing.mjs` (`npm run assets:typing`) — it
   preserves every earlier row byte-for-byte and adds a 96px `type` row at the
   bottom (sheet grows to 768×608). Its source is a green chroma-key Comfy run
@@ -204,13 +209,18 @@ texture, ear shape, tooth/eye-highlight details, and outline weight across
 every row. No human cleanup beyond the mechanical pipeline.
 
 **`assets:adult-placeholder` must NOT be re-run against the committed
-`beaver-adult.png`** now that idle/walk are final art: it would silently
-clobber these rows back to the teen-upscale placeholder. `build-adult-
-placeholder.ts` itself stays in the tree (its own retirement is a WAVE-2
-item; other code may still reference it as a generation utility), but running
-its CLI and committing the result over the shipped adult sheet is a
-regression, not a refresh — an unconditional committed-sheet byte-pin test
-(`ingest-animation-frames.test.ts`) catches an accidental clobber commit.
+`beaver-adult.png`**: `build-adult-placeholder.ts` derives idle/walk from the
+teen sheet and writes a FRESH 2-row 192×192 sheet from scratch, not a
+targeted idle/walk patch — a rerun destroys all 8 other committed rows
+(`struggle`/`parachute-wind`/`land`/`type`/`watering`/`drink`/`sleep`/
+`stretch`), not just idle/walk. `build-adult-placeholder.ts` itself stays in
+the tree (its own retirement is a WAVE-2 item; other code may still
+reference it as a generation utility), but running its CLI and committing
+the result over the shipped adult sheet is a regression, not a refresh — the
+script now refuses to run against a committed sheet that has rows beyond
+idle/walk (see its own header comment), and an unconditional committed-sheet
+byte-pin test (`ingest-animation-frames.test.ts`) catches an accidental
+clobber commit too.
 
 `struggle`/`parachute-wind`/`land` rows for baby and adult are appended
 separately by `scripts/gen-sprites/ingest-animation-frames.mjs` from Comfy
