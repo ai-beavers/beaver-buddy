@@ -3,6 +3,8 @@
 // set, length caps, and charset sanity. Runs in main regardless of what the
 // renderer UI already disables — the renderer is never trusted.
 
+import { USAGE_SOURCE_IDS, type UsageSourceId } from '../usage/sources';
+
 export const MAX_FIELD_LEN = 200;
 const PRINTABLE_ASCII = /^[\x20-\x7E]*$/;
 
@@ -18,7 +20,7 @@ export interface ValidatedSave {
 }
 
 export interface ValidatedDisconnect {
-  readonly target: 'stripe' | 'revenuecat' | 'claude' | 'codex';
+  readonly target: 'stripe' | 'revenuecat' | UsageSourceId;
 }
 
 export function isValidationError(value: unknown): value is ValidationError {
@@ -70,14 +72,14 @@ export function validateSaveInput(input: unknown): ValidatedSave | ValidationErr
 export function validateDisconnectInput(input: unknown): ValidatedDisconnect | ValidationError {
   if (typeof input !== 'object' || input === null) return { error: 'payload must be an object' };
   const target = (input as Record<string, unknown>).target;
-  if (target !== 'stripe' && target !== 'revenuecat' && target !== 'claude' && target !== 'codex') {
-    return { error: 'target must be "stripe", "revenuecat", "claude", or "codex"' };
+  if (target === 'stripe' || target === 'revenuecat' || USAGE_SOURCE_IDS.includes(target as UsageSourceId)) {
+    return { target: target as ValidatedDisconnect['target'] };
   }
-  return { target };
+  return { error: 'target must be a supported connection target' };
 }
 
 export interface ValidatedConnectUsage {
-  readonly target: 'claude' | 'codex';
+  readonly target: UsageSourceId;
 }
 
 export function validateConnectUsageInput(input: unknown): ValidatedConnectUsage | ValidationError {
@@ -87,6 +89,6 @@ export function validateConnectUsageInput(input: unknown): ValidatedConnectUsage
     if (key !== 'target') return { error: `unexpected field: ${key}` };
   }
   const target = obj.target;
-  if (target !== 'claude' && target !== 'codex') return { error: 'target must be "claude" or "codex"' };
-  return { target };
+  if (!USAGE_SOURCE_IDS.includes(target as UsageSourceId)) return { error: 'target must be a supported usage source' };
+  return { target: target as UsageSourceId };
 }

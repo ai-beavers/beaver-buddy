@@ -17,6 +17,7 @@ import {
   SETTINGS_RESET_PROGRESS_CHANNEL,
   SETTINGS_SAVE_CHANNEL,
 } from '../ipc-channels';
+import { USAGE_SOURCE_IDS, type UsageSourceId } from '../usage/sources';
 import type { UsageSourcesSnapshot } from '../usage/tracker';
 import { REVENUECAT_KEY_ACCOUNT, REVENUECAT_PROJECT_ACCOUNT, STRIPE_KEY_ACCOUNT } from './mrr-config';
 import { deleteSecret, setSecret } from './secrets';
@@ -39,17 +40,15 @@ export interface SettingsWindowDeps {
   readonly onForceWork: () => void;
   // Re-scan logs + return per-source status (enabled is opt-in; tokens only when enabled).
   readonly getUsageSources: () => UsageSourcesSnapshot;
-  readonly onUsageEnabledChanged: (next: { claudeEnabled: boolean; codexEnabled: boolean }) => void;
+  readonly onUsageEnabledChanged: (next: SettingsState) => void;
 }
 
 let settingsWindow: BrowserWindow | null = null;
 let handlersRegistered = false;
 
-// Measured on Windows 2026-07-17 via CDP (scripts/cdp-screenshot.mjs --measure,
-// worst case: #claudeStatus/#codexStatus, both token lines and #status filled):
-// documentElement.scrollHeight = 705 CSS-px -> +8 px buffer for DPI rounding and
-// Windows font metrics = 713. With useContentSize the height is the content
-// size, so the measured value maps 1:1 onto the option.
+// Baseline content height for the settings window. It is capped below against
+// the current work area, so adding usage-source rows degrades to scrolling on
+// small/high-DPI screens instead of clipping content.
 const SETTINGS_WINDOW_CONTENT_HEIGHT = 713;
 // useContentSize height covers only the content; workAreaSize is the total
 // usable screen, so reserve room for the OS title bar (~31 px on Windows)
@@ -83,23 +82,44 @@ export interface SettingsHandlers {
 }
 
 function usagePayload(usage: UsageSourcesSnapshot) {
+  return Object.fromEntries(
+    USAGE_SOURCE_IDS.map((source) => {
+      const snapshot = usage[source];
+      return [
+        source,
+        {
+          enabled: snapshot?.enabled ?? false,
+          connected: snapshot?.connected ?? false,
+          logsFound: snapshot?.logsFound ?? false,
+          lifetimeTokens: snapshot?.lifetimeTokens ?? 0,
+          todayTokens: snapshot?.todayTokens ?? 0,
+        },
+      ];
+    }),
+  );
+}
+
+function preserveOptionalUsageFlags(current: SettingsState): Partial<SettingsState> {
   return {
-    claude: {
-      enabled: usage.claude.enabled,
-      connected: usage.claude.connected,
-      logsFound: usage.claude.logsFound,
-      lifetimeTokens: usage.claude.lifetimeTokens,
-      todayTokens: usage.claude.todayTokens,
-    },
-    codex: {
-      enabled: usage.codex.enabled,
-      connected: usage.codex.connected,
-      logsFound: usage.codex.logsFound,
-      lifetimeTokens: usage.codex.lifetimeTokens,
-      todayTokens: usage.codex.todayTokens,
-    },
+    ...(current.piEnabled === undefined ? {} : { piEnabled: current.piEnabled }),
+    ...(current.kimiEnabled === undefined ? {} : { kimiEnabled: current.kimiEnabled }),
+    ...(current.opencodeEnabled === undefined ? {} : { opencodeEnabled: current.opencodeEnabled }),
   };
 }
+
+function setUsageEnabled(current: SettingsState, target: UsageSourceId, enabled: boolean): SettingsState {
+  return {
+    ...current,
+    claudeEnabled: target === 'claude' ? enabled : current.claudeEnabled,
+    codexEnabled: target === 'codex' ? enabled : current.codexEnabled,
+    ...(target === 'pi' || current.piEnabled !== undefined ? { piEnabled: target === 'pi' ? enabled : current.piEnabled ?? false } : {}),
+    ...(target === 'kimi' || current.kimiEnabled !== undefined ? { kimiEnabled: target === 'kimi' ? enabled : current.kimiEnabled ?? false } : {}),
+    ...(target === 'opencode' || current.opencodeEnabled !== undefined
+      ? { opencodeEnabled: target === 'opencode' ? enabled : current.opencodeEnabled ?? false }
+      : {}),
+  };
+}
+
 
 // Handler bodies are Electron-free (validate + keychain + settings store +
 // deps only); the sender-frame check comes in as a predicate so tests can
@@ -150,6 +170,7 @@ export function createSettingsHandlers(
         revenuecatConnected,
         claudeEnabled: current.claudeEnabled,
         codexEnabled: current.codexEnabled,
+        ...preserveOptionalUsageFlags(current),
       };
       await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
@@ -163,15 +184,11 @@ export function createSettingsHandlers(
 
       const current = deps.getSettings();
 
-      if (parsed.target === 'claude' || parsed.target === 'codex') {
-        const next: SettingsState = {
-          ...current,
-          claudeEnabled: parsed.target === 'claude' ? false : current.claudeEnabled,
-          codexEnabled: parsed.target === 'codex' ? false : current.codexEnabled,
-        };
+      if (USAGE_SOURCE_IDS.includes(parsed.target as UsageSourceId)) {
+        const next = setUsageEnabled(current, parsed.target as UsageSourceId, false);
         await saveSettingsState(deps.stateDir, next);
         deps.onSettingsChanged(next);
-        deps.onUsageEnabledChanged({ claudeEnabled: next.claudeEnabled, codexEnabled: next.codexEnabled });
+        deps.onUsageEnabledChanged(next);
         return { ok: true, ...usagePayload(deps.getUsageSources()) };
       }
 
@@ -198,6 +215,7 @@ export function createSettingsHandlers(
         revenuecatConnected,
         claudeEnabled: current.claudeEnabled,
         codexEnabled: current.codexEnabled,
+        ...preserveOptionalUsageFlags(current),
       };
       await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
@@ -229,20 +247,16 @@ export function createSettingsHandlers(
       if (isValidationError(parsed)) return { ok: false, error: parsed.error };
 
       const current = deps.getSettings();
-      const next: SettingsState = {
-        ...current,
-        claudeEnabled: parsed.target === 'claude' ? true : current.claudeEnabled,
-        codexEnabled: parsed.target === 'codex' ? true : current.codexEnabled,
-      };
+      const next = setUsageEnabled(current, parsed.target, true);
       await saveSettingsState(deps.stateDir, next);
       deps.onSettingsChanged(next);
-      deps.onUsageEnabledChanged({ claudeEnabled: next.claudeEnabled, codexEnabled: next.codexEnabled });
+      deps.onUsageEnabledChanged(next);
       const usage = deps.getUsageSources();
-      const source = parsed.target === 'claude' ? usage.claude : usage.codex;
+      const source = usage[parsed.target];
       return {
         ok: true,
         target: parsed.target,
-        connected: source.connected,
+        connected: source?.connected ?? false,
         ...usagePayload(usage),
       };
     },

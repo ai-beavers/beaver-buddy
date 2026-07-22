@@ -1,5 +1,5 @@
 // Read-only, enumerated path discovery for usage logs (CLAUDE.md: "the
-// specific Claude Code / Codex usage files the parser documents" — nothing
+// specific coding-agent usage files the parser documents" — nothing
 // else is ever read). No file content is touched here, only directory
 // listings of the documented shapes.
 
@@ -12,6 +12,9 @@ export type Platform = 'win32' | 'darwin' | 'linux';
 export interface DiscoveredPaths {
   readonly claudeFiles: readonly string[];
   readonly codexFiles: readonly string[];
+  readonly piFiles: readonly string[];
+  readonly kimiFiles: readonly string[];
+  readonly opencodeFiles: readonly string[];
 }
 
 // Subset of process.env this module reads — kept narrow and injectable so
@@ -21,6 +24,9 @@ export interface PathEnv {
   readonly CODEX_HOME?: string;
   readonly LOCALAPPDATA?: string;
   readonly APPDATA?: string;
+  readonly PI_AGENT_DIR?: string;
+  readonly KIMI_DATA_DIR?: string;
+  readonly OPENCODE_DATA_DIR?: string;
 }
 
 function safeReaddir(dir: string): fs.Dirent[] {
@@ -29,6 +35,29 @@ function safeReaddir(dir: string): fs.Dirent[] {
   } catch {
     return [];
   }
+}
+
+
+function splitConfiguredDirs(value: string): string[] {
+  return value
+    .split(/[,;]/)
+    .map((d) => d.trim())
+    .filter((d) => d.length > 0);
+}
+
+function findJsonLikeFiles(root: string, predicate: (fileName: string) => boolean = (fileName) => fileName.endsWith('.jsonl')): string[] {
+  const files: string[] = [];
+  for (const entry of safeReaddir(root)) {
+    const entryPath = path.join(root, entry.name);
+    if (entry.isFile() && predicate(entry.name)) {
+      files.push(entryPath);
+      continue;
+    }
+    if (entry.isDirectory()) {
+      files.push(...findJsonLikeFiles(entryPath, predicate));
+    }
+  }
+  return files;
 }
 
 function normalizePlatform(platform: string): Platform {
@@ -43,10 +72,7 @@ function claudeConfigDirs(env: PathEnv, home: string, platform: Platform): strin
   if (configured && configured.trim().length > 0) {
     // Comma is the documented separator; semicolon is additionally accepted
     // because it is the conventional PATH separator on Windows.
-    return configured
-      .split(/[,;]/)
-      .map((d) => d.trim())
-      .filter((d) => d.length > 0);
+    return splitConfiguredDirs(configured);
   }
 
   const legacy = path.join(home, '.claude');
@@ -66,11 +92,29 @@ function claudeConfigDirs(env: PathEnv, home: string, platform: Platform): strin
   return [xdg, legacy].filter((d) => fs.existsSync(d));
 }
 
-// Enumerated Claude Code layout: `projects/{project}/{session}.jsonl` and
-// `projects/{project}/{session}/subagents/{subagent}.jsonl`. Nothing outside
-// this shape is read.
+// Enumerated Claude Code layouts: `projects/{project}/{session}.jsonl`,
+// nested `projects/{project}/{session}/subagents/**/*.jsonl`, and Tokscale-
+// observed wrapper transcripts at `transcripts/*.jsonl`. Nothing outside
+// these shapes is read. Workflow `journal.jsonl` files under `subagents/` are
+// orchestration metadata, not message transcripts, so they are skipped.
+function findSubagentFiles(subagentsDir: string): string[] {
+  const files: string[] = [];
+  for (const entry of safeReaddir(subagentsDir)) {
+    const entryPath = path.join(subagentsDir, entry.name);
+    if (entry.isFile() && entry.name.endsWith('.jsonl') && entry.name !== 'journal.jsonl') {
+      files.push(entryPath);
+      continue;
+    }
+    if (entry.isDirectory()) {
+      files.push(...findSubagentFiles(entryPath));
+    }
+  }
+  return files;
+}
+
 function findClaudeFiles(configDir: string): string[] {
   const projectsDir = path.join(configDir, 'projects');
+  const transcriptsDir = path.join(configDir, 'transcripts');
   const files: string[] = [];
 
   for (const project of safeReaddir(projectsDir)) {
@@ -83,13 +127,14 @@ function findClaudeFiles(configDir: string): string[] {
         continue;
       }
       if (entry.isDirectory()) {
-        const subagentsDir = path.join(projectDir, entry.name, 'subagents');
-        for (const sub of safeReaddir(subagentsDir)) {
-          if (sub.isFile() && sub.name.endsWith('.jsonl')) {
-            files.push(path.join(subagentsDir, sub.name));
-          }
-        }
+        files.push(...findSubagentFiles(path.join(projectDir, entry.name, 'subagents')));
       }
+    }
+  }
+
+  for (const transcript of safeReaddir(transcriptsDir)) {
+    if (transcript.isFile() && transcript.name.endsWith('.jsonl')) {
+      files.push(path.join(transcriptsDir, transcript.name));
     }
   }
 
@@ -179,6 +224,35 @@ function resolveCodexHomes(env: PathEnv, home: string, platform: Platform): stri
   return codexHomes(env, home, platform).filter((codexHome) => fs.existsSync(codexHome));
 }
 
+function configuredOrDefaultDirs(configured: string | undefined, defaults: readonly string[]): string[] {
+  if (configured && configured.trim().length > 0) return splitConfiguredDirs(configured);
+  return defaults.filter((d) => fs.existsSync(d));
+}
+
+function piSessionDirs(env: PathEnv, home: string): string[] {
+  return configuredOrDefaultDirs(env.PI_AGENT_DIR, [path.join(home, '.pi', 'agent', 'sessions')]);
+}
+
+function kimiDataDirs(env: PathEnv, home: string): string[] {
+  return configuredOrDefaultDirs(env.KIMI_DATA_DIR, [path.join(home, '.kimi'), path.join(home, '.kimi-code')]);
+}
+
+function opencodeDataDirs(env: PathEnv, home: string): string[] {
+  return configuredOrDefaultDirs(env.OPENCODE_DATA_DIR, [path.join(home, '.local', 'share', 'opencode')]);
+}
+
+function findKimiFiles(root: string): string[] {
+  return findJsonLikeFiles(path.join(root, 'sessions'), (fileName) => fileName === 'wire.jsonl');
+}
+
+function findPiFiles(sessionsDir: string): string[] {
+  return findJsonLikeFiles(sessionsDir, (fileName) => fileName.endsWith('.jsonl') || fileName.endsWith('.json'));
+}
+
+function findOpenCodeFiles(dataDir: string): string[] {
+  return findJsonLikeFiles(path.join(dataDir, 'session'), (fileName) => fileName.endsWith('.json'));
+}
+
 export function discoverPaths(
   env: PathEnv = process.env,
   home: string = os.homedir(),
@@ -187,6 +261,9 @@ export function discoverPaths(
   const claudeFiles = claudeConfigDirs(env, home, platform).flatMap(findClaudeFiles);
 
   const codexFiles = findAllCodexFiles(resolveCodexHomes(env, home, platform));
+  const piFiles = piSessionDirs(env, home).flatMap(findPiFiles);
+  const kimiFiles = kimiDataDirs(env, home).flatMap(findKimiFiles);
+  const opencodeFiles = opencodeDataDirs(env, home).flatMap(findOpenCodeFiles);
 
-  return { claudeFiles, codexFiles };
+  return { claudeFiles, codexFiles, piFiles, kimiFiles, opencodeFiles };
 }

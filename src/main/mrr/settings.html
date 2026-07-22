@@ -60,7 +60,7 @@
     <fieldset>
       <legend>Connect</legend>
       <p class="hint">
-        Opt in to read local Claude Code / Codex usage logs on this computer — no API keys.
+        Opt in to read local Claude Code / Codex / Pi Agent / Kimi Code / OpenCode usage logs on this computer — no API keys.
         Nothing is connected until you click Connect.
       </p>
       <div style="margin-top: 8px">
@@ -78,6 +78,30 @@
           <span id="codexStatus"></span>
         </div>
         <p class="tokens" id="codexTokens"></p>
+      </div>
+      <div style="margin-top: 12px">
+        <div class="row">
+          <button id="connectPi" type="button">Connect Pi Agent</button>
+          <button id="disconnectPi" type="button" hidden>Disconnect Pi Agent</button>
+          <span id="piStatus"></span>
+        </div>
+        <p class="tokens" id="piTokens"></p>
+      </div>
+      <div style="margin-top: 12px">
+        <div class="row">
+          <button id="connectKimi" type="button">Connect Kimi Code</button>
+          <button id="disconnectKimi" type="button" hidden>Disconnect Kimi Code</button>
+          <span id="kimiStatus"></span>
+        </div>
+        <p class="tokens" id="kimiTokens"></p>
+      </div>
+      <div style="margin-top: 12px">
+        <div class="row">
+          <button id="connectOpencode" type="button">Connect OpenCode</button>
+          <button id="disconnectOpencode" type="button" hidden>Disconnect OpenCode</button>
+          <span id="opencodeStatus"></span>
+        </div>
+        <p class="tokens" id="opencodeTokens"></p>
       </div>
     </fieldset>
 
@@ -139,12 +163,19 @@
         return Number(n || 0).toLocaleString('en-US');
       }
 
-      function renderSource(prefix, source) {
+      const sources = [
+        ['claude', 'Claude', 'Claude Code'],
+        ['codex', 'Codex', 'Codex'],
+        ['pi', 'Pi', 'Pi Agent'],
+        ['kimi', 'Kimi', 'Kimi Code'],
+        ['opencode', 'Opencode', 'OpenCode'],
+      ];
+
+      function renderSource(prefix, buttonName, source) {
         const statusEl = document.getElementById(prefix + 'Status');
         const tokensEl = document.getElementById(prefix + 'Tokens');
-        const name = prefix === 'claude' ? 'Claude' : 'Codex';
-        const connectButton = document.getElementById('connect' + name);
-        const disconnectButton = document.getElementById('disconnect' + name);
+        const connectButton = document.getElementById('connect' + buttonName);
+        const disconnectButton = document.getElementById('disconnect' + buttonName);
         if (!source || !source.enabled) {
           statusEl.textContent = 'not connected';
           tokensEl.textContent = '';
@@ -172,8 +203,7 @@
         }
         document.getElementById('stripeStatus').textContent = status.stripeConnected ? 'connected' : 'not connected';
         document.getElementById('revenuecatStatus').textContent = status.revenuecatConnected ? 'connected' : 'not connected';
-        renderSource('claude', status.claude);
-        renderSource('codex', status.codex);
+        for (const [prefix, buttonName] of sources) renderSource(prefix, buttonName, status[prefix]);
         const mrrAvailable = status.stripeConnected || status.revenuecatConnected;
         const mrrRadio = document.getElementById('modeMrr');
         mrrRadio.disabled = !mrrAvailable;
@@ -193,8 +223,9 @@
           setStatus(`error: ${result && result.error}`);
           return;
         }
-        const label = target === 'claude' ? 'Claude Code' : 'Codex';
-        const source = target === 'claude' ? result.claude : result.codex;
+        const found = sources.find(([prefix]) => prefix === target);
+        const label = found ? found[2] : target;
+        const source = result[target];
         setStatus(
           source && source.connected
             ? label + ' connected'
@@ -209,10 +240,10 @@
         await refresh();
       }
 
-      document.getElementById('connectClaude').addEventListener('click', () => connectUsage('claude'));
-      document.getElementById('connectCodex').addEventListener('click', () => connectUsage('codex'));
-      document.getElementById('disconnectClaude').addEventListener('click', () => disconnectUsage('claude'));
-      document.getElementById('disconnectCodex').addEventListener('click', () => disconnectUsage('codex'));
+      for (const [prefix, buttonName] of sources) {
+        document.getElementById('connect' + buttonName).addEventListener('click', () => connectUsage(prefix));
+        document.getElementById('disconnect' + buttonName).addEventListener('click', () => disconnectUsage(prefix));
+      }
 
       document.getElementById('saveStripe').addEventListener('click', () => {
         const stripeKey = document.getElementById('stripeKey').value;

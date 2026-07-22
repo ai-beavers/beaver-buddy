@@ -24,16 +24,22 @@ function touch(filePath: string, content = '{}'): void {
 }
 
 describe.each(['win32', 'darwin', 'linux'] as const)('discoverPaths — Claude on %s', (platform) => {
-  it('finds top-level session files and subagent files, ignores non-jsonl entries', () => {
+  it('finds top-level session, nested subagent, and transcript files, ignores non-jsonl metadata', () => {
     touch(path.join(home, '.claude', 'projects', 'project-a', 'session-1.jsonl'));
     touch(path.join(home, '.claude', 'projects', 'project-a', 'session-1', 'subagents', 'sub-1.jsonl'));
+    touch(path.join(home, '.claude', 'projects', 'project-a', 'session-1', 'subagents', 'workflows', 'wf-a', 'agent-1.jsonl'));
+    touch(path.join(home, '.claude', 'projects', 'project-a', 'session-1', 'subagents', 'workflows', 'wf-a', 'journal.jsonl'));
     touch(path.join(home, '.claude', 'projects', 'project-a', 'notes.txt'));
+    touch(path.join(home, '.claude', 'transcripts', 'wrapper-session.jsonl'));
+    touch(path.join(home, '.claude', 'transcripts', 'notes.txt'));
 
     const { claudeFiles } = discoverPaths({}, home, platform);
     expect([...claudeFiles].sort()).toEqual(
       [
         path.join(home, '.claude', 'projects', 'project-a', 'session-1.jsonl'),
         path.join(home, '.claude', 'projects', 'project-a', 'session-1', 'subagents', 'sub-1.jsonl'),
+        path.join(home, '.claude', 'projects', 'project-a', 'session-1', 'subagents', 'workflows', 'wf-a', 'agent-1.jsonl'),
+        path.join(home, '.claude', 'transcripts', 'wrapper-session.jsonl'),
       ].sort(),
     );
   });
@@ -232,5 +238,60 @@ describe('discoverPaths — Codex on Windows', () => {
     } finally {
       fs.rmSync(decoyRoot, { recursive: true, force: true });
     }
+  });
+});
+
+describe('discoverPaths — additional coding harnesses', () => {
+  it('finds pi-agent session json/jsonl files under the default sessions root', () => {
+    touch(path.join(home, '.pi', 'agent', 'sessions', 'session-a', 'events.jsonl'));
+    touch(path.join(home, '.pi', 'agent', 'sessions', 'session-a', 'summary.json'));
+    touch(path.join(home, '.pi', 'agent', 'sessions', 'session-a', 'notes.txt'));
+
+    expect([...discoverPaths({}, home, 'linux').piFiles].sort()).toEqual(
+      [
+        path.join(home, '.pi', 'agent', 'sessions', 'session-a', 'events.jsonl'),
+        path.join(home, '.pi', 'agent', 'sessions', 'session-a', 'summary.json'),
+      ].sort(),
+    );
+  });
+
+  it('finds Kimi wire logs in both .kimi and .kimi-code roots', () => {
+    touch(path.join(home, '.kimi', 'sessions', 'group-a', 'session-a', 'wire.jsonl'));
+    touch(path.join(home, '.kimi-code', 'sessions', 'workspace-a', 'session-a', 'agents', 'agent-a', 'wire.jsonl'));
+    touch(path.join(home, '.kimi-code', 'sessions', 'workspace-a', 'session-a', 'agents', 'agent-a', 'notes.jsonl'));
+
+    expect([...discoverPaths({}, home, 'linux').kimiFiles].sort()).toEqual(
+      [
+        path.join(home, '.kimi', 'sessions', 'group-a', 'session-a', 'wire.jsonl'),
+        path.join(home, '.kimi-code', 'sessions', 'workspace-a', 'session-a', 'agents', 'agent-a', 'wire.jsonl'),
+      ].sort(),
+    );
+  });
+
+  it('finds OpenCode JSON message files under the default data root', () => {
+    touch(path.join(home, '.local', 'share', 'opencode', 'session', 'session-a', 'message-a.json'));
+    touch(path.join(home, '.local', 'share', 'opencode', 'session', 'session-a', 'message-a.jsonl'));
+
+    expect(discoverPaths({}, home, 'linux').opencodeFiles).toEqual([
+      path.join(home, '.local', 'share', 'opencode', 'session', 'session-a', 'message-a.json'),
+    ]);
+  });
+
+  it('honors comma-separated overrides for pi, Kimi, and OpenCode data roots', () => {
+    const piA = path.join(home, 'pi-a');
+    const kimiA = path.join(home, 'kimi-a');
+    const ocA = path.join(home, 'oc-a');
+    touch(path.join(piA, 'session-a.jsonl'));
+    touch(path.join(kimiA, 'sessions', 'group-a', 'session-a', 'wire.jsonl'));
+    touch(path.join(ocA, 'session', 'session-a', 'message-a.json'));
+
+    const discovered = discoverPaths(
+      { PI_AGENT_DIR: piA, KIMI_DATA_DIR: kimiA, OPENCODE_DATA_DIR: ocA },
+      home,
+      'linux',
+    );
+    expect(discovered.piFiles).toHaveLength(1);
+    expect(discovered.kimiFiles).toHaveLength(1);
+    expect(discovered.opencodeFiles).toHaveLength(1);
   });
 });

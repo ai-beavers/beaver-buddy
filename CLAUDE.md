@@ -66,10 +66,11 @@ extended.
   live in the platform's secure storage (macOS Keychain / Windows secure storage)
   — the one sanctioned exception to the single state-directory rule below.
 - Usage-log reading (PRD R7) is **read-only and enumerated**: only the specific
-  Claude Code / Codex usage files the parser documents, parsed with bounded reads and
-  schema validation; treat contents as sensitive AND malformed-by-default. Never log,
-  persist, or display raw log content — derived token counts only. Tests use
-  synthetic fixtures, never the operator's real `~/.claude` / `~/.codex`.
+  Claude Code / Codex / Pi Agent / Kimi Code / OpenCode usage files the parser
+  documents, parsed with bounded reads and schema validation; treat contents as
+  sensitive AND malformed-by-default. Never log, persist, or display raw log
+  content — derived token counts only. Tests use synthetic fixtures, never the
+  operator's real `~/.claude` / `~/.codex` / coding-agent homes.
 - XP ingestion is idempotent: durable read cursor, no double-counting across
   restarts, log rotation, or replays.
 - Real prompts, repo paths, usernames, or account identifiers must never appear in
@@ -92,17 +93,41 @@ section in sync with it.
 - Claude Code: Union of `%USERPROFILE%\.claude` (legacy) and
   `%USERPROFILE%\.config\claude` (XDG) — every existing location is scanned
   and merged (users who migrated or use WSL toolchains may have data in
-  either spot).
+  either spot). Within each root, `projects/{project}/*.jsonl`, nested
+  `projects/{project}/{session}/subagents/**/*.jsonl` (except workflow
+  `journal.jsonl` metadata), and wrapper `transcripts/*.jsonl` are read.
 - Codex: Union across all existing candidates — `%LOCALAPPDATA%\Codex`,
   `%APPDATA%\Codex`, `~/.codex` (legacy) — merged and deduplicated by relative
   session path (earliest candidate wins on collision; within one root,
   `sessions/` beats `archived_sessions/`).
+- Pi Agent: `${PI_AGENT_DIR:-~/.pi/agent/sessions}` recursively, limited to
+  `.json` and `.jsonl` candidate session files; parsing still ignores entries
+  without token-usage metadata.
+- Kimi Code: `${KIMI_DATA_DIR:-~/.kimi,~/.kimi-code}` recursively under
+  `sessions/`, limited to `wire.jsonl`.
+- OpenCode: `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/session/**/*.json`.
+- Cursor / Crush / Google Antigravity: no local read path is enabled yet. Cursor
+  currently needs an account/API sync cache in tools like Tokscale, while Crush
+  and Antigravity need redacted sample logs with reliable token fields before
+  they can satisfy this repo's read-only/enumerated rule.
 
 ### macOS / Linux
 
 - Claude Code: Union of `~/.config/claude` (XDG) and `~/.claude` (legacy) —
-  every existing location is scanned.
+  every existing location is scanned. Within each root, `projects/{project}/*.jsonl`,
+  nested `projects/{project}/{session}/subagents/**/*.jsonl` (except workflow
+  `journal.jsonl` metadata), and wrapper `transcripts/*.jsonl` are read.
 - Codex: `~/.codex` only.
+- Pi Agent: `${PI_AGENT_DIR:-~/.pi/agent/sessions}` recursively, limited to
+  `.json` and `.jsonl` candidate session files; parsing still ignores entries
+  without token-usage metadata.
+- Kimi Code: `${KIMI_DATA_DIR:-~/.kimi,~/.kimi-code}` recursively under
+  `sessions/`, limited to `wire.jsonl`.
+- OpenCode: `${OPENCODE_DATA_DIR:-~/.local/share/opencode}/session/**/*.json`.
+- Cursor / Crush / Google Antigravity: no local read path is enabled yet. Cursor
+  currently needs an account/API sync cache in tools like Tokscale, while Crush
+  and Antigravity need redacted sample logs with reliable token fields before
+  they can satisfy this repo's read-only/enumerated rule.
 
 ### All platforms
 
@@ -112,6 +137,9 @@ section in sync with it.
   are intentionally not treated as separators on Windows because they would
   conflict with drive letters (`C:\`).
 - `CODEX_HOME` overrides Codex discovery with a single directory.
+- `PI_AGENT_DIR`, `KIMI_DATA_DIR`, and `OPENCODE_DATA_DIR` override their
+  corresponding additional harness roots. Each accepts comma- or
+  semicolon-separated directories.
 
 ## Overlay etiquette
 
