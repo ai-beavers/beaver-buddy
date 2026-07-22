@@ -269,8 +269,8 @@ New steps:
 In the main plan `.flightplan/Archive/WINDOWS_PORT_PLAN.md`, the dependency of BL-WIN-9 on BL-WIN-5 was removed:
 
 ```diff
-- **Abhängigkeiten:** BL-WIN-1, BL-WIN-2, BL-WIN-5.
-+ **Abhängigkeiten:** BL-WIN-1, BL-WIN-2.
+- **Dependencies:** BL-WIN-1, BL-WIN-2, BL-WIN-5.
++ **Dependencies:** BL-WIN-1, BL-WIN-2.
 ```
 
 ---

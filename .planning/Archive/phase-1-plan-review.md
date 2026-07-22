@@ -47,7 +47,7 @@ In `WINDOWS_PORT_PLAN.md` section 4 (build items), the dependency of BL-WIN-9 on
 
 ```text
 BL-WIN-9: CI-Windows-Runner
-Abhängigkeiten: BL-WIN-1, BL-WIN-2
+Dependencies: BL-WIN-1, BL-WIN-2
 ```
 
 BL-WIN-5 is Phase 3 and must not be a Phase 1 dependency.
