@@ -350,6 +350,50 @@ export function computeStageScale(bboxes, tile, targetContentHeightPx) {
   return Math.min(targetContentHeightPx / maxH, tile / maxW);
 }
 
+// Replaces (or appends) one named row in an already-baked sheet, keyed by
+// NAME not position. Two separate scripts append rows onto the same
+// committed sheet over time (e.g. a `type` row, then later a `watering`
+// row) — a re-run of the earlier script can no longer assume its row is a
+// contiguous prefix or the physical last row, so finding it by name and
+// preserving every other row's bytes around it (shifting whatever comes
+// after when the row's height changes) is the only order-safe way to
+// rebuild in place. Rows before the target keep their exact bytes; rows
+// after it are copied unchanged, just shifted if tileHeight differs from
+// the row being replaced.
+export function spliceRow(sheet, meta, rowName, tiles, tileHeight = meta.tile) {
+  const width = meta.sheetWidth;
+  const heightOf = (row) => row.height ?? meta.tile;
+  const idx = meta.rows.findIndex((row) => row.name === rowName);
+  const before = idx === -1 ? meta.rows : meta.rows.slice(0, idx);
+  const after = idx === -1 ? [] : meta.rows.slice(idx + 1);
+  const beforeHeight = before.reduce((sum, row) => sum + heightOf(row), 0);
+  const afterHeight = after.reduce((sum, row) => sum + heightOf(row), 0);
+  const oldRowHeight = idx === -1 ? 0 : heightOf(meta.rows[idx]);
+
+  const height = beforeHeight + tileHeight + afterHeight;
+  const data = new Uint8ClampedArray(width * height * 4);
+  data.set(sheet.data.subarray(0, width * beforeHeight * 4), 0);
+  tiles.forEach((tile, i) => {
+    for (let y = 0; y < tileHeight; y += 1) {
+      const destStart = ((beforeHeight + y) * width + i * meta.tile) * 4;
+      data.set(tile.data.subarray(y * meta.tile * 4, (y + 1) * meta.tile * 4), destStart);
+    }
+  });
+  if (after.length > 0) {
+    const oldAfterStart = width * (beforeHeight + oldRowHeight) * 4;
+    const newAfterStart = width * (beforeHeight + tileHeight) * 4;
+    data.set(sheet.data.subarray(oldAfterStart, oldAfterStart + width * afterHeight * 4), newAfterStart);
+  }
+
+  const rowMeta = { name: rowName, frames: tiles.length, ...(tileHeight !== meta.tile ? { height: tileHeight } : {}) };
+  return {
+    width,
+    height,
+    data,
+    meta: { tile: meta.tile, fps: meta.fps, sheetWidth: width, sheetHeight: height, rows: [...before, rowMeta, ...after] },
+  };
+}
+
 // Row/frame order is CLAUDE.md-binding (see assets/STYLE.md): right-facing
 // only, idle then walk, no run/sleep/react. The user's left-facing images
 // ({stage}-idle-left.png, {stage}-to-left-{1,2}.png) are unused — the

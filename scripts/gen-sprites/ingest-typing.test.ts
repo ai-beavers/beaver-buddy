@@ -23,13 +23,13 @@ interface Meta {
 describe('ingest-typing committed sheet', () => {
   const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as Meta;
   // The type row is one TILE tall; find its cumulative y-offset by name
-  // rather than assuming it's the last row — BL-1/T2 appends a `watering`
-  // row after it, so `type` is no longer the sheet's bottom-most row.
+  // rather than assuming it's the last row — a `watering` row is appended
+  // after it, so `type` is no longer the sheet's bottom-most row.
   const typeRowIndex = meta.rows.findIndex((row) => row.name === 'type');
   const typeTopY = meta.rows.slice(0, typeRowIndex).reduce((sum, row) => sum + (row.height ?? meta.tile), 0);
 
   it('appends a type row of 8 frames to the golden adult sheet', () => {
-    expect(meta.rows.map((row) => row.name)).toContain('type');
+    expect(meta.rows.map((row) => row.name)).toEqual(['idle', 'walk', 'struggle', 'parachute-wind', 'land', 'type', 'watering']);
     expect(meta.rows.find((row) => row.name === 'type')).toMatchObject({ name: 'type', frames: 8 });
   });
 

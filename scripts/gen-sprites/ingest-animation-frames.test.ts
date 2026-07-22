@@ -107,7 +107,7 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     };
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
     // is appended by ingest-typing.mjs (see ingest-typing); `watering` is
-    // appended by buildAdultWateringSheet (BL-1/T2, see below).
+    // appended by buildAdultWateringSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -167,10 +167,10 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
   }, 15_000);
 
   // The committed sheet is the golden build (this) with a `type` row (by
-  // ingest-typing.mjs) and a `watering` row (by buildAdultWateringSheet,
-  // BL-1/T2) appended after it, so the golden block must match byte-for-byte
-  // at the top of the committed sheet and its rows must be the committed
-  // sheet's leading rows. The appended rows themselves are covered by
+  // ingest-typing.mjs) and a `watering` row (by buildAdultWateringSheet)
+  // appended after it, so the golden block must match byte-for-byte at the
+  // top of the committed sheet and its rows must be the committed sheet's
+  // leading rows. The appended rows themselves are covered by
   // ingest-typing.test and the watering block below.
   it('committed adult sheet (golden block) matches the build output byte-for-byte and matches its JSON', () => {
     const { png, meta } = buildStageSheet(repoRoot, ADULT);
@@ -232,9 +232,9 @@ describe.skipIf(!hasSourceBeaver || !hasBabyComfyui)('ingest-animation-frames id
   }, 15_000);
 });
 
-// Watering row (BL-1/T2): committed-sheet assertions run on every checkout;
-// the byte-for-byte regeneration check needs the gitignored raw grid dump
-// and skips gracefully without it (same convention as the other pipeline
+// Watering row: committed-sheet assertions run on every checkout; the
+// byte-for-byte regeneration check needs the gitignored raw grid dump and
+// skips gracefully without it (same convention as the other pipeline
 // blocks above and ingest-typing.test.ts).
 describe('ingest-animation-frames watering row (adult)', () => {
   const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);

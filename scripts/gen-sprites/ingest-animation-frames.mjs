@@ -34,6 +34,7 @@ import {
   resizeAreaAverage,
   placeOnTile,
   computeStageScale,
+  spliceRow,
 } from './ingest-images.mjs';
 import { encodeRgbaPng } from './png.ts';
 
@@ -184,17 +185,19 @@ export function buildBabySheet(repoRoot) {
   return buildStageSheet(repoRoot, BABY);
 }
 
-// Adult watering-can loop (BL-1/T2): appended directly onto the already-
-// committed beaver-adult sheet, NOT folded into ADULT.animations above.
-// Rebuilding the whole adult stage from ADULT.animations would require
-// struggle/parachute-wind/land's own gitignored Comfy run dirs to also
-// exist locally, and Comfy generation isn't deterministic — re-baking them
-// on a machine that lacks those dumps would silently replace already-shipped
-// pixels. This mirrors ingest-typing.mjs's "append one row to the committed
-// sheet, preserving every earlier row byte-for-byte" pattern, but reads a
-// single 4-col x 2-row grid image (like the type row's source sheet) instead
-// of per-file frames, and reuses this file's own crop/scale/composite step
-// rather than a third copy of that logic.
+// Adult watering-can loop: appended directly onto the already-committed
+// beaver-adult sheet, NOT folded into ADULT.animations above. Rebuilding the
+// whole adult stage from ADULT.animations would require struggle/parachute-
+// wind/land's own gitignored Comfy run dirs to also exist locally, and Comfy
+// generation isn't deterministic — re-baking them on a machine that lacks
+// those dumps would silently replace already-shipped pixels. This mirrors
+// ingest-typing.mjs's "append one row to the committed sheet, preserving
+// every other row byte-for-byte" pattern (both now share spliceRow, which
+// finds the target row by name rather than assuming it's a contiguous
+// prefix or the physical last row — needed because this row and
+// ingest-typing's `type` row both append onto the same sheet over time), but
+// reads a single 4-col x 2-row grid image (like the type row's source sheet)
+// instead of per-file frames.
 export const ADULT_WATERING = {
   name: 'watering',
   run: 'adult-watering',
@@ -203,20 +206,11 @@ export const ADULT_WATERING = {
   targetContentHeightPx: 88,
 };
 
-function rowHeight(row) {
-  return row.height ?? TILE;
-}
-
 export function buildAdultWateringSheet(repoRoot) {
   const pngPath = path.join(repoRoot, 'assets', 'sprites', ADULT.shippedPng);
   const jsonPath = pngPath.replace(/\.png$/, '.json');
   const shipped = decodePng(fs.readFileSync(pngPath));
   const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-
-  // Idempotent re-run: drop a pre-existing watering row before appending.
-  const baseRows = shippedMeta.rows.filter((row) => row.name !== ADULT_WATERING.name);
-  const baseHeight = baseRows.reduce((sum, row) => sum + rowHeight(row), 0);
-  const width = shippedMeta.sheetWidth;
 
   const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', ADULT_WATERING.run, 'sheet.png');
   const grid = decodePng(fs.readFileSync(sheetPath));
@@ -234,23 +228,7 @@ export function buildAdultWateringSheet(repoRoot) {
     return placeOnTile(resizeAreaAverage(img, destW, destH), TILE);
   });
 
-  const height = baseHeight + TILE;
-  const data = new Uint8ClampedArray(width * height * 4);
-  data.set(shipped.data.subarray(0, width * baseHeight * 4), 0);
-  tiles.forEach((tile, i) => {
-    for (let y = 0; y < TILE; y += 1) {
-      const destStart = ((baseHeight + y) * width + i * TILE) * 4;
-      data.set(tile.data.subarray(y * TILE * 4, (y + 1) * TILE * 4), destStart);
-    }
-  });
-
-  const meta = {
-    tile: shippedMeta.tile,
-    fps: shippedMeta.fps,
-    sheetWidth: width,
-    sheetHeight: height,
-    rows: [...baseRows, { name: ADULT_WATERING.name, frames: tiles.length }],
-  };
+  const { width, height, data, meta } = spliceRow(shipped, shippedMeta, ADULT_WATERING.name, tiles);
   return { png: encodeRgbaPng({ width, height, data }), meta, scale };
 }
 

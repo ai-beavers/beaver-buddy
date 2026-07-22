@@ -52,3 +52,18 @@ export function computeStageScale(
   targetContentHeightPx: number,
 ): number;
 export function ingestStage(stageSpec: StageSpec, srcDir: string): IngestResult;
+
+export interface SplicedSheet {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+  readonly meta: SheetMeta;
+}
+
+export function spliceRow(
+  sheet: DecodedImage,
+  meta: SheetMeta,
+  rowName: string,
+  tiles: readonly DecodedImage[],
+  tileHeight?: number,
+): SplicedSheet;
