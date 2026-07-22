@@ -262,10 +262,30 @@ export function buildAdultDrinkSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_DRINK);
 }
 
+// Sleep loop (BL-4): curled-up idle loop, gentle breathing rise/fall and
+// pulsing "zzz" wisps above the head — same reference-conditioned green
+// chroma-key 4x2 grid convention as watering/drink. Unlike drink/watering
+// (which settle to a grounded standing pose), sleep is a LOOP with no
+// settle/lie-down transition frame: matches every
+// other looping row, a one-shot fall-asleep transition can be added as its
+// own row later without reworking this one.
+export const ADULT_SLEEP = {
+  rowName: 'sleep',
+  sourceDir: 'adult-sleep',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 88,
+};
+
+export function buildAdultSleepSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_SLEEP);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
-// way (watering, drink, future BL-8..12 rows just add a config here).
-const ADULT_ROWS = { 'adult-watering': ADULT_WATERING, 'adult-drink': ADULT_DRINK };
+// way (watering, drink, sleep, future BL-8..12 rows just add a config here).
+const ADULT_ROWS = { 'adult-watering': ADULT_WATERING, 'adult-drink': ADULT_DRINK, 'adult-sleep': ADULT_SLEEP };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {

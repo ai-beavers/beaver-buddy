@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 800,
+  "sheetHeight": 896,
   "rows": [
     {
       "name": "idle",
@@ -35,6 +35,10 @@
     },
     {
       "name": "drink",
+      "frames": 8
+    },
+    {
+      "name": "sleep",
       "frames": 8
     }
   ]

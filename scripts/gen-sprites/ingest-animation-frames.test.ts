@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_DRINK, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_DRINK, ADULT_SLEEP, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultSleepSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -15,6 +15,7 @@ const hasAdultComfyui = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT.
 const hasSourceBeaver = fs.existsSync(new URL('../../assets-src/beaver', import.meta.url));
 const hasWateringSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WATERING.sourceDir}/sheet.png`, import.meta.url));
 const hasDrinkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_DRINK.sourceDir}/sheet.png`, import.meta.url));
+const hasSleepSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_SLEEP.sourceDir}/sheet.png`, import.meta.url));
 
 // Cumulative y-offset of a row found by name, not position — rows keep
 // getting appended after each other (watering, then drink, ...), so no test
@@ -115,9 +116,9 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       rows: readonly { name: string; frames: number; height?: number }[];
     };
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
-    // is appended by ingest-typing.mjs (see ingest-typing); `watering` and
-    // `drink` are appended by buildAdultWateringSheet / buildAdultDrinkSheet
-    // (see below).
+    // is appended by ingest-typing.mjs (see ingest-typing); `watering`,
+    // `drink`, and `sleep` are appended by buildAdultWateringSheet /
+    // buildAdultDrinkSheet / buildAdultSleepSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -127,21 +128,22 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'type', frames: 8 },
       { name: 'watering', frames: 8 },
       { name: 'drink', frames: 8 },
+      { name: 'sleep', frames: 8 },
     ]);
   });
 
   // Golden rows: 96*4 + 128(parachute-wind) = 512; ingest-typing appends a
   // 96px `type` row → 608; buildAdultWateringSheet appends a 96px `watering`
-  // row → 704; buildAdultDrinkSheet appends a 96px `drink` row → 800. Width
-  // stays a flat 8-col grid at the 96px tile — only row height varies, never
-  // column width.
-  it('is a 768x800 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96)', () => {
+  // row → 704; buildAdultDrinkSheet appends a 96px `drink` row → 800;
+  // buildAdultSleepSheet appends a 96px `sleep` row → 896. Width stays a flat
+  // 8-col grid at the 96px tile — only row height varies, never column width.
+  it('is a 768x896 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(800);
+    expect(decoded.height).toBe(896);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(800);
+    expect(meta.sheetHeight).toBe(896);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -206,6 +208,7 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
     expect(committedMeta.rows.find((row) => row.name === 'type')).toMatchObject({ name: 'type', frames: 8 });
     expect(committedMeta.rows.find((row) => row.name === 'watering')).toMatchObject({ name: 'watering', frames: 8 });
     expect(committedMeta.rows.find((row) => row.name === 'drink')).toMatchObject({ name: 'drink', frames: 8 });
+    expect(committedMeta.rows.find((row) => row.name === 'sleep')).toMatchObject({ name: 'sleep', frames: 8 });
   }, 15_000);
 });
 
@@ -365,5 +368,98 @@ describe.skipIf(!hasDrinkSource)('ingest-animation-frames drink regeneration', (
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultDrinkSheet(repoRoot).png.equals(buildAdultDrinkSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Sleep row (BL-4): same committed-sheet + gated-regeneration convention as
+// the watering/drink blocks above, via the shared buildAdultRowSheet config.
+// Sleep is a loop-only row (curled idle + breathing + pulsing zzz), no
+// settle/lie-down transition frame.
+describe('ingest-animation-frames sleep row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a sleep row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'sleep');
+    expect(row).toEqual({ name: 'sleep', frames: 8 });
+  });
+
+  it('every sleep frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'sleep');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at sleep[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `sleep[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `sleep[${frame}] not grounded`).toBe(true);
+    }
+  });
+
+  // BL-5 handoff: assets-src/reference/adult-sleep-pose.png is a curated,
+  // committed copy of sleep frame index 7 (frame 8 of 8 — the pose with the
+  // fewest/faintest zzz wisps, so BL-5's wake-up generation doesn't condition
+  // on particle art) so it must stay pixel-identical to that frame forever,
+  // not just at generation time.
+  it('the committed BL-5 reference tile is pixel-identical to sleep frame index 7', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'sleep');
+    const { tile } = meta;
+    const frameIndex = 7;
+
+    const reference = decodePng(fs.readFileSync(new URL('../../assets-src/reference/adult-sleep-pose.png', import.meta.url)));
+    expect(reference.width).toBe(tile);
+    expect(reference.height).toBe(tile);
+
+    for (let y = 0; y < tile; y += 1) {
+      for (let x = 0; x < tile; x += 1) {
+        const si = ((originY + y) * decoded.width + frameIndex * tile + x) * 4;
+        const di = (y * tile + x) * 4;
+        expect(reference.data[di]).toBe(decoded.data[si]);
+        expect(reference.data[di + 1]).toBe(decoded.data[si + 1]);
+        expect(reference.data[di + 2]).toBe(decoded.data[si + 2]);
+        expect(reference.data[di + 3]).toBe(decoded.data[si + 3]);
+      }
+    }
+  });
+});
+
+describe.skipIf(!hasSleepSource)('ingest-animation-frames sleep regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultSleepSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultSleepSheet(repoRoot).png.equals(buildAdultSleepSheet(repoRoot).png)).toBe(true);
   });
 });
