@@ -1,44 +1,44 @@
-# Item #51 — Settings-Fensterhöhe: messen, dann setzen
+# Item #51 — Settings window height: measure, then set
 
-Datum: 2026-07-17 · Branch: bl-item/windows-native/BL-WIN · Status: Umsetzung Runde 2
-(2026-07-17) — Verifikations-Korrekturen B1–B5 aus
-`51-settings-fensterhoehe-verification.md` (Urteil: PLAN OK MIT KORREKTUREN) eingearbeitet.
+Date: 2026-07-17 · Branch: bl-item/windows-native/BL-WIN · Status: Implementation round 2
+(2026-07-17) — verification corrections B1–B5 from
+`51-settings-fensterhoehe-verification.md` (verdict: PLAN OK WITH CORRECTIONS) incorporated.
 
-## 1. Ziel & Akzeptanzkriterien
+## 1. Goal & acceptance criteria
 
-Das Growth-Settings-Fenster (`src/main/mrr/settings-window.ts:250-255`, aktuell 420×680,
-`resizable: false`, kein `useContentSize`) zeigt nach dem Merge 5 Fieldsets + Statuszeile.
-Die Paritäts-Analyse (`.flightplan/Archive/plans/parity/bereich-2-connect-ui.md`, B2.2) schätzt
-Content ≈ 700–730 CSS-px vs. Windows-Viewport ≈ 649 px → Pet/Reset-Sektion und `#status`
-liegen ~50–80 px below the fold; unter Windows ist die Scrollbar dauerhaft sichtbar.
+The Growth settings window (`src/main/mrr/settings-window.ts:250-255`, currently 420×680,
+`resizable: false`, no `useContentSize`) shows after the merge 5 fieldsets + status line.
+The parity analysis (`.flightplan/Archive/plans/parity/bereich-2-connect-ui.md`, B2.2) estimates
+content ≈ 700–730 CSS px vs. Windows viewport ≈ 649 px → Pet/Reset section and `#status`
+are ~50–80 px below the fold; under Windows the scrollbar is permanently visible.
 
-Akzeptanzkriterien:
+Acceptance criteria:
 
-1. **Gemessen, nicht geschätzt:** Die echte Content-Höhe ist per CDP `Runtime.evaluate`
-   (`document.body.scrollHeight` / `document.documentElement.scrollHeight`) auf Windows
-   ermittelt und im Commit/Verdict dokumentiert — inkl. Worst-Case (beide Token-Zeilen
-   `#claudeTokens`/`#codexTokens` gefüllt, Status-Spans `#claudeStatus`/`#codexStatus`
-   gefüllt, `#status` belegt).
-2. Beim Öffnen sind **alle 5 Fieldsets inkl. kompletter Reset-Danger-Zone und die
-   Statuszeile ohne Scrollen sichtbar** — auf Windows **und** macOS (gleiche `height`
-   gilt plattformübergreifend; macOS-Viewport wird gegenüber heute nicht kleiner).
-3. Post-fix CDP-Messung belegt: `scrollHeight ≤ innerHeight` (kein vertikaler Overflow)
-   und kein horizontaler Overflow (`scrollWidth ≤ innerWidth`).
-4. **Screenshot-Beweis (Windows):** `docs/design-reviews/BL-51-settings.png` zeigt das
-   geöffnete Fenster mit allen Sektionen inkl. Reset-Button, ohne sichtbare Scrollbar.
-5. `npm test` (434 Tests + neuer Größen-Pin-Test), `npm run lint`, `npm run typecheck` grün.
+1. **Measured, not estimated:** The real content height is determined via CDP `Runtime.evaluate`
+   (`document.body.scrollHeight` / `document.documentElement.scrollHeight`) on Windows and
+   documented in the commit/verdict — incl. worst-case (both token lines
+   `#claudeTokens`/`#codexTokens` filled, status spans `#claudeStatus`/`#codexStatus` filled,
+   `#status` occupied).
+2. When opened, **all 5 fieldsets incl. complete reset danger zone and the status line are
+   visible without scrolling** — on Windows **and** macOS (same `height` applies cross-platform;
+   macOS viewport will not be smaller than today).
+3. Post-fix CDP measurement proves: `scrollHeight ≤ innerHeight` (no vertical overflow) and no
+   horizontal overflow (`scrollWidth ≤ innerWidth`).
+4. **Screenshot proof (Windows):** `docs/design-reviews/BL-51-settings.png` shows the opened
+   window with all sections incl. reset button, without visible scrollbar.
+5. `npm test` (434 tests + new size pin test), `npm run lint`, `npm run typecheck` green.
 
-## 2. Mess-Ansatz: cdp-screenshot.mjs erweitern
+## 2. Measurement approach: extend cdp-screenshot.mjs
 
-Bestand (`scripts/cdp-screenshot.mjs`, 45 Zeilen, plain Node, built-in `fetch`/`WebSocket`):
-wählt aktuell das **erste** `page`-Target → das ist das Pet-Overlay, nicht das Settings-Fenster.
+Current state (`scripts/cdp-screenshot.mjs`, 45 lines, plain Node, built-in `fetch`/`WebSocket`):
+currently selects the **first** `page` target → that is the pet overlay, not the settings window.
 
-### 2.1 Änderungen an `scripts/cdp-screenshot.mjs` (minimal, rückwärtskompatibel)
+### 2.1 Changes to `scripts/cdp-screenshot.mjs` (minimal, backwards-compatible)
 
-- **Arg-Parsing:** Positionale Args (`port`, `outfile`, `delayMs`) wie bisher; neue optionale
-  Flags werden aus `process.argv` herausgefiltert (`--target=…`, `--measure`).
-  `outfile` darf `-` sein → kein Screenshot (reiner Messlauf).
-- **`--target=<substring>`** (case-insensitive Substring-Match auf `t.title` **oder** `t.url`):
+- **Arg parsing:** Positional args (`port`, `outfile`, `delayMs`) as before; new optional
+  flags are filtered from `process.argv` (`--target=…`, `--measure`).
+  `outfile` may be `-` → no screenshot (pure measurement run).
+- **`--target=<substring>`** (case-insensitive substring match on `t.title` **or** `t.url`):
   ```js
   const page = list.find((t) =>
     t.type === 'page' &&
@@ -46,16 +46,16 @@ wählt aktuell das **erste** `page`-Target → das ist das Pet-Overlay, nicht da
       (t.title || '').toLowerCase().includes(targetMatch) ||
       (t.url || '').toLowerCase().includes(targetMatch)));
   ```
-  Ohne Flag: exakt das bisherige Verhalten (erstes page-Target). Match für das
-  Settings-Fenster: `--target=settings.html` (URL ist `file://…/dist/main/mrr/settings.html`;
-  Fenstertitel „Beaver Buddy — Settings" / HTML-`<title>` „Settings" → auch
-  `--target=settings` matcht).
-- **`--measure`:** vor dem Screenshot ein `Runtime.evaluate` mit `returnByValue: true`,
-  Ausgabe als eine `METRICS {…}`-Zeile auf stdout. Der Ausdruck misst den **Worst-Case**:
-  Er füllt zuerst die Status-Spans (`#claudeStatus`, `#codexStatus`), die beiden
-  Token-Zeilen (`#claudeTokens`, `#codexTokens`) und `#status` mit repräsentativem Text,
-  liest synchron die Höhen (read erzwingt Layout) und stellt den DOM im selben Evaluate
-  wieder her — so bleibt der danach aufgenommene Screenshot unverändert:
+  Without flag: exactly the previous behavior (first page target). Match for the
+  settings window: `--target=settings.html` (URL is `file://…/dist/main/mrr/settings.html`;
+  window title „Beaver Buddy — Settings" / HTML-`<title>` „Settings" → also
+  `--target=settings` matches).
+- **`--measure`:** before the screenshot a `Runtime.evaluate` with `returnByValue: true`,
+  output as one `METRICS {…}` line to stdout. The expression measures the **worst case**:
+  It first fills the status spans (`#claudeStatus`, `#codexStatus`), the two token lines
+  (`#claudeTokens`, `#codexTokens`) and `#status` with representative text, reads the heights
+  synchronously (read forces layout), and restores the DOM in the same evaluate — so the
+  screenshot taken afterwards remains unchanged:
   ```js
   (() => {
     const fill = [['claudeStatus','enabled — logs not found'],
@@ -77,194 +77,189 @@ wählt aktuell das **erste** `page`-Target → das ist das Pet-Overlay, nicht da
     return m;
   })()
   ```
-  (Verifikations-Nit B5: `#claudeStatus`/`#codexStatus` sind jetzt im Fill enthalten, damit
-  der Worst-Case formal maximal ist.)
-- Keine neuen Dependencies; `Page.captureScreenshot`-Pfad bleibt unverändert.
+  (Verification nit B5: `#claudeStatus`/`#codexStatus` are now included in the fill, so the
+  worst case is formally maximal.)
+- No new dependencies; `Page.captureScreenshot` path remains unchanged.
 
-### 2.2 Mess-Prozedur (Windows, BL-9-Isolationsmuster)
+### 2.2 Measurement procedure (Windows, BL-9 isolation pattern)
 
-1. `npm run build` (App lädt `dist/main/mrr/settings.html`, Build ist Pflicht).
-2. Isolierter Start wie BL-9/BL-10 (scratch-dirs, nie echte Logs/Config):
+1. `npm run build` (the app loads `dist/main/mrr/settings.html`, build is mandatory).
+2. Isolated start like BL-9/BL-10 (scratch dirs, never real logs/config):
    ```bash
    scratch=$(mktemp -d)
    CLAUDE_CONFIG_DIR="$scratch/claude" CODEX_HOME="$scratch/codex" \
      npx electron . --user-data-dir="$scratch/ud" \
      --open-growth-settings --remote-debugging-port=9222 &
    ```
-   (`--open-growth-settings` verifiziert: `src/main/main.ts:335` → `openGrowthSettings()`
-   → exakt der Tray-Codepfad.)
-3. Messen (Worst-Case dank Fill-Logik):
+   (`--open-growth-settings` verifies: `src/main/main.ts:335` → `openGrowthSettings()`
+   → exactly the tray code path.)
+3. Measure (worst-case thanks to fill logic):
    ```bash
    node scripts/cdp-screenshot.mjs 9222 - 3000 --target=settings.html --measure
    ```
-   Erwartet: `hasVScroll: true`, `docScrollH` ≈ 700–760 → das ist **H**.
-4. Höhe setzen (s. §3), rebuild, relaunch, erneut messen → jetzt muss
-   `hasVScroll: false`, `hasHScroll: false`, `innerH ≥ docScrollH` gelten.
-5. Beweis-Screenshot:
+   Expected: `hasVScroll: true`, `docScrollH` ≈ 700–760 → that is **H**.
+4. Set height (see §3), rebuild, relaunch, measure again → now
+   `hasVScroll: false`, `hasHScroll: false`, `innerH ≥ docScrollH` must hold.
+5. Proof screenshot:
    ```bash
    node scripts/cdp-screenshot.mjs 9222 docs/design-reviews/BL-51-settings.png 3000 --target=settings.html
    ```
-   Danach PNG per Read-Tool prüfen: 5 Fieldsets, Reset-Button, Statuszeile, keine Scrollbar.
+   Then check PNG with the read tool: 5 fieldsets, reset button, status line, no scrollbar.
 
-## 3. Entscheidung: `useContentSize: true` + gemessene Content-Höhe, gekappt an workArea
+## 3. Decision: `useContentSize: true` + measured content height, capped to workArea
 
-**Entscheidung: `useContentSize: true` setzen und `height` auf die gemessene Content-Höhe
-plus kleinen Puffer, gekappt an die nutzbare Bildschirmhöhe.** Gemessener Zielwert:
-H = 705 (Worst-Case, §7) ⇒ **`height` = 713** (finaler Wert =
+**Decision: set `useContentSize: true` and `height` to the measured content height plus a
+small buffer, capped to the usable screen height.** Measured target value:
+H = 705 (worst-case, §7) ⇒ **`height` = 713** (final value =
 `min(Math.ceil(H) + 8, screen.getPrimaryDisplay().workAreaSize.height - 40)`,
-aus der Messung §2.2, Schritt 3).
+from the measurement §2.2, step 3).
 
-Begründung:
+Rationale:
 
-- Der Bug ist genau ein Frame-Semantik-Problem: Content ≈ 700–730 vs. Viewport =
-  Fensterhöhe − Titelleiste (macOS ~28 px, Windows ~31 px, per BL-9-Screenshot kalibriert).
-  Nur die Zahl zu erhöhen (680 → 760) reproduziert dieselbe implizite Kopplung an
-  Titelleisten-Arithmetik — die nächste Sektion oder ein Plattform-Unterschied bricht sie
-  wieder still.
-- Mit `useContentSize: true` bedeuten `width`/`height` die **Content-Größe** (dokumentiertes
-  Electron-Verhalten auf win32/darwin). Die gemessene `scrollHeight` bildet sich damit 1:1
-  auf den Optionswert ab — Messung → Setting ohne Titelleisten-Umrechnung pro Plattform.
-  Für nicht-resizable Fenster ist das der übliche, dokumentierte Einsatzzweck.
-- **workArea-Kappung (Verifikations-Befund B1):** Mit `useContentSize` bezieht sich `height`
-  auf den Content; die Gesamt-Fensterhöhe ist Content + Titelleiste (~31 px Win). Auf
-  kleinen/logisch verkleinerten Screens (1366×768-Laptop: workArea ≈ 728 px; 1920×1080 @
-  150 % Skalierung: workArea ≈ 688 px) würde ein ungekappter Wert von ~740 px Content
-  (Gesamt ~771 px) unten herausragen — ausgerechnet die unteren Sektionen (Pet/Reset +
-  `#status`) lägen wieder außerhalb. Darum:
+- The bug is exactly a frame semantics problem: content ≈ 700–730 vs. viewport =
+  window height − title bar (macOS ~28 px, Windows ~31 px, calibrated per BL-9 screenshot).
+  Only increasing the number (680 → 760) reproduces the same implicit coupling to
+  title-bar arithmetic — the next section or a platform difference silently breaks it again.
+- With `useContentSize: true`, `width`/`height` mean the **content size** (documented
+  Electron behavior on win32/darwin). The measured `scrollHeight` maps 1:1 to the option value
+  — measurement → setting without title-bar conversion per platform.
+  For non-resizable windows this is the usual, documented use case.
+- **workArea capping (verification finding B1):** With `useContentSize`, `height` refers to
+  the content; the total window height is content + title bar (~31 px Win). On small/logically
+  shrunk screens (1366×768 laptop: workArea ≈ 728 px; 1920×1080 @ 150 % scaling: workArea ≈
+  688 px) an uncapped value of ~740 px content (total ~771 px) would stick out at the bottom
+  — exactly the lower sections (Pet/Reset + `#status`) would be outside again. Therefore:
   `height = Math.min(SETTINGS_WINDOW_CONTENT_HEIGHT, screen.getPrimaryDisplay().workAreaSize.height - TITLE_BAR_ALLOWANCE)`
-  mit `TITLE_BAR_ALLOWANCE = 40` (konservativ: Titelleiste ~31 px + Rundungs-/Rahmenpuffer).
-  `workAreaSize` ist logisch (DIP), also direkt mit der Content-Höhe vergleichbar. `screen`
-  ist im Main-Prozess verfügbar. Auf kleinen Screens bleibt das Fenster dann funktional
-  scrollbar (kein Datenverlust), ragt aber nicht aus dem nutzbaren Bereich.
-- macOS wird nicht schlechter: Content-Area ist dann exakt `height` (heute 680−28 = 652 px
-  Viewport) → mit ~740 eindeutig größer; `width: 420` bleibt Content-Breite (macOS hatte
-  faktisch schon 420 px Content, Windows minimal mehr Gesamtbreite — kein Reflow-Risiko,
-  s. §6).
-- Puffer +8 px deckt Rundung bei fraktionalem DPI-Scaling und Font-Metrik-Differenzen
-  (Windows fällt auf Chromium-`sans-serif`/Arial statt `-apple-system` zurück); der
-  Worst-Case-Fill in der Messung deckt den gefüllt-Zustand (Status-Spans + Token-Zeilen +
-  Status) ab — so passt es auch nach dem Connect beider Quellen ohne Scrollbar.
-- Alternative „feste 750–760 ohne useContentSize" verworfen: zwar 1-Zahl-Diff im
-  Bestandsstil (upstream bumpte historisch 480→560→640→680), aber plattformabhängig
-  (Win-Viewport = 750−31 = 719 vs. macOS = 722 — bei Content 730 wieder below the fold
-  unter Windows) und erneut ratend statt messend.
+  with `TITLE_BAR_ALLOWANCE = 40` (conservative: title bar ~31 px + rounding/frame buffer).
+  `workAreaSize` is logical (DIP), so directly comparable to the content height. `screen` is
+  available in the main process. On small screens the window remains functionally scrollable
+  (no data loss), but does not extend beyond the usable area.
+- macOS does not get worse: content area is then exactly `height` (today 680−28 = 652 px
+  viewport) → with ~740 clearly larger; `width: 420` remains content width (macOS effectively
+  already had 420 px content, Windows slightly more total width — no reflow risk, s. §6).
+- The +8 px buffer covers rounding at fractional DPI scaling and font metric differences
+  (Windows falls back to Chromium `sans-serif`/Arial instead of `-apple-system`); the worst-case
+  fill in the measurement covers the filled state (status spans + token lines + status) — so
+  it also fits after connecting both sources without scrollbar.
+- Alternative „fixed 750–760 without useContentSize" rejected: although a 1-number diff in the
+  existing style (upstream historically bumped 480→560→640→680), it is platform-dependent
+  (Win viewport = 750−31 = 719 vs. macOS = 722 — with content 730 again below the fold under
+  Windows) and guessing again instead of measuring.
 
-Breite bleibt 420. `resizable: false` bleibt. Der Kommentar über `height`
-(`settings-window.ts:252-253`) wird auf die Messung + useContentSize-Begründung +
-Kappungslogik aktualisiert.
+Width remains 420. `resizable: false` remains. The comment about `height`
+(`settings-window.ts:252-253`) is updated to the measurement + useContentSize rationale +
+capping logic.
 
-## 4. Änderungsliste pro Datei
+## 4. Change list per file
 
-1. **`src/main/mrr/settings-window.ts`** (~Zeilen 250-264): `useContentSize: true` in die
-   `BrowserWindow`-Optionen; `height: 680` → `Math.min(SETTINGS_WINDOW_CONTENT_HEIGHT,
+1. **`src/main/mrr/settings-window.ts`** (~lines 250-264): `useContentSize: true` into the
+   `BrowserWindow` options; `height: 680` → `Math.min(SETTINGS_WINDOW_CONTENT_HEIGHT,
    screen.getPrimaryDisplay().workAreaSize.height - TITLE_BAR_ALLOWANCE)`;
-   `SETTINGS_WINDOW_CONTENT_HEIGHT` = gemessener Worst-Case + 8 = **713** (war im Plan
-   mit ~735–750 geschätzt; Messung §7) als
-   Konstante mit kurzem Kommentar (Messwert + Datum + Kappungslogik);
-   `TITLE_BAR_ALLOWANCE = 40` (Titelleiste ~31 px Win + Puffer, da `height` mit
-   `useContentSize` nur den Content meint, `workAreaSize` aber die Gesamtfläche);
-   `screen` zum Electron-Import hinzufügen. Keine sonstigen Änderungen (Hardening, Preload,
-   Single-Instance bleiben unberührt).
-2. **`scripts/cdp-screenshot.mjs`**: Flag-Parsing (`--target=`, `--measure`, `outfile === '-'`
-   = kein Screenshot), Target-Auswahl nach Titel/URL, `Runtime.evaluate`-Messblock mit
-   Worst-Case-Fill (inkl. `#claudeStatus`/`#codexStatus`, Nit B5). Bestandsaufrufe bleiben
-   kompatibel.
-3. **`src/main/mrr/settings-window.test.ts`**: bisher **keine** Größen-Assertions (gegreppt:
-   keine Treffer für `height`/`width`/`680`; die Datei testet nur Electron-freie Handler).
-   Neu: Regression-Pin auf die Fensteroptionen:
-   - `vi.mock('electron', …)` mit `app.getAppPath: () => '/app'`, `ipcMain.handle: vi.fn()`,
+   `SETTINGS_WINDOW_CONTENT_HEIGHT` = measured worst-case + 8 = **713** (was estimated in the
+   plan at ~735–750; measurement §7) as a constant with short comment (measurement + date +
+   capping logic); `TITLE_BAR_ALLOWANCE = 40` (title bar ~31 px Win + buffer, because `height`
+   with `useContentSize` only means the content, but `workAreaSize` is the total area); add
+   `screen` to the Electron import. No other changes (hardening, preload, single-instance
+   remain untouched).
+2. **`scripts/cdp-screenshot.mjs`**: flag parsing (`--target=`, `--measure`, `outfile === '-'`
+   = no screenshot), target selection by title/URL, `Runtime.evaluate` measurement block with
+   worst-case fill (incl. `#claudeStatus`/`#codexStatus`, nit B5). Existing calls remain
+   compatible.
+3. **`src/main/mrr/settings-window.test.ts`**: previously **no** size assertions (grepped: no
+   hits for `height`/`width`/`680`; the file only tests Electron-free handlers). New:
+   regression pin on the window options:
+   - `vi.mock('electron', …)` with `app.getAppPath: () => '/app'`, `ipcMain.handle: vi.fn()`,
      `screen: { getPrimaryDisplay: () => ({ workAreaSize: { width: 4000, height: 4000 } }) }`
-     (große workArea → der Pin assertiert die ungeknappte Konstante),
-     **`BrowserWindow: vi.fn().mockImplementation(() => fakeWin)`** (Verifikations-Nit B4:
-     `vi.fn()` allein liefert als Konstruktor ein leeres Objekt, `win.loadFile(...)` würde
-     werfen — daher `mockImplementation` mit Fake-Win); `vi.mock('../hardening', …)` no-op.
-     Sicher für Bestandstests — sie rufen keine Electron-APIs (Kommentar Zeile 1-4 der Datei).
-     Modul-State (`settingsWindow`, `handlersRegistered`, `settings-window.ts:42-43`) ist
-     global — für genau einen neuen Test unkritisch (kein `vi.resetModules()` nötig).
-   - Ein Test: `openSettingsWindow(deps())` mit Fake-Win
-     (`loadFile: vi.fn().mockResolvedValue(undefined)`, `on`, `focus`,
-     `isDestroyed: () => false`, `webContents: {}`) aufrufen und
-     `expect(BrowserWindow).toHaveBeenCalledWith(expect.objectContaining({
+     (large workArea → the pin asserts the uncapped constant),
+     **`BrowserWindow: vi.fn().mockImplementation(() => fakeWin)`** (verification nit B4:
+     `vi.fn()` alone returns an empty object as constructor, `win.loadFile(...)` would throw —
+     therefore `mockImplementation` with fake window); `vi.mock('../hardening', …)` no-op.
+     Safe for existing tests — they do not call any Electron APIs (comment lines 1-4 of the file).
+     Module state (`settingsWindow`, `handlersRegistered`, `settings-window.ts:42-43`) is global —
+     uncritical for exactly one new test (no `vi.resetModules()` needed).
+   - One test: call `openSettingsWindow(deps())` with fake window (`loadFile:
+     vi.fn().mockResolvedValue(undefined)`, `on`, `focus`, `isDestroyed: () => false`,
+     `webContents: {}`) and `expect(BrowserWindow).toHaveBeenCalledWith(expect.objectContaining({
      width: 420, height: 713, useContentSize: true, resizable: false }))`.
-4. **`docs/design-reviews/BL-51-settings.png`** (generiertes Artefakt, Namensmuster wie
-   `BL-9-settings.png`). Empfohlen, aber optional: kurzes `BL-51-verdict.md` mit den
-   gemessenen Zahlen (Vorher/Nachher `METRICS`-Zeilen) — jedes BL-* dort hat eines.
-5. **Flight-Plan (Abschlussschritt, Verifikations-Befund B3):**
-   `.flightplan/Reference/windows-native-flight-plan.md` Item `### 51`: Status auf
-   „Umgesetzt (Runde 2, 2026-07-17) — Verifikation ausstehend" + `Umsetzung:`-Zeile
-   (geänderte Dateien, gemessene Höhe, finale Höhe). Erst nach erfolgreichem Screenshot.
+4. **`docs/design-reviews/BL-51-settings.png`** (generated artifact, naming pattern like
+   `BL-9-settings.png`). Recommended, but optional: short `BL-51-verdict.md` with the measured
+   numbers (before/after `METRICS` lines) — every BL-* there has one.
+5. **Flight-plan (final step, verification finding B3):**
+   `.flightplan/Reference/windows-native-flight-plan.md` Item `### 51`: set status to
+   „Implemented (Round 2, 2026-07-17) — verification pending" + `Implementation:` line
+   (changed files, measured height, final height). Only after successful screenshot.
 
-## 5. Testplan
+## 5. Test plan
 
-- **Unit:** neuer Pin-Test (§4.3) + voller Lauf `npm test` (434 Bestandstests müssen grün
-  bleiben; `openSettingsWindow` wird sonst nirgends in Tests gerufen, `main.ts` unberührt).
-- **Statisch:** `npm run lint`, `npm run typecheck` (cdp-screenshot.mjs ist plain JS und
-  faktisch außerhalb des eslint-Scope — verifiziert an `eslint.config.js`).
-- **Live (Windows, manuell im Umsetzungs-Schritt):**
-  1. Vorher-Messung dokumentiert Overflow (`hasVScroll: true`) → Baseline.
-  2. Nachher-Messung: `hasVScroll: false`, `hasHScroll: false`, `innerH ≥ docScrollH`.
-  3. Screenshot `BL-51-settings.png` visuell geprüft: Reset-Button + Status sichtbar,
-     keine Scrollbar am rechten Rand.
-- **macOS-Nichtregression:** nicht live prüfbar von hier aus — argumentativ abgesichert
-  (Content-Area wächst 652 → ~740 px, Breite unverändert); im Verdict vermerken.
-- **Abschluss:** Flight-Plan-Statusupdate (§4.5) als letzter Schritt.
+- **Unit:** new pin test (§4.3) + full run `npm test` (434 existing tests must stay green;
+  `openSettingsWindow` is otherwise not called anywhere in tests, `main.ts` untouched).
+- **Static:** `npm run lint`, `npm run typecheck` (cdp-screenshot.mjs is plain JS and
+  effectively outside eslint scope — verified against `eslint.config.js`).
+- **Live (Windows, manually during implementation step):**
+  1. Pre-measurement documents overflow (`hasVScroll: true`) → baseline.
+  2. Post-measurement: `hasVScroll: false`, `hasHScroll: false`, `innerH ≥ docScrollH`.
+  3. Screenshot `BL-51-settings.png` visually checked: reset button + status visible,
+     no scrollbar on the right edge.
+- **macOS non-regression:** not live-testable from here — secured by reasoning
+  (content area grows 652 → ~740 px, width unchanged); note in the verdict.
+- **Conclusion:** Flight-plan status update (§4.5) as the last step.
 
-## 6. Risiken / Offenes
+## 6. Risks / open items
 
-- **Reihenfolge zu Item #50** (ändert `settings.html:63` „on this Mac" → neutral, +5 Zeichen
-  im umbrechenden Hint ⇒ ±1 Zeile ≈ ±15 px): **#50 ist bereits gelandet** (verifiziert:
-  `settings.html:63` „usage logs on this computer") — die Messung sieht den finalen
-  Textstand. Ursprüngliche Empfehlung damit erledigt.
-- **Horizontale Scrollbar bei 420 px + 15-px-Scrollbar:** geprüft an `settings.html` —
-  Inputs sind `width:100%` mit `box-sizing: border-box` (Zeile 27-32), `.row` hat
-  `flex-wrap: wrap` (33-38), keine Fixbreiten ⇒ kein Horizontal-Overflow möglich; nach dem
-  Höhen-Fix gibt es ohnehin keine vertikale Scrollbar mehr. Post-fix-Messung assertiert
-  zusätzlich `hasHScroll === false`. Keine CSS-Änderung nötig.
-- **`useContentSize`-Semantikänderung:** betrifft nur dieses eine Fenster; Overlay-Fenster
-  unberührt. Bekannte Electron-Ungenauigkeiten betreffen v. a. exotische Linux-WMs — für
-  die Zielplattformen win32/darwin kein Thema; Restrisiko im Verdict notieren.
-- **DPI-Rundung:** bei 125/150 %-Scaling kann die Content-Höhe um <1 px gerundet werden;
-  der +8-Puffer absorbiert das. Wer will, misst zusätzlich bei 150 % Scaling nach (optional).
-- **Kleine Screens / hohe DPI-Skalierung (B1):** auf Screens mit workArea < Content + 40 px
-  (z. B. 768-px-Laptops, 1080p @ 150 %) greift die Kappung aus §3 — das Fenster bleibt dann
-  innerhalb der workArea, der Inhalt ist funktional scrollbar. „Alles ohne Scrollen
-  sichtbar" ist auf solchen Screens physikalisch unerfüllbar; akzeptiertes Restrisiko.
-- **Windows-Textskalierung >100 % (B2, akzeptiertes Restrisiko):** „Text größer machen"
-  (Accessibility) skaliert die Renderer-Fonts und erhöht die Content-Höhe unabhängig von
-  DPI; der +8-px-Puffer deckt das nicht, und jede feste Höhe kann dagegen nicht robust sein
-  (nur Laufzeit-Messung). Folge: bei aktiver Textskalierung kann wieder eine Scrollbar
-  erscheinen — funktional ohne Datenverlust. Im Rahmen dieses Items akzeptiert.
-- **Screenshot-Ziel:** `Page.captureScreenshot` liefert nur den Viewport des Fensters
-  (kein OS-Chrome) — für den „kein Overflow"-Beweis genau richtig; ein Fenster-mit-
-  Titelleiste-Beweis wäre ein OS-Screenshot und ist nicht Teil dieses Plans.
+- **Order relative to Item #50** (changes `settings.html:63` „on this Mac" → neutral, +5
+  characters in the wrapping hint ⇒ ±1 line ≈ ±15 px): **#50 has already landed** (verified:
+  `settings.html:63` „usage logs on this computer") — the measurement sees the final text
+  state. Original recommendation thus done.
+- **Horizontal scrollbar at 420 px + 15-px scrollbar:** checked on `settings.html` — inputs
+  are `width:100%` with `box-sizing: border-box` (lines 27-32), `.row` has `flex-wrap: wrap`
+  (33-38), no fixed widths ⇒ no horizontal overflow possible; after the height fix there is no
+  vertical scrollbar anyway. Post-fix measurement additionally asserts `hasHScroll === false`.
+  No CSS change needed.
+- **`useContentSize` semantics change:** only affects this one window; overlay window untouched.
+  Known Electron inaccuracies mainly affect exotic Linux WMs — no issue for target platforms
+  win32/darwin; note residual risk in the verdict.
+- **DPI rounding:** at 125/150 % scaling the content height may round by <1 px; the +8 buffer
+  absorbs it. Whoever wants can additionally measure at 150 % scaling (optional).
+- **Small screens / high DPI scaling (B1):** on screens with workArea < content + 40 px (e.g.
+  768 px laptops, 1080p @ 150 %) the capping from §3 applies — the window then stays within
+  the workArea, the content is functionally scrollable. „Everything visible without scrolling"
+  is physically impossible on such screens; accepted residual risk.
+- **Windows text scaling >100 % (B2, accepted residual risk):** „Make text bigger"
+  (accessibility) scales the renderer fonts and increases the content height independently of
+  DPI; the +8 px buffer does not cover that, and no fixed height can be robust against it (only
+  runtime measurement). Result: with active text scaling a scrollbar may appear again —
+  functional without data loss. Accepted within the scope of this item.
+- **Screenshot target:** `Page.captureScreenshot` only delivers the window viewport (no OS
+  chrome) — exactly right for the „no overflow" proof; a window-with-title-bar proof would be
+  an OS screenshot and is not part of this plan.
 
-## 7. Umsetzungs-Ergebnis (Runde 2, 2026-07-17, Windows)
+## 7. Implementation result (Round 2, 2026-07-17, Windows)
 
-**Vorher-Messung** (Bestand 420×680, kein `useContentSize`), Worst-Case-Fill aktiv:
+**Pre-measurement** (current state 420×680, no `useContentSize`), worst-case fill active:
 `METRICS {"bodyScrollH":673,"docScrollH":705,"innerH":619,"innerW":407,"docScrollW":392,"hasVScroll":true,"hasHScroll":false}`
-→ Overflow bestätigt (Content 705 > Viewport 619). **H = 705** (`docScrollH`).
+→ Overflow confirmed (content 705 > viewport 619). **H = 705** (`docScrollH`).
 
-**Gesetzte Höhe:** `SETTINGS_WINDOW_CONTENT_HEIGHT = 713` (= ⌈705⌉ + 8), mit
-`useContentSize: true` und Kappung `min(713, screen.getPrimaryDisplay().workAreaSize.height - 40)`
-(`TITLE_BAR_ALLOWANCE = 40`, da `height` mit `useContentSize` nur den Content meint,
-`workAreaSize` aber die Gesamtfläche inkl. Titelleiste ~31 px).
+**Set height:** `SETTINGS_WINDOW_CONTENT_HEIGHT = 713` (= ⌈705⌉ + 8), with
+`useContentSize: true` and capping `min(713, screen.getPrimaryDisplay().workAreaSize.height - 40)`
+(`TITLE_BAR_ALLOWANCE = 40`, because `height` with `useContentSize` only means the content,
+`workAreaSize` is the total area incl. title bar ~31 px).
 
-**Nachher-Messung** (gleiche Maschine, gleicher Worst-Case-Fill):
+**Post-measurement** (same machine, same worst-case fill):
 `METRICS {"bodyScrollH":673,"docScrollH":740,"innerH":740,"innerW":426,"docScrollW":426,"hasVScroll":false,"hasHScroll":false}`
-→ `hasVScroll: false`, `hasHScroll: false` — Akzeptanzkriterium 3 erfüllt. Hinweise zur
-Interpretation: `docScrollH == innerH`, weil `documentElement.scrollHeight` bei passendem
-Content auf die Viewport-Höhe geklemmt wird; der reale Content ist unverändert 705
-(`bodyScrollH` 673 + 2×16 px body-Margin). Beobachtete Electron/win32-Ungenauigkeit:
-Viewport wurde 740×426 statt exakt 713×420 (≈ +27 px Höhe, +6 px Breite — DWM-/Frame-
-Rundung unter Windows 11) — gutartig (Fenster minimal größer statt kleiner), macOS-
-Aussage unverändert (Content-Area ≥ 713 > 652 heute).
+→ `hasVScroll: false`, `hasHScroll: false` — acceptance criterion 3 fulfilled. Notes on
+interpretation: `docScrollH == innerH` because `documentElement.scrollHeight` is clamped to the
+viewport height when content fits; the real content is unchanged 705 (`bodyScrollH` 673 +
+2×16 px body margin). Observed Electron/win32 inaccuracy: viewport was 740×426 instead of
+exactly 713×420 (≈ +27 px height, +6 px width — DWM/frame rounding under Windows 11) — benign
+(window slightly larger rather than smaller), macOS statement unchanged (content area ≥ 713 >
+652 today).
 
-**Screenshot:** `docs/design-reviews/BL-51-settings.png` — alle 5 Fieldsets (Connect,
-Stripe, RevenueCat, Growth source, Pet inkl. Reset-Button) plus Statuszeilen-Bereich
-sichtbar, keine Scrollbar. Visuell geprüft 2026-07-17.
+**Screenshot:** `docs/design-reviews/BL-51-settings.png` — all 5 fieldsets (Connect, Stripe,
+RevenueCat, Growth source, Pet incl. reset button) plus status line area visible, no scrollbar.
+Visually checked 2026-07-17.
 
-**Tests:** 435 passed, 6 skipped (434 Baseline + 1 Pin-Test); typecheck, lint, build grün.
+**Tests:** 435 passed, 6 skipped (434 baseline + 1 pin test); typecheck, lint, build green.
 
-**Restrisiken (akzeptiert):** Windows-Textskalierung >100 % (B2) und workArea-Kappung auf
-sehr kleinen Screens (B1, Fenster bleibt dort scrollbar, kein Datenverlust); `useContentSize`-
-Ungenauigkeiten auf exotischen Linux-WMs (kein Target).
+**Residual risks (accepted):** Windows text scaling >100 % (B2) and workArea capping on very
+small screens (B1, window remains scrollable there, no data loss); `useContentSize` inaccuracies
+on exotic Linux WMs (not a target).

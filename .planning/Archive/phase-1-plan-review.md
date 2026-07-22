@@ -1,101 +1,101 @@
-# Kritisches Review: Phase-1-Plan (Foundation)
+# Critical Review: Phase 1 Plan (Foundation)
 
-**Geprüfte Dateien:**
-- `.flightplan/Archive/WINDOWS_PORT_PLAN.md` (Hauptplan)
-- `.flightplan/Archive/phase-1-plan.md` (zu prüfender Plan)
+**Reviewed Files:**
+- `.flightplan/Archive/WINDOWS_PORT_PLAN.md` (main plan)
+- `.flightplan/Archive/phase-1-plan.md` (plan under review)
 - `package.json`
 - `electron-builder.yml`
 - `.github/workflows/ci.yml`
-- `assets/` (inkl. `assets/STYLE.md`)
+- `assets/` (incl. `assets/STYLE.md`)
 - `scripts/`
 
-**Review-Datum:** 2026-07-15
+**Review Date:** 2026-07-15
 
 ---
 
-## 1. Zusammenfassung des geprüften Plans
+## 1. Summary of the Reviewed Plan
 
-Der Phase-1-Plan deckt die drei Foundation-Build-Items ab: plattformunabhängiges Build-Skript (BL-WIN-1), Windows-Packaging inkl. Icon-Assets (BL-WIN-2) und CI-Erweiterung auf `windows-latest` (BL-WIN-9). Die Reihenfolge ist logisch, die Akzeptanzkriterien sind größtenteils messbar, und der Plan verzichtet bewusst auf neue Dependencies sowie auf Änderungen an der App-Logik. Insgesamt ist der Plan umsetzbar, enthält aber mehrere Lücken, Inkonsistenzen zum Hauptplan und Windows-spezifische Fallstricke, die noch nicht ausreichend adressiert sind.
-
----
-
-## 2. Gefundene Probleme / Lücken / Fehler
-
-| # | Thema | Schweregrad | Beschreibung |
-|---|-------|-------------|--------------|
-| 1 | **Inkonsistenz: BL-WIN-9 hängt laut Hauptplan von BL-WIN-5 ab** | Mittel | `WINDOWS_PORT_PLAN.md` (Abschnitt 4, Zeile 236) listet als Abhängigkeit für BL-WIN-9: BL-WIN-1, BL-WIN-2, BL-WIN-5. BL-WIN-5 ist aber Phase-3 („Windows Integrations“). Der Phase-1-Plan erkennt dies an (Abschnitt 2.9) und sagt, CI müsse trotzdem grün werden, ohne BL-WIN-5 umzusetzen. Das ist die richtige Lesart, aber der Hauptplan ist hier nicht konsistent. |
-| 2 | **Node-Version-Diskrepanz wird nicht operativ behandelt** | Mittel | Projekt verlangt Node 24.x (`package.json:8`), lokale Umgebung läuft auf 22.x. Der Plan erwähnt das als Risiko, gibt aber keine konkrete Handlungsanweisung für Phase 1 (z. B. ob Phase 1 CI-getrieben entwickelt wird, ob `engines.node` vorübergehend gelockert werden soll, oder ob ein Node-Manager-Wechsel empfohlen wird). |
-| 3 | **Skalierung des Sprite-Assets auf 256×256 für `.ico` ist problematisch** | Mittel | Die vorhandenen Beaver-Sprites sind 96×96 px (`assets/STYLE.md:41`). Eine Skalierung auf 256×256 ist kein Integer-Multiple (96 × 2,666…). Bei nearest-neighbor entsteht ein verzerrtes, unscharfes Icon. Der Plan schlägt 256×256 vor, ohne auf das Padding/Canvas-Problem einzugehen. Besser: 2× auf 192×192 skalieren und in 256×256-Canvas mit transparentem Rand zentrieren. |
-| 4 | **NSIS-/Portable-Ausgabenamen sind zu spezifisch formuliert** | Niedrig | Der Plan behauptet, `electron-builder --win` erzeuge exakt `Beaver Buddy Setup.exe` und `Beaver Buddy.exe`. Tatsächlich hängen die Dateinamen von `productName`, Version und electron-builder-Defaults ab; portable heißt oft `${productName} ${version}.exe` oder ähnlich. Das führt zu falschen Erwartungen im Smoke-Test. |
-| 5 | **Fehlende Prüfung von `src/renderer/tsconfig.json` / `outDir`** | Mittel | BL-WIN-1 setzt voraus, dass `tsc -p src/renderer/tsconfig.json` die Dateien nach `dist/renderer/` ausgibt. Der Plan prüft die `tsconfig.json` nicht. Falls `outDir` fehlt oder anders konfiguriert ist, schlägt `fs.cpSync` nach `dist/renderer/...` fehl. |
-| 6 | **Kein Hinweis auf Windows-Pfadlängen-Limit** | Niedrig-Mittel | Bei `node_modules`-verschachtelten Projekten kann das 260-Zeichen-Limit auf Windows zu Build-/Packaging-Fehlern führen. Der Plan erwähnt diesen klassischen Windows-Fallstrick nicht. |
-| 7 | **Antivirus/Defender kann Build und Installer blockieren** | Niedrig-Mittel | SmartScreen wird erwähnt, nicht aber, dass Windows Defender (oder andere AV) den unsignierten Installer oder sogar die portable `.exe` in CI/lokal quarantänisieren kann. Das kann Smoke-Tests blockieren. |
-| 8 | **`tray-icon.png` in Phase 1 ist out-of-scope für BL-WIN-2** | Niedrig | Der Plan will `assets/tray-icon.png` bereits in BL-WIN-2 erzeugen, obwohl es erst in BL-WIN-4 (Tray-Adapter) verwendet wird. Das ist nicht falsch, aber es verschleiert, dass BL-WIN-2 eigentlich nur `assets/icon.ico` braucht. |
-| 9 | **Verwechslungsgefahr zwischen Build-Scripts** | Niedrig | Es existiert bereits `scripts/gen-sprites/build.ts` (aufgerufen via `npm run assets:build`). Das neue `scripts/build-assets.js` hat einen ähnlich klingenden Namen. Das ist nicht blockierend, aber dokumentationswürdig. |
-| 10 | **Akzeptanzkriterium „Icon wird korrekt angezeigt“ ist nicht automatisierbar** | Niedrig | BL-WIN-2 fordert, das Icon werde „im Installer, im Explorer und im Task-Manager korrekt angezeigt“. Das ist ein manueller visueller Test. Der Plan sollte kennzeichnen, dass dies ein manuelles Smoke-Test-Kriterium ist. |
-| 11 | **Keine Angabe zu `nsis.installerIcon` / Uninstaller-Icon** | Niedrig | Für einen vollständigen Windows-Installer-Eindruck sollte geprüft werden, ob `nsis.installerIcon` und ggf. `nsis.uninstallerIcon` gesetzt werden. Der Plan reduziert das auf `win.icon`, was für App/Explorer reicht, aber den Installer-Dialog selbst nicht zwingend styled. |
-| 12 | **Fehlende Fallback-Strategie, wenn Tests auf Windows rot laufen** | Mittel | Der Plan sagt, man solle „vor Merge prüfen“ und ggf. Testfixes in Phase 1 oder Phase 3 einplanen. Das ist reaktiv. Für einen sauberen Phase-1-Abschluss sollte vor der CI-Erweiterung ein Testlauf auf Windows geplant oder zumindest eine klare Eskalationsregel definiert werden. |
-| 13 | **`description` in `package.json` bleibt macOS-only** | Niedrig | `package.json:5` lautet noch „Pixel-art desktop beaver overlay for macOS“. Der Plan markiert die Aktualisierung als optional, aber diese Description kann in Windows-Installer/Explorer sichtbar werden und sollte daher spätestens in BL-WIN-2 angepasst werden. |
-| 14 | **Keine Klärung, wie mit `assets:build` interagiert wird** | Niedrig | `npm run build` kopiert nur bestehende `assets/sprites/*.png`. Falls `assets/sprites` vor dem Build via `npm run assets:build` neu generiert werden muss, ist das nicht Teil von BL-WIN-1. Der Plan geht davon aus, dass `assets/sprites` bereits committed sind, was aktuell stimmt. |
+The Phase 1 plan covers the three Foundation build items: a platform-independent build script (BL-WIN-1), Windows packaging incl. icon assets (BL-WIN-2), and the CI extension to `windows-latest` (BL-WIN-9). The order is logical, the acceptance criteria are mostly measurable, and the plan deliberately avoids new dependencies as well as changes to the app logic. Overall the plan is implementable, but it contains several gaps, inconsistencies with the main plan, and Windows-specific pitfalls that are not yet sufficiently addressed.
 
 ---
 
-## 3. Konkrete Verbesserungsvorschläge
+## 2. Found Problems / Gaps / Errors
 
-### 3.1 Hauptplan-Abhängigkeit korrigieren
-In `WINDOWS_PORT_PLAN.md` Abschnitt 4 (Build-Items) sollte die Abhängigkeit von BL-WIN-9 auf BL-WIN-5 entfernt werden. Richtig ist:
+| # | Topic | Severity | Description |
+|---|-------|----------|-------------|
+| 1 | **Inconsistency: according to the main plan, BL-WIN-9 depends on BL-WIN-5** | Medium | `WINDOWS_PORT_PLAN.md` (section 4, line 236) lists as dependencies for BL-WIN-9: BL-WIN-1, BL-WIN-2, BL-WIN-5. But BL-WIN-5 is Phase 3 ("Windows Integrations"). The Phase 1 plan acknowledges this (section 2.9) and says CI must still go green without implementing BL-WIN-5. That is the right reading, but the main plan is inconsistent here. |
+| 2 | **Node version discrepancy is not addressed operationally** | Medium | The project requires Node 24.x (`package.json:8`); the local environment runs 22.x. The plan mentions this as a risk but gives no concrete instruction for Phase 1 (e.g. whether Phase 1 is developed CI-driven, whether `engines.node` should be temporarily relaxed, or whether a Node manager switch is recommended). |
+| 3 | **Scaling the sprite asset to 256×256 for `.ico` is problematic** | Medium | The existing beaver sprites are 96×96 px (`assets/STYLE.md:41`). Scaling to 256×256 is not an integer multiple (96 × 2.666…). With nearest-neighbor this produces a distorted, blurry icon. The plan proposes 256×256 without addressing the padding/canvas problem. Better: scale 2× to 192×192 and center on a 256×256 canvas with a transparent border. |
+| 4 | **NSIS/portable output names are phrased too specifically** | Low | The plan claims `electron-builder --win` produces exactly `Beaver Buddy Setup.exe` and `Beaver Buddy.exe`. In reality the file names depend on `productName`, version, and electron-builder defaults; portable is often `${productName} ${version}.exe` or similar. This creates wrong expectations in the smoke test. |
+| 5 | **Missing check of `src/renderer/tsconfig.json` / `outDir`** | Medium | BL-WIN-1 assumes that `tsc -p src/renderer/tsconfig.json` outputs files to `dist/renderer/`. The plan does not check the `tsconfig.json`. If `outDir` is missing or configured differently, `fs.cpSync` to `dist/renderer/...` fails. |
+| 6 | **No mention of the Windows path-length limit** | Low-Medium | In projects with nested `node_modules`, the 260-character limit on Windows can cause build/packaging errors. The plan does not mention this classic Windows pitfall. |
+| 7 | **Antivirus/Defender can block the build and installer** | Low-Medium | SmartScreen is mentioned, but not that Windows Defender (or other AV) can quarantine the unsigned installer or even the portable `.exe` in CI/locally. This can block smoke tests. |
+| 8 | **`tray-icon.png` in Phase 1 is out of scope for BL-WIN-2** | Low | The plan wants to produce `assets/tray-icon.png` already in BL-WIN-2, even though it is only used in BL-WIN-4 (tray adapter). That is not wrong, but it obscures that BL-WIN-2 actually only needs `assets/icon.ico`. |
+| 9 | **Risk of confusion between build scripts** | Low | `scripts/gen-sprites/build.ts` already exists (invoked via `npm run assets:build`). The new `scripts/build-assets.js` has a similar-sounding name. Not blocking, but worth documenting. |
+| 10 | **Acceptance criterion "icon is displayed correctly" is not automatable** | Low | BL-WIN-2 requires the icon to be "displayed correctly in the installer, in Explorer, and in Task Manager". That is a manual visual test. The plan should mark this as a manual smoke-test criterion. |
+| 11 | **No statement on `nsis.installerIcon` / uninstaller icon** | Low | For a complete Windows installer impression, it should be checked whether `nsis.installerIcon` and possibly `nsis.uninstallerIcon` are set. The plan reduces this to `win.icon`, which suffices for the app/Explorer but does not necessarily style the installer dialog itself. |
+| 12 | **Missing fallback strategy if tests run red on Windows** | Medium | The plan says to "check before merge" and possibly schedule test fixes in Phase 1 or Phase 3. That is reactive. For a clean Phase 1 completion, a test run on Windows should be planned before the CI extension, or at least a clear escalation rule defined. |
+| 13 | **`description` in `package.json` remains macOS-only** | Low | `package.json:5` still reads "Pixel-art desktop beaver overlay for macOS". The plan marks the update as optional, but this description can become visible in the Windows installer/Explorer and should therefore be adjusted at the latest in BL-WIN-2. |
+| 14 | **No clarification on how `assets:build` is interacted with** | Low | `npm run build` only copies existing `assets/sprites/*.png`. If `assets/sprites` must be regenerated before the build via `npm run assets:build`, that is not part of BL-WIN-1. The plan assumes `assets/sprites` are already committed, which is currently true. |
+
+---
+
+## 3. Concrete Improvement Suggestions
+
+### 3.1 Correct the Main Plan Dependency
+In `WINDOWS_PORT_PLAN.md` section 4 (build items), the dependency of BL-WIN-9 on BL-WIN-5 should be removed. Correct is:
 
 ```text
 BL-WIN-9: CI-Windows-Runner
 Abhängigkeiten: BL-WIN-1, BL-WIN-2
 ```
 
-BL-WIN-5 ist Phase-3 und darf keine Phase-1-Abhängigkeit sein.
+BL-WIN-5 is Phase 3 and must not be a Phase 1 dependency.
 
-### 3.2 Node-Version-Diskrepanz konkret behandeln
-Im Phase-1-Plan Abschnitt 5 (Risiken) ergänzen:
+### 3.2 Address the Node Version Discrepancy Concretely
+Add to the Phase 1 plan, section 5 (risks):
 
-> Für Phase 1 gilt: Die CI läuft explizit mit Node 24.x. Lokale Entwicklung auf Node 22.x ist akzeptabel, solange `npm run build` und `npx electron-builder --win` damit funktionieren. Falls `engines.node: "24.x"` ein `npm ci`-Fehler verursacht, kann vorübergehend `engines.node: ">=22.x <=24.x"` oder `.npmrc` mit `engine-strict=false` verwendet werden — dies muss aber in einem separaten ADR/Commit dokumentiert werden.
+> For Phase 1 the following applies: CI runs explicitly with Node 24.x. Local development on Node 22.x is acceptable as long as `npm run build` and `npx electron-builder --win` work with it. If `engines.node: "24.x"` causes an `npm ci` error, `engines.node: ">=22.x <=24.x"` or `.npmrc` with `engine-strict=false` can be used temporarily — but this must be documented in a separate ADR/commit.
 
-### 3.3 Icon-Generierungsanleitung präzisieren
-In BL-WIN-2, Abschnitt 2.7:
+### 3.3 Clarify the Icon Generation Instructions
+In BL-WIN-2, section 2.7:
 
-- Statt „Skaliere auf 256×256 px“ sollte stehen:
-  - Wähle ein 96×96-Quellsprite.
-  - Skaliere mit nearest-neighbor auf 192×192 px (exakt 2×).
-  - Platziere das 192×192-Bild in einem 256×256-Canvas mit transparentem Rand (z. B. zentriert unten).
-  - Exportiere als `.ico` mit den Auflösungen 16, 32, 48, 128, 256 px, wobei die 256×256-Version das gepaddete Bild enthält.
-  - Für `tray-icon.png` (32×32) ebenfalls 2×-Skalierung auf 192×192 und Downsample auf 32×32 mit nearest-neighbor.
+- Instead of "scale to 256×256 px" it should say:
+  - Choose a 96×96 source sprite.
+  - Scale to 192×192 px with nearest-neighbor (exactly 2×).
+  - Place the 192×192 image on a 256×256 canvas with a transparent border (e.g. centered at the bottom).
+  - Export as `.ico` with the resolutions 16, 32, 48, 128, 256 px, where the 256×256 version contains the padded image.
+  - For `tray-icon.png` (32×32), likewise 2× scaling to 192×192 and downsampling to 32×32 with nearest-neighbor.
 
-Alternativ: Icon-Generierung in Phase 1 als „funktional, nicht visuell final“ markieren und BL-WIN-10 als Design-Gate verbindlich machen.
+Alternatively: mark icon generation in Phase 1 as "functional, not visually final" and make BL-WIN-10 a binding design gate.
 
-### 3.4 Ausgabenamen in Akzeptanzkriterien relativieren
-In BL-WIN-2, Abschnitt 2.8:
+### 3.4 Relativize Output Names in Acceptance Criteria
+In BL-WIN-2, section 2.8:
 
-> Statt exakter Dateinamen prüfen:
-> - Im `release/`-Verzeichnis existiert **ein** `*.exe`-Installer (NSIS) und **eine** portable `*.exe`.
-> - Optional: Dateinamen via `artifactName` in `electron-builder.yml` festlegen, z. B. `${productName}-${version}-Setup.${ext}` und `${productName}-${version}-Portable.${ext}`.
+> Instead of checking exact file names:
+> - In the `release/` directory there exists **one** `*.exe` installer (NSIS) and **one** portable `*.exe`.
+> - Optionally: fix file names via `artifactName` in `electron-builder.yml`, e.g. `${productName}-${version}-Setup.${ext}` and `${productName}-${version}-Portable.${ext}`.
 
-### 3.5 `src/renderer/tsconfig.json` vor BL-WIN-1 prüfen
-Empfohlene Voraussetzung für BL-WIN-1:
+### 3.5 Check `src/renderer/tsconfig.json` Before BL-WIN-1
+Recommended prerequisite for BL-WIN-1:
 
 ```bash
 npx tsc -p src/renderer/tsconfig.json --showConfig | grep outDir
 ```
 
-Falls `outDir` nicht `dist/renderer` ist, muss `scripts/build-assets.js` angepasst oder die `tsconfig.json` korrigiert werden.
+If `outDir` is not `dist/renderer`, `scripts/build-assets.js` must be adjusted or the `tsconfig.json` corrected.
 
-### 3.6 Windows-Fallstricke ergänzen
-In Abschnitt 5 (Risiken) hinzufügen:
+### 3.6 Add Windows Pitfalls
+Add to section 5 (risks):
 
-| Risiko | Auswirkung | Mitigation |
-|--------|------------|------------|
-| Windows-Pfadlängen-Limit (260 Zeichen) | `node_modules` oder `release/`-Pfade werden abgeschnitten. | In CI `LongPathsEnabled` prüfen; lokal ggf. `\\?\`-Präfix oder kürzere Pfade verwenden. |
-| Antivirus/Windows Defender blockiert unsignierte `.exe` | Smoke-Test oder CI-Artifact-Download schlägt fehl. | Ausnahme für `release/`-Ordner; Artefakte als ZIP packen, falls nötig. |
-| `tsc`-Ausgabe-Pfade nicht wie erwartet | `build-assets.js` kopiert in nicht existierende `dist/`-Pfade. | `tsconfig.json` vorab validieren (siehe 3.5). |
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Windows path-length limit (260 characters) | `node_modules` or `release/` paths get truncated. | Check `LongPathsEnabled` in CI; locally use the `\\?\` prefix or shorter paths if needed. |
+| Antivirus/Windows Defender blocks unsigned `.exe` | Smoke test or CI artifact download fails. | Exception for the `release/` folder; pack artifacts as ZIP if needed. |
+| `tsc` output paths not as expected | `build-assets.js` copies into non-existent `dist/` paths. | Validate `tsconfig.json` beforehand (see 3.5). |
 
-### 3.7 Installer-Icon separat konfigurieren
-In `electron-builder.yml` ergänzen:
+### 3.7 Configure the Installer Icon Separately
+Add to `electron-builder.yml`:
 
 ```yaml
 win:
@@ -109,37 +109,37 @@ nsis:
   uninstallerIcon: assets/icon.ico
 ```
 
-Das verbessert den visuellen Eindruck im Setup-Dialog.
+This improves the visual impression in the setup dialog.
 
-### 3.8 `description` in `package.json` anpassen
-In BL-WIN-1 oder BL-WIN-2:
+### 3.8 Adjust `description` in `package.json`
+In BL-WIN-1 or BL-WIN-2:
 
 ```json
 "description": "Pixel-art desktop beaver overlay for macOS and Windows"
 ```
 
-### 3.9 Testlauf auf Windows vor CI-Matrix-Erweiterung
-Vor BL-WIN-9 sollte explizit ein Schritt „Test-Plattformneutralität prüfen“ eingeführt werden:
+### 3.9 Test Run on Windows Before the CI Matrix Extension
+Before BL-WIN-9, an explicit step "check test platform neutrality" should be introduced:
 
-> Bevor `windows-latest` zur Matrix hinzugefügt wird, `npm test` lokal auf Windows (oder in einem temporären Windows-Runner) ausführen. Falls Tests rot sind, entweder minimal plattformneutral machen oder dokumentieren, warum sie vorerst auf Windows ausgeschlossen werden.
-
----
-
-## 4. GO / NO-GO Empfehlung
-
-**Empfehlung: GO — mit Vorbedingungen.**
-
-Der Plan ist grundsätzlich solide und umsetzbar. Die drei Build-Items sind sinnvoll gereiht, die Akzeptanzkriterien sind überwiegend messbar, und der Verzicht auf neue Dependencies sowie App-Logik-Änderungen ist richtig. Allerdings sollten die oben genannten Lücken (insbesondere die Hauptplan-Inkonsistenz bei BL-WIN-9, die Node-Version-Diskrepanz und die Icon-Skalierung) vor oder parallel zur Umsetzung behoben werden.
+> Before `windows-latest` is added to the matrix, run `npm test` locally on Windows (or in a temporary Windows runner). If tests are red, either make them minimally platform-neutral or document why they are excluded on Windows for now.
 
 ---
 
-## 5. Wichtige Hinweise für den Implementierungs-Agenten
+## 4. GO / NO-GO Recommendation
 
-1. **Reihenfolge strikt einhalten:** BL-WIN-1 muss vor BL-WIN-2 laufen, BL-WIN-2 vor BL-WIN-9. Lokale Windows-Verifikation Schritt für Schritt durchführen.
-2. **`src/renderer/tsconfig.json` vorab prüfen:** Stelle sicher, dass `tsc -p src/renderer/tsconfig.json` die Dateien wirklich nach `dist/renderer/` schreibt, bevor `scripts/build-assets.js` kopiert.
-3. **Icon-Generierung nicht übersehen:** `assets/icon.ico` und `assets/tray-icon.png` existieren noch nicht. Für Phase 1 reicht eine funktionale Zwischenlösung aus Sprite-Assets, aber die Skalierung muss integer (z. B. 96→192 in 256-Canvas) oder visuell geprüft werden.
-4. **Node-Version beachten:** Lokale Umgebung hat Node 22.x, Projekt verlangt 24.x. CI läuft mit 24.x — nutze CI als Quelle der Wahrheit für Phase 1.
-5. **Tests auf Windows vor CI-Erweiterung laufen lassen:** Falls `npm test` auf Windows fehlschlägt, nicht einfach die CI-Matrix auf Windows erweitern. Entscheide: minimal fixen oder Testausschluss dokumentieren.
-6. **Windows-Fallstricke im Hinterkopf behalten:** Pfadlängen, Defender/AV, SmartScreen. Bei Problemen Artefakte als ZIP hochladen oder Ausnahmen konfigurieren.
-7. **Keine Source-Dateien anfassen:** Phase 1 beschränkt sich auf `package.json`, `scripts/build-assets.js`, `electron-builder.yml`, `assets/*` und `.github/workflows/ci.yml`.
-8. **Dokumentation nachziehen:** README/PRD/CLAUDE werden in BL-WIN-10 final angepasst, aber `assets/STYLE.md` sollte spätestens mit den neuen Icons einen Hinweis auf temporäre Windows-Icons erhalten.
+**Recommendation: GO — with preconditions.**
+
+The plan is fundamentally solid and implementable. The three build items are sensibly ordered, the acceptance criteria are predominantly measurable, and avoiding new dependencies as well as app-logic changes is correct. However, the gaps mentioned above (in particular the main-plan inconsistency for BL-WIN-9, the Node version discrepancy, and the icon scaling) should be fixed before or in parallel with implementation.
+
+---
+
+## 5. Important Notes for the Implementation Agent
+
+1. **Strictly follow the order:** BL-WIN-1 must run before BL-WIN-2, BL-WIN-2 before BL-WIN-9. Do the local Windows verification step by step.
+2. **Check `src/renderer/tsconfig.json` beforehand:** Make sure `tsc -p src/renderer/tsconfig.json` actually writes the files to `dist/renderer/` before `scripts/build-assets.js` copies.
+3. **Don't overlook icon generation:** `assets/icon.ico` and `assets/tray-icon.png` do not exist yet. For Phase 1, a functional interim solution from sprite assets suffices, but the scaling must be integer (e.g. 96→192 on a 256 canvas) or visually checked.
+4. **Mind the Node version:** The local environment has Node 22.x; the project requires 24.x. CI runs with 24.x — use CI as the source of truth for Phase 1.
+5. **Run tests on Windows before the CI extension:** If `npm test` fails on Windows, do not simply extend the CI matrix to Windows. Decide: fix minimally or document a test exclusion.
+6. **Keep Windows pitfalls in mind:** path lengths, Defender/AV, SmartScreen. If problems occur, upload artifacts as ZIP or configure exceptions.
+7. **Don't touch source files:** Phase 1 is limited to `package.json`, `scripts/build-assets.js`, `electron-builder.yml`, `assets/*`, and `.github/workflows/ci.yml`.
+8. **Follow up on documentation:** README/PRD/CLAUDE are finalized in BL-WIN-10, but `assets/STYLE.md` should receive a note about temporary Windows icons at the latest when the new icons are added.

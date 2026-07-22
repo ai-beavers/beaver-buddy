@@ -49,7 +49,7 @@ The remaining warnings are all known, documented limitations that the implementa
 | Design-gate verdict exists | ✅ | `docs/design-reviews/phase-4-windows/verdict.md` exists and evaluates app icon, tray icon, HiDPI rendering, overlay bounds, auto-hide taskbar, and consistency. |
 | Verdict is sensible | ✅ | Overall verdict is **CONDITIONAL PASS**, matching the provisional icon assets and documented auto-hide limitation. |
 | Screenshots captured | ❌ | The `docs/design-reviews/phase-4-windows/` directory contains only `verdict.md`; no screenshots are present. The verdict explicitly notes this and states they should be added when Windows hardware is available. |
-| WINDOWS_PORT_PLAN.md updated | ✅ | Phase 4 is marked complete; BL-WIN-8 and BL-WIN-10 are detailed; "Finales Master-Icon / Design-Pass" is added to Phase 5 / deferred tasks. |
+| WINDOWS_PORT_PLAN.md updated | ✅ | Phase 4 is marked complete; BL-WIN-8 and BL-WIN-10 are detailed; "Final Master Icon / Design Pass" is added to Phase 5 / deferred tasks. |
 
 ---
 
@@ -96,7 +96,7 @@ All commands were executed locally on Windows.
 | **Review #4:** Regression test for `bounds()` and clear | ✅ Added | `src/renderer/renderer.test.ts`. |
 | **Review #5:** Document non-integer DPR unevenness | ✅ Documented | README, verdict, implementation log. |
 | **Review #6:** Auto-hide in design gate | ✅ Included | Verdict evaluates auto-hide taskbar as CONDITIONAL PASS. |
-| **Review #7:** Icon debt as explicit follow-up | ✅ Added | `WINDOWS_PORT_PLAN.md` Phase 5 lists "Finales Master-Icon / Design-Pass". |
+| **Review #7:** Icon debt as explicit follow-up | ✅ Added | `WINDOWS_PORT_PLAN.md` Phase 5 lists "Final Master Icon / Design Pass". |
 
 ---
 

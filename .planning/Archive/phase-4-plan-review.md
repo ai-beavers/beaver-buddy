@@ -1,62 +1,62 @@
 # Phase-4-Plan Review — Beaver Buddy Windows Port
 
-**Geprüft:** `.flightplan/Archive/phase-4-plan.md` (BL-WIN-8, BL-WIN-10)  
-**Gegen Referenzen:** `WINDOWS_PORT_PLAN.md` (Phase-4-Abschnitt), `src/renderer/renderer.ts`, `src/renderer/sprites.ts`, `src/renderer/roam.ts`, `src/renderer/sprites.test.ts`, `assets/STYLE.md`, `README.md`, `PRD.md`, `CLAUDE.md`  
-**Reviewer:** kritischer Review-Agent  
-**Datum:** 2026-07-15
+**Reviewed:** `.flightplan/Archive/phase-4-plan.md` (BL-WIN-8, BL-WIN-10)  
+**Against references:** `WINDOWS_PORT_PLAN.md` (Phase 4 section), `src/renderer/renderer.ts`, `src/renderer/sprites.ts`, `src/renderer/roam.ts`, `src/renderer/sprites.test.ts`, `assets/STYLE.md`, `README.md`, `PRD.md`, `CLAUDE.md`  
+**Reviewer:** critical review agent  
+**Date:** 2026-07-15
 
 ---
 
-## 1. Zusammenfassung des geprüften Plans
+## 1. Summary of the Reviewed Plan
 
-Phase 4 soll Beaver Buddy für Windows visuell fertigmachen (HiDPI/Scaling) und die Dokumentation sowie ein Design-Gate abschließen. Der Plan behandelt zwei Build-Items:
+Phase 4 is meant to make Beaver Buddy visually complete for Windows (HiDPI/scaling) and to finish the documentation plus a design gate. The plan covers two build items:
 
-- **BL-WIN-8 (optional):** DPR-gerechte Canvas-Rendering in `src/renderer/renderer.ts`, damit Pixel-Art auf 125 %/150 %/200 % Windows-Skalierung scharf bleibt.
-- **BL-WIN-10:** Aktualisierung von `README.md`, `PRD.md`, `CLAUDE.md` und ein visuelles/manuelles Design-Gate mit Screenshots unter `docs/design-reviews/phase-4-windows/`.
+- **BL-WIN-8 (optional):** DPR-correct canvas rendering in `src/renderer/renderer.ts`, so pixel art stays sharp at 125 %/150 %/200 % Windows scaling.
+- **BL-WIN-10:** Updates to `README.md`, `PRD.md`, `CLAUDE.md` and a visual/manual design gate with screenshots under `docs/design-reviews/phase-4-windows/`.
 
-Der Plan ist grundsätzlich vernünftig: BL-WIN-8 ist korrekt als optional markiert, enthält eine dokumentierte Degradation und verzichtet auf neue Dependencies. Die Berücksichtigung der IPC-Bounds aus Phase 2 (`state:bounds` statt `window.innerWidth/Height`) ist erkannt und wird bei der DPR-Umrechnung genutzt.
+The plan is fundamentally sound: BL-WIN-8 is correctly marked as optional, includes a documented degradation path and adds no new dependencies. The consideration of the IPC bounds from Phase 2 (`state:bounds` instead of `window.innerWidth/Height`) is recognized and used in the DPR conversion.
 
-Allerdings enthält der Plan **einen kritischen, noch nicht erkannten Implementierungsfehler** im Clearing-Verhalten von `draw()`, mehrere Lücken in der Teststrategie und unterschätzt die Edge-Cases bei reinen DPR-Änderungen ohne Fenstergrößenänderung.
+However, the plan contains **one critical, not-yet-identified implementation error** in the clearing behavior of `draw()`, several gaps in the test strategy, and it underestimates the edge cases of pure DPR changes without a window-size change.
 
 ---
 
-## 2. Gefundene Probleme / Lücken / Fehler
+## 2. Found Problems / Gaps / Errors
 
-| # | Problem | Schweregrad | Begründung |
+| # | Problem | Severity | Rationale |
 |---|---|---|---|
-| 1 | **`draw()` löscht bei fehlendem Dirty-Rect den falschen Bereich**, wenn `ctx` DPR-skaliert ist. In `src/renderer/renderer.ts:279` steht `ctx.clearRect(0, 0, canvas.width, canvas.height)`. Nach BL-WIN-8 sind `canvas.width/height` physische Pixel (z. B. 2880×1620 bei 1.5× DPR), aber der Kontext ist um `dpr` skaliert. Der Aufruf würde dann nur den logischen Bereich `0..canvas.width/dpr` löschen — also nicht den ganzen Canvas. | **Kritisch** | Visuelles Smearing/Geisterbilder im gesamten Overlay, sobald ein Frame ohne Dirty-Rect gezeichnet wird (erster Frame, Resize, Quip-Ausblendung). |
-| 2 | **`bounds()` muss explizit auf `logicalBounds` umgestellt werden**, nicht nur „weiterhin logische Pixel zurückgeben“. Aktuell hängt `bounds()` an `canvas.width/height`. Der Plan erwähnt die Änderung, aber nicht die Konsequenz: alle Aufrufer (`createRoamState`, `clampRoamStateToBounds`, `hatchPosition`, `layoutBubble`, `tick`) bekommen sonst physische Pixel und der Biber wandert außerhalb des sichtbaren Fensters. | **Hoch** | Funktionale Regression im Roaming/Clamping, wenn der Patch nur halb ausgeführt wird. |
-| 3 | **DPR-Änderungen ohne Fenstergrößenänderung werden nicht zuverlässig erkannt.** `onBoundsChanged` wird nur bei Work-Area-Änderungen aus dem Main-Prozess gefeuert. Ändert der Nutzer in Windows nur die Skalierung (z. B. 100 % → 125 %), ohne dass sich die logische Fenstergröße ändert, kommt kein neues `state:bounds`-Event. | **Hoch** | Biber bleibt unscharf oder falsch skaliert, bis er das Fenster verschiebt/resize. |
-| 4 | **Kein Test für die Regression in `draw()` und `bounds()`.** Der Plan schlägt optional einen rein mathematischen Test für `configureCanvasDpr` vor, ignoriert aber das eigentliche Risiko: die Interaktion zwischen DPR-transformiertem Kontext, `canvas.width/height` und den logischen Koordinaten in `draw()` / `bounds()`. | **Mittel** | Fehler aus #1 und #2 können durch bestehende Tests nicht aufgedeckt werden. |
-| 5 | **Nicht-integer-DPR (1.25, 1.5) führt zu ungleichmäßigen Pixel-Verdopplungen.** Der Plan nennt das als Risiko, unterschätzt aber die visuelle Auswirkung: bei 1.25× werden 4 Quellpixel auf 5 physische Pixel verteilt, was bei langsam wanderndem Sprite zu „wackelnden“ Outlines führt. Das Design-Gate-Kriterium „keine bilineare Weichzeichnung“ ist notwendig, aber nicht hinreichend für ein gutes Ergebnis. | **Mittel** | Akzeptanzkriterium „125 %/150 % dürfen nur keine Bilinear-Unschärfe zeigen“ könnte im Design-Gate als FAIL enden, obwohl technisch korrekt implementiert. |
-| 6 | **Design-Gate-Prozess unterschätzt den Aufwand für synthetische Screenshots.** Der Plan verlangt Screenshots bei 100 %, 125 %, 150 % und 200 % Skalierung plus Taskleiste an vier Kanten. Das erfordert mindestens 16 manuelle Screenshots (4 Skalierungen × 4 Kanten), ohne Auto-Hide-Variante. | **Niedrig-Mittel** | Zeitaufwand nicht budgetiert; Gefahr, dass das Gate unvollständig abgeschlossen wird. |
-| 7 | **Auto-Hide-Taskleiste und HiDPI-Rendering sind nicht verknüpft.** Wenn bei Auto-Hide `workArea === bounds` gilt (dokumentierte Limitation aus Phase 2), wird das Overlay auf die volle physische Auflösung ausgerichtet. Das Design-Gate sollte prüfen, ob der Biber bei eingeblendeter Auto-Hide-Leiste trotzdem scharf aussieht und nicht abgeschnitten wird. | **Niedrig-Mittel** | Lücke im Design-Gate; potenziell neuer FAIL, der nicht abgedeckt ist. |
-| 8 | **PRD.md-Zeilenangaben können veralten.** Der Plan verweist auf konkrete Zeilennummern (z. B. R10 bei Zeile 108–115). Bei zukünftigen Änderungen an `PRD.md` verschieben sich die Zeilen, was Verwirrung beim Implementierungs-Agenten verursachen kann. | **Niedrig** | Kein Blocker, aber wartungsfeindlich; besser auf Überschriften/IDs verweisen. |
-| 9 | **„Finales Master-Icon fehlt“ wird als bekanntes Follow-up markiert, aber nicht in `WINDOWS_PORT_PLAN.md` als explizites Build-Item nachgetragen.** Wenn BL-WIN-10 abschließt, bleibt das Icon-Debt unsichtbar, bis ein Folgeplan es aufgreift. | **Niedrig** | Verfolgungsrisiko; sollte in der Follow-up-Liste von `WINDOWS_PORT_PLAN.md` verankert werden. |
+| 1 | **`draw()` clears the wrong area when no dirty rect exists**, if `ctx` is DPR-scaled. `src/renderer/renderer.ts:279` contains `ctx.clearRect(0, 0, canvas.width, canvas.height)`. After BL-WIN-8, `canvas.width/height` are physical pixels (e.g. 2880×1620 at 1.5× DPR), but the context is scaled by `dpr`. The call would then only clear the logical area `0..canvas.width/dpr` — i.e. not the whole canvas. | **Critical** | Visual smearing/ghosting across the entire overlay as soon as a frame is drawn without a dirty rect (first frame, resize, quip fade-out). |
+| 2 | **`bounds()` must be explicitly switched to `logicalBounds`**, not just "continue to return logical pixels". Currently `bounds()` hangs on `canvas.width/height`. The plan mentions the change, but not the consequence: all callers (`createRoamState`, `clampRoamStateToBounds`, `hatchPosition`, `layoutBubble`, `tick`) would otherwise receive physical pixels and the beaver would roam outside the visible window. | **High** | Functional regression in roaming/clamping if the patch is only half applied. |
+| 3 | **DPR changes without a window-size change are not reliably detected.** `onBoundsChanged` only fires on work-area changes from the main process. If the user only changes the scaling in Windows (e.g. 100 % → 125 %) without the logical window size changing, no new `state:bounds` event arrives. | **High** | The beaver stays blurry or incorrectly scaled until the window is moved/resized. |
+| 4 | **No test for the regression in `draw()` and `bounds()`.** The plan optionally suggests a purely mathematical test for `configureCanvasDpr`, but ignores the actual risk: the interaction between the DPR-transformed context, `canvas.width/height` and the logical coordinates in `draw()` / `bounds()`. | **Medium** | Errors from #1 and #2 cannot be caught by existing tests. |
+| 5 | **Non-integer DPR (1.25, 1.5) leads to uneven pixel doubling.** The plan names this as a risk but underestimates the visual impact: at 1.25×, 4 source pixels are distributed across 5 physical pixels, which leads to "wobbling" outlines on a slowly moving sprite. The design gate criterion "no bilinear blur" is necessary but not sufficient for a good result. | **Medium** | The acceptance criterion "125 %/150 % may only show no bilinear blur" could end as FAIL in the design gate even though it is technically implemented correctly. |
+| 6 | **The design gate process underestimates the effort for synthetic screenshots.** The plan requires screenshots at 100 %, 125 %, 150 % and 200 % scaling plus the taskbar on four edges. That requires at least 16 manual screenshots (4 scalings × 4 edges), without the auto-hide variant. | **Low-Medium** | Time effort not budgeted; risk that the gate is completed incompletely. |
+| 7 | **Auto-hide taskbar and HiDPI rendering are not linked.** When `workArea === bounds` with auto-hide enabled (documented limitation from Phase 2), the overlay is aligned to the full physical resolution. The design gate should check whether the beaver still looks sharp and is not clipped when the auto-hide bar slides in. | **Low-Medium** | Gap in the design gate; potentially a new FAIL that is not covered. |
+| 8 | **PRD.md line references can go stale.** The plan refers to concrete line numbers (e.g. R10 at lines 108–115). Future changes to `PRD.md` shift the lines, which can confuse the implementing agent. | **Low** | Not a blocker, but maintenance-hostile; better to reference headings/IDs. |
+| 9 | **"Final master icon missing" is marked as a known follow-up but not carried over into `WINDOWS_PORT_PLAN.md` as an explicit build item.** Once BL-WIN-10 closes, the icon debt stays invisible until a follow-up plan picks it up. | **Low** | Tracking risk; should be anchored in the follow-up list of `WINDOWS_PORT_PLAN.md`. |
 
 ---
 
-## 3. Konkrete Verbesserungsvorschläge
+## 3. Concrete Improvement Suggestions
 
-### 3.1 Kritisch: `draw()` an DPR-Transformation anpassen
-**Datei:** `src/renderer/renderer.ts:279`
+### 3.1 Critical: Adapt `draw()` to the DPR transformation
+**File:** `src/renderer/renderer.ts:279`
 
-Ändere den Full-Canvas-Clear so, dass er im skalierten Kontext logische Koordinaten verwendet:
+Change the full-canvas clear so that it uses logical coordinates in the scaled context:
 
 ```ts
-// Statt:
+// Instead of:
 ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// Besser:
+// Better:
 ctx.clearRect(0, 0, bounds().width, bounds().height);
 ```
 
-Da `bounds()` logische Pixel zurückgeben muss (siehe 3.2), wird der Clear-Bereich durch die `setTransform(dpr, …)`-Matrix korrekt auf den physischen Canvas ausgedehnt.
+Since `bounds()` must return logical pixels (see 3.2), the clear area is correctly extended to the physical canvas by the `setTransform(dpr, …)` matrix.
 
-### 3.2 Hoch: `bounds()` explizit auf `logicalBounds` umstellen
-**Datei:** `src/renderer/renderer.ts:92-94`
+### 3.2 High: Explicitly switch `bounds()` to `logicalBounds`
+**File:** `src/renderer/renderer.ts:92-94`
 
-Der Plan erwähnt `logicalBounds`, aber die aktuelle `bounds()`-Implementierung liest `canvas.width/height`. Dies muss in der Implementierung zwingend geändert werden:
+The plan mentions `logicalBounds`, but the current `bounds()` implementation reads `canvas.width/height`. This must be changed in the implementation without fail:
 
 ```ts
 let logicalBounds: Bounds = { width: window.innerWidth, height: window.innerHeight };
@@ -66,7 +66,7 @@ function bounds(): Bounds {
 }
 ```
 
-Und im `onBoundsChanged`-Handler muss `logicalBounds` gesetzt werden:
+And in the `onBoundsChanged` handler, `logicalBounds` must be set:
 
 ```ts
 window.beaverBuddy.onBoundsChanged((next) => {
@@ -77,12 +77,12 @@ window.beaverBuddy.onBoundsChanged((next) => {
 });
 ```
 
-**Wichtig:** Kein anderer Code darf danach `canvas.width/height` als logische Größe interpretieren.
+**Important:** No other code may afterwards interpret `canvas.width/height` as a logical size.
 
-### 3.3 Hoch: Auf DPR-Änderungen separat lauschen
-**Datei:** `src/renderer/renderer.ts`
+### 3.3 High: Listen separately for DPR changes
+**File:** `src/renderer/renderer.ts`
 
-Ergänze einen Listener, der auch bei reinen DPR-Änderungen `configureCanvasDpr` neu aufruft:
+Add a listener that re-invokes `configureCanvasDpr` on pure DPR changes as well:
 
 ```ts
 function updateDprFromMedia(): void {
@@ -91,19 +91,19 @@ function updateDprFromMedia(): void {
 }
 
 window.matchMedia('screen and (resolution: 1dppx)').addEventListener('change', updateDprFromMedia);
-// Hinweis: matchMedia für DPR-Änderungen ist ein bekanntes Pattern, funktioniert aber nicht
-// auf allen Plattformen zuverlässig. Alternativ kann man beim resize-Event prüfen,
-// ob sich devicePixelRatio geändert hat.
+// Note: matchMedia for DPR changes is a known pattern, but it does not work
+// reliably on all platforms. Alternatively, one can check on the resize event
+// whether devicePixelRatio has changed.
 ```
 
-Noch robuster: Beim `window.resize`-Event prüfen, ob `window.devicePixelRatio` gegenüber dem letzten bekannten Wert gesprungen ist, und ggf. neu konfigurieren. Das sollte im Plan als **zwingender Schritt** (nicht „ggf.") geführt werden, weil Windows-Nutzer die Skalierung häufig ohne Fenster-Resize ändern.
+Even more robust: on the `window.resize` event, check whether `window.devicePixelRatio` has jumped compared to the last known value, and reconfigure if needed. This should be carried in the plan as a **mandatory step** (not "optionally"), because Windows users frequently change the scaling without a window resize.
 
-### 3.4 Mittel: Renderer-Teststrategie erweitern
-**Dateien:** `src/renderer/renderer.test.ts` (neu) oder `src/renderer/sprites.test.ts`
+### 3.4 Medium: Extend the renderer test strategy
+**Files:** `src/renderer/renderer.test.ts` (new) or `src/renderer/sprites.test.ts`
 
-Der Plan schlägt einen mathematischen Test für `configureCanvasDpr` vor. Das ist sinnvoll, aber nicht ausreichend. Zusätzlich empfohlen:
+The plan suggests a mathematical test for `configureCanvasDpr`. That is sensible but not sufficient. Additionally recommended:
 
-1. **Unit-Test für DPR-Mathematik:**
+1. **Unit test for DPR math:**
    ```ts
    expect(configureCanvas(1920, 1080, 1.5)).toEqual({
      canvasWidth: 2880,
@@ -113,75 +113,75 @@ Der Plan schlägt einen mathematischen Test für `configureCanvasDpr` vor. Das i
    });
    ```
 
-2. **Regressionstest für `bounds()` nach DPR-Umstellung:** Stelle sicher, dass `bounds()` nach `configureCanvasDpr(1920, 1080, 2)` weiterhin `{ width: 1920, height: 1080 }` liefert, obwohl `canvas.width === 3840`.
+2. **Regression test for `bounds()` after the DPR switch:** Ensure that `bounds()` still returns `{ width: 1920, height: 1080 }` after `configureCanvasDpr(1920, 1080, 2)`, even though `canvas.width === 3840`.
 
-3. **Integrationstest für `draw()` Clear-Bereich:** Wenn möglich, prüfen, dass nach einem Full-Canvas-Clear bei DPR=2 der Clear-Rect logische 1920×1080 (nicht physische 3840×2160) an `clearRect` übergeben wird. Das verhindert Fehler #1.
+3. **Integration test for the `draw()` clear area:** If possible, verify that after a full-canvas clear at DPR=2, the clear rect passes logical 1920×1080 (not physical 3840×2160) to `clearRect`. This prevents error #1.
 
-Da `renderer.ts` stark DOM-seiteneffektbehaftet ist, kann Punkt 3 aufwendig sein. Mindestens Punkte 1 und 2 sollten aber umgesetzt werden, bevor BL-WIN-8 als abgeschlossen gilt.
+Since `renderer.ts` is heavily DOM side-effect-laden, point 3 can be expensive. At minimum, points 1 and 2 should be implemented before BL-WIN-8 counts as completed.
 
-### 3.5 Mittel: Design-Gate-Kriterien für nicht-integer DPR präzisieren
-**Datei:** `.flightplan/Archive/phase-4-plan.md` Abschnitt 4.3
+### 3.5 Medium: Make design gate criteria for non-integer DPR more precise
+**File:** `.flightplan/Archive/phase-4-plan.md` section 4.3
 
-Ergänze das HiDPI-Kriterium:
+Extend the HiDPI criterion:
 
-> „Bei 200 %: Sprite-Kanten sind scharf und Pixel-Verdopplung ist integer (keine halben Pixel).  
-> Bei 125 %/150 %: Keine bilineare Weichzeichnung; leichte Ungleichmäßigkeit im Pixel-Raster ist akzeptabel, solange die Silhouette beim Stehen/Walken nicht auffällig flackert."
+> "At 200 %: sprite edges are sharp and pixel doubling is integer (no half pixels).  
+> At 125 %/150 %: no bilinear blur; slight unevenness in the pixel grid is acceptable as long as the silhouette does not noticeably flicker while standing/walking."
 
-Falls bei 125 %/150 % ein sichtbares Flackern auftritt, sollte das Verdict explizit als **CONDITIONAL PASS** (nicht FAIL) dokumentiert werden, weil dies ein fundamentales Limit von nearest-neighbor bei nicht-integer-DPR ist.
+If visible flickering occurs at 125 %/150 %, the verdict should be explicitly documented as **CONDITIONAL PASS** (not FAIL), because this is a fundamental limit of nearest-neighbor at non-integer DPR.
 
-### 3.6 Mittel: Auto-Hide in Design-Gate aufnehmen
-**Datei:** `.flightplan/Archive/phase-4-plan.md` Abschnitt 4.3
+### 3.6 Medium: Include auto-hide in the design gate
+**File:** `.flightplan/Archive/phase-4-plan.md` section 4.3
 
-Ergänze einen Prüfpunkt:
+Add a checkpoint:
 
-| Prüfpunkt | Kriterium |
+| Checkpoint | Criterion |
 |---|---|
-| **Auto-Hide-Taskleiste** | Bei aktivierter Auto-Hide-Taskleiste wird der Biber nicht dauerhaft verdeckt; bei eingeblendeter Leiste bleibt er scharf und vollständig sichtbar. |
+| **Auto-hide taskbar** | With the auto-hide taskbar enabled, the beaver is not permanently covered; when the bar slides in, he stays sharp and fully visible. |
 
-### 3.7 Niedrig: Icon-Debt als explizites Follow-up verankern
-**Datei:** `.flightplan/Archive/WINDOWS_PORT_PLAN.md` Abschnitt 8
+### 3.7 Low: Anchor icon debt as an explicit follow-up
+**File:** `.flightplan/Archive/WINDOWS_PORT_PLAN.md` section 8
 
-Ergänze unter „Verschobene Aufgaben" oder als neues Phase-5-Item:
+Add under "Deferred tasks" or as a new Phase 5 item:
 
-> **Finales Master-Icon / Design-Pass** — Nachlieferung eines professionellen App-Icons und Tray-Icons durch Design; ersetzt die vorläufigen Sprite-generierten `assets/icon.ico` und `assets/tray-icon.png`.
+> **Final master icon / design pass** — Delivery of a professional app icon and tray icon by design; replaces the provisional sprite-generated `assets/icon.ico` and `assets/tray-icon.png`.
 
-### 3.8 Niedrig: Zeilenreferenzen in Plan durch semantische Verweise ersetzen
-**Datei:** `.flightplan/Archive/phase-4-plan.md` Abschnitt 4.2
+### 3.8 Low: Replace line references in the plan with semantic references
+**File:** `.flightplan/Archive/phase-4-plan.md` section 4.2
 
-Statt „Zeile 108–115" besser: „PRD.md, Abschnitt R10 (Design QA gate)".
-
----
-
-## 4. GO / NO-GO Empfehlung
-
-**Empfehlung: GO — mit Vorbedingungen.**
-
-Der Phase-4-Plan ist umsetzbar, aber nicht in der aktuellen Form. Vor dem Start der Implementierung müssen die Punkte #1, #2 und #3 aus Abschnitt 2 in den Plan übernommen werden, sonst riskiert der Implementierungs-Agent einen kritischen Rendering-Bug und eine DPR-Änderungs-Regression.
-
-BL-WIN-10 (Dokumentation & Design-Gate) ist realistisch umsetzbar, auch ohne finales Master-Icon, solange das Gate klar als Bewertung gegen **vorläufige** Assets kommuniziert wird.
+Instead of "lines 108–115", better: "PRD.md, section R10 (Design QA gate)".
 
 ---
 
-## 5. Hinweise für den Implementierungs-Agenten
+## 4. GO / NO-GO Recommendation
 
-Wenn du BL-WIN-8 umsetzt, beachte bitte besonders:
+**Recommendation: GO — with preconditions.**
 
-1. **Nie `canvas.width/height` als logische Größe verwenden**, nachdem DPR aktiviert wurde. Alle Roaming-, Hatch-, Bubble- und Dirty-Rect-Berechnungen müssen über `bounds()` laufen, das `logicalBounds` zurückgibt.
+The Phase 4 plan is implementable, but not in its current form. Before implementation starts, points #1, #2 and #3 from section 2 must be incorporated into the plan, otherwise the implementing agent risks a critical rendering bug and a DPR-change regression.
 
-2. **Fixe den Full-Canvas-Clear in `src/renderer/renderer.ts:279`**: `ctx.clearRect(0, 0, bounds().width, bounds().height)` statt `canvas.width/height`.
+BL-WIN-10 (Documentation & Design-Gate) is realistically achievable, even without a final master icon, as long as the gate is clearly communicated as an evaluation against **provisional** assets.
 
-3. **Lausche auf DPR-Änderungen**, nicht nur auf `onBoundsChanged`. Ein `window.resize`-Handler, der `window.devicePixelRatio` mit einem gespeicherten Wert vergleicht, ist der robusteste Ansatz ohne neue Dependencies.
+---
 
-4. **Halte `PET_SCALE`/`LODGE_SCALE` integer** (`src/renderer/pet-config.ts`). Ändere sie nicht auf Bruchwerte, um Halbpixel zu vermeiden.
+## 5. Notes for the Implementing Agent
 
-5. **`drawFrame` in `src/renderer/sprites.ts` bleibt unverändert**, aber prüfe, dass der übergebene `ctx` die DPR-Transformation trägt und dass `x`, `y`, `scale` logische Werte bleiben.
+When you implement BL-WIN-8, please pay special attention to:
 
-6. **Führe nach der Umstellung einen visuellen Test auf 100 %, 125 %, 150 % und 200 % durch.** Achte dabei nicht nur auf „nicht unscharf", sondern auch auf flackernde/wackelnde Outlines bei langsamer Bewegung.
+1. **Never use `canvas.width/height` as a logical size** after DPR is enabled. All roaming, hatch, bubble and dirty-rect calculations must go through `bounds()`, which returns `logicalBounds`.
 
-7. **Teste Auto-Hide-Taskleiste separat.** Wenn die Taskleiste eingeblendet wird, darf der Biber nicht abgeschnitten werden und das Rendering darf nicht neu initialisiert/zurückgesetzt werden.
+2. **Fix the full-canvas clear in `src/renderer/renderer.ts:279`**: `ctx.clearRect(0, 0, bounds().width, bounds().height)` instead of `canvas.width/height`.
 
-8. **Für BL-WIN-10:** Verwende für Screenshots einen neutralen Desktop-Hintergrund und entferne persönliche Fenster/Dateinamen. Speichere das Verdict als `docs/design-reviews/phase-4-windows/verdict.md`.
+3. **Listen for DPR changes**, not just `onBoundsChanged`. A `window.resize` handler that compares `window.devicePixelRatio` with a stored value is the most robust approach without new dependencies.
 
-9. **Falls BL-WIN-8 abgeschaltet wird:** Dokumentiere die Einschränkung in `README.md`, `CLAUDE.md` **und** `WINDOWS_PORT_PLAN.md`, wie im Plan vorgesehen. Stelle sicher, dass die Degradation wirklich alle DPR-Änderungen in `renderer.ts` rückgängig macht.
+4. **Keep `PET_SCALE`/`LODGE_SCALE` integer** (`src/renderer/pet-config.ts`). Do not change them to fractional values, to avoid half pixels.
 
-10. **Vor dem Abschluss:** `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` und `npx electron-builder --win --publish never` müssen grün sein. Füge mindestens einen Unit-Test für die DPR-Mathematik hinzu.
+5. **`drawFrame` in `src/renderer/sprites.ts` stays unchanged**, but verify that the passed `ctx` carries the DPR transformation and that `x`, `y`, `scale` remain logical values.
+
+6. **After the switch, run a visual test at 100 %, 125 %, 150 % and 200 %.** Look not only for "not blurry" but also for flickering/wobbling outlines during slow movement.
+
+7. **Test the auto-hide taskbar separately.** When the taskbar slides in, the beaver must not be clipped and the rendering must not be re-initialized/reset.
+
+8. **For BL-WIN-10:** Use a neutral desktop background for screenshots and remove personal windows/file names. Save the verdict as `docs/design-reviews/phase-4-windows/verdict.md`.
+
+9. **If BL-WIN-8 is deactivated:** Document the limitation in `README.md`, `CLAUDE.md` **and** `WINDOWS_PORT_PLAN.md`, as provided in the plan. Make sure the degradation really reverts all DPR changes in `renderer.ts`.
+
+10. **Before closing:** `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` and `npx electron-builder --win --publish never` must be green. Add at least one unit test for the DPR math.

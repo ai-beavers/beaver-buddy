@@ -1,162 +1,162 @@
-# Beaver Buddy — Phase 2: Core Windows Experience — Implementationslog
+# Beaver Buddy — Phase 2: Core Windows Experience — Implementation Log
 
-**Datum:** 2026-07-15  
-**Build-Items:** BL-WIN-3 (Overlay-Adapter für Windows), BL-WIN-4 (Tray-Adapter für Windows)  
-**Umgesetzt von:** Implementierungs-Agent
+**Date:** 2026-07-15  
+**Build items:** BL-WIN-3 (Overlay adapter for Windows), BL-WIN-4 (Tray adapter for Windows)  
+**Implemented by:** Implementation agent
 
 ---
 
-## 1. Zusammenfassung der Änderungen
+## 1. Summary of changes
 
-### 1.1 Neue Datei: `src/main/overlay-adapter.ts`
+### 1.1 New file: `src/main/overlay-adapter.ts`
 
-Eingeführt als plattformspezifischer Adapter für Overlay-Position, Z-Order und Taskleisten-Erkennung:
+Introduced as a platform-specific adapter for overlay position, Z-order, and taskbar detection:
 
-- `detectTaskbarEdge(bounds, workArea)` — ermittelt `top`/`bottom`/`left`/`right`/`none` aus dem Vergleich von Display-Bounds und Work-Area.
-- `getPrimaryWorkAreaInfo()` — liefert die Work-Area des primären Displays inkl. Taskleisten-Kante.
-- `getOverlayWindowBounds(display)` — berechnet die Fenster-Bounds aus der Work-Area.
-- `configureAlwaysOnTop(win)` — setzt auf macOS `floating`, auf Windows/Linux `normal`.
-- `fitWindowToWorkArea(win, info)` — setzt Fenster-Bounds sofort (`setBounds(..., false)`), ohne Animation.
-- `onWorkAreaChanged(callback)` — abonniert `display-added`, `display-removed`, `display-metrics-changed` und liefert einen Unsubscribe-Handler.
+- `detectTaskbarEdge(bounds, workArea)` — determines `top`/`bottom`/`left`/`right`/`none` by comparing display bounds and work area.
+- `getPrimaryWorkAreaInfo()` — returns the work area of the primary display, including the taskbar edge.
+- `getOverlayWindowBounds(display)` — computes the window bounds from the work area.
+- `configureAlwaysOnTop(win)` — sets `floating` on macOS, `normal` on Windows/Linux.
+- `fitWindowToWorkArea(win, info)` — applies window bounds immediately (`setBounds(..., false)`), without animation.
+- `onWorkAreaChanged(callback)` — subscribes to `display-added`, `display-removed`, and `display-metrics-changed` and returns an unsubscribe handler.
 
-### 1.2 Anpassungen `src/main/main.ts`
+### 1.2 Changes to `src/main/main.ts`
 
-- Importiert den Overlay-Adapter und `BOUNDS_CHANGED_CHANNEL`.
-- `createWindow()` verwendet `configureAlwaysOnTop(win)` statt hartkodiertem `'floating'`.
-- Nach dem Fensteraufbau wird `fitWindowToWorkArea(mainWindow, lastWorkArea)` aufgerufen.
-- `onWorkAreaChanged`-Handler speichert die letzte Work-Area und aktualisiert `setBounds` nur, wenn sich `x/y/width/height` tatsächlich ändern.
-- Bei Work-Area-Änderungen werden die neuen Bounds über IPC (`state:bounds`) an den Renderer gesendet.
-- `did-finish-load` sendet die initialen Bounds explizit an den Renderer.
-- `--smoke` liefert zusätzlich `boundsMatchWorkArea` zurück.
+- Imports the overlay adapter and `BOUNDS_CHANGED_CHANNEL`.
+- `createWindow()` uses `configureAlwaysOnTop(win)` instead of the hardcoded `'floating'`.
+- After the window is created, `fitWindowToWorkArea(mainWindow, lastWorkArea)` is called.
+- The `onWorkAreaChanged` handler stores the latest work area and only calls `setBounds` when `x/y/width/height` actually change.
+- On work-area changes, the new bounds are sent to the renderer via IPC (`state:bounds`).
+- `did-finish-load` explicitly sends the initial bounds to the renderer.
+- `--smoke` additionally returns `boundsMatchWorkArea`.
 
-### 1.3 IPC-Kanal `state:bounds`
+### 1.3 IPC channel `state:bounds`
 
 - `src/main/ipc-channels.ts`: `BOUNDS_CHANGED_CHANNEL = 'state:bounds'`.
-- `src/main/preload.ts`: `onBoundsChanged` exposed via `contextBridge`; Kanal-Name als Inline-Literal (Preload kann keine Sibling-Module importieren).
+- `src/main/preload.ts`: `onBoundsChanged` exposed via `contextBridge`; channel name as an inline literal (preload cannot import sibling modules).
 
-### 1.4 Anpassungen Renderer
+### 1.4 Renderer changes
 
-- `src/renderer/roam.ts`: Neue Exportfunktion `clampRoamStateToBounds(state, bounds)` verwendet die bestehenden `maxX`/`groundY`-Helfer.
+- `src/renderer/roam.ts`: New exported function `clampRoamStateToBounds(state, bounds)` uses the existing `maxX`/`groundY` helpers.
 - `src/renderer/renderer.ts`:
-  - `Window.beaverBuddy` Interface um `onBoundsChanged` erweitert.
-  - Handler setzt `canvas.width/height` explizit auf die IPC-Bounds (nicht `window.innerWidth/Height`).
-  - Roaming-State wird nach Bounds-Änderung auf die neuen Grenzen geklemmt.
+  - `Window.beaverBuddy` interface extended with `onBoundsChanged`.
+  - The handler sets `canvas.width/height` explicitly from the IPC bounds (not `window.innerWidth/Height`).
+  - The roaming state is clamped to the new bounds after a bounds change.
 
-### 1.5 Tray-Adapter für Windows (`src/main/tray.ts`)
+### 1.5 Tray adapter for Windows (`src/main/tray.ts`)
 
-- Neue Hilfsfunktion `loadTrayIcon()`:
+- New helper function `loadTrayIcon()`:
   - macOS: `assets/tray-iconTemplate.png` + `setTemplateImage(true)`.
-  - Windows/Linux: `assets/tray-icon.png` (farbig), kein `setTemplateImage`.
+  - Windows/Linux: `assets/tray-icon.png` (colored), no `setTemplateImage`.
 
 ### 1.6 Tests
 
-- `src/main/overlay-adapter.test.ts` (neu):
-  - `detectTaskbarEdge` für alle vier Kanten + `none`.
-  - `configureAlwaysOnTop` für `darwin`, `win32`, `linux`.
-  - `fitWindowToWorkArea` prüft `setBounds(..., false)`.
-  - `onWorkAreaChanged` prüft Subscribe/Unsubscribe und Event-Feuerung.
-- `src/main/preload.test.ts` (neu):
-  - Prüft, dass `onBoundsChanged` über `contextBridge` exposed wird.
-  - Simuliert `ipcRenderer.on('state:bounds', ...)` und prüft Weiterleitung an Callback.
-- `src/main/tray.test.ts` (erweitert):
-  - Tests für `loadTrayIcon()` auf `win32`, `darwin`, `linux` inkl. Template-Image-Verhalten.
+- `src/main/overlay-adapter.test.ts` (new):
+  - `detectTaskbarEdge` for all four edges + `none`.
+  - `configureAlwaysOnTop` for `darwin`, `win32`, `linux`.
+  - `fitWindowToWorkArea` checks `setBounds(..., false)`.
+  - `onWorkAreaChanged` checks subscribe/unsubscribe and event firing.
+- `src/main/preload.test.ts` (new):
+  - Verifies that `onBoundsChanged` is exposed via `contextBridge`.
+  - Simulates `ipcRenderer.on('state:bounds', ...)` and verifies forwarding to the callback.
+- `src/main/tray.test.ts` (extended):
+  - Tests for `loadTrayIcon()` on `win32`, `darwin`, `linux`, including template-image behavior.
 
 ---
 
-## 2. Entscheidungen
+## 2. Decisions
 
-### 2.1 Auto-Hide-Taskleiste
+### 2.1 Auto-hide taskbar
 
-**Befund:** `workArea` und `bounds` sind bei Auto-Hide auf Windows oft identisch; eine zuverlässige Erkennung der Taskleisten-Kante ist ohne native AppBar-API nicht möglich.
+**Finding:** `workArea` and `bounds` are often identical on Windows with auto-hide enabled; reliably detecting the taskbar edge is not possible without the native AppBar API.
 
-**Entscheidung:** Auto-Hide wurde explizit aus den Akzeptanzkriterien entfernt. Der Code dokumentiert dies in `detectTaskbarEdge` und `getPrimaryWorkAreaInfo`: Bei Auto-Hide wird `taskbarEdge: 'none'` zurückgegeben und das Fenster auf die volle Bildschirmgröße ausgerichtet. Der Biber kann kurzzeitig von einer eingeblendeten Auto-Hide-Leiste verdeckt werden. Eine native AppBar-API wurde nicht eingeführt, da dies neue Dependencies (z. B. `node-ffi-napi`) erfordern würde — im Widerspruch zu CLAUDE.md und den Review-Befunden.
+**Decision:** Auto-hide was explicitly removed from the acceptance criteria. The code documents this in `detectTaskbarEdge` and `getPrimaryWorkAreaInfo`: with auto-hide, `taskbarEdge: 'none'` is returned and the window is aligned to the full screen size. The beaver can briefly be obscured by an auto-hide bar sliding in. The native AppBar API was not introduced because it would require new dependencies (e.g. `node-ffi-napi`) — contradicting CLAUDE.md and the review findings.
 
-### 2.2 Fenster-Animation bei Bounds-Änderungen
+### 2.2 Window animation on bounds changes
 
-**Entscheidung:** `fitWindowToWorkArea` verwendet `setBounds(..., false)` (keine Animation). Begründung:
+**Decision:** `fitWindowToWorkArea` uses `setBounds(..., false)` (no animation). Rationale:
 
-- Vermeidet Asynchronität zwischen Main-Prozess und Renderer.
-- Transparente, klick-durch-Fenster können beim animierten Resize auf Windows flackern/ghosten.
-- Die „Sanftheit" der Positionierung wird durch den Roaming-State erreicht: `clampRoamStateToBounds` stellt sicher, dass der Biber bei einer kleiner werdenden Work-Area selbst in die neue Fläche läuft.
+- Avoids asynchrony between the main process and the renderer.
+- Transparent, click-through windows can flicker/ghost during animated resizes on Windows.
+- The "smoothness" of the repositioning is achieved through the roaming state: `clampRoamStateToBounds` ensures the beaver walks itself into the new area when the work area shrinks.
 
-### 2.3 Renderer-Bounds
+### 2.3 Renderer bounds
 
-**Entscheidung:** Der Renderer verwendet ausschließlich die expliziten Bounds aus dem `state:bounds`-IPC-Kanal. `canvas.width/height` werden im `onBoundsChanged`-Handler direkt aus dem Payload gesetzt; `window.innerWidth/Height` dienen nur noch als initialer Fallback (das Fenster wird bereits beim Erstellen auf die Work-Area ausgerichtet).
+**Decision:** The renderer uses only the explicit bounds from the `state:bounds` IPC channel. `canvas.width/height` are set directly from the payload in the `onBoundsChanged` handler; `window.innerWidth/Height` now serve only as an initial fallback (the window is already aligned to the work area when created).
 
-### 2.4 Z-Order-Level (`setAlwaysOnTop`)
+### 2.4 Z-order level (`setAlwaysOnTop`)
 
-**Entscheidung:**
+**Decision:**
 
-- macOS: `floating` (unverändert).
+- macOS: `floating` (unchanged).
 - Windows/Linux: `normal`.
 
-**Begründung:** `normal` ist der geringste topmost-Level, der das Fenster über normalen Anwendungen hält, ohne über Vollbild-Apps oder System-UI zu schweben. Der Review forderte einen empirischen Test auf echter Windows-Hardware. Dieser Agent kann keinen solchen Test durchführen. Daher wurde `normal` als konservative Startwahl implementiert und im Code kommentiert. Falls auf echter Hardware `normal` unter der Taskleiste liegt, ist der dokumentierte Fallback `'pop-up-menu'` (höherer Level, aber möglicherweise störend über Vollbild-Apps).
+**Rationale:** `normal` is the lowest topmost level that keeps the window above normal applications without floating above fullscreen apps or system UI. The review called for an empirical test on real Windows hardware. This agent cannot perform such a test. Therefore `normal` was implemented as the conservative starting choice and documented in a code comment. If `normal` ends up beneath the taskbar on real hardware, the documented fallback is `'pop-up-menu'` (higher level, but potentially intrusive over fullscreen apps).
 
-### 2.5 Deduplizierung von WorkArea-Änderungen
+### 2.5 Deduplication of work-area changes
 
-**Entscheidung:** `main.ts` speichert `lastWorkArea` und ruft `fitWindowToWorkArea` + `webContents.send` nur auf, wenn sich mindestens eines der Felder `x/y/width/height` geändert hat. Das vermeidet unnötige `setBounds`-Aufrufe bei DPI-/Scaling-Änderungen, die die Work-Area nicht verändern.
+**Decision:** `main.ts` stores `lastWorkArea` and only calls `fitWindowToWorkArea` + `webContents.send` when at least one of the `x/y/width/height` fields has changed. This avoids unnecessary `setBounds` calls on DPI/scaling changes that do not alter the work area.
 
-### 2.6 Keine neuen Dependencies
+### 2.6 No new dependencies
 
-Es wurden keine neuen npm-Packages hinzugefügt. Alle Änderungen verwenden bestehende Electron-/Node-APIs.
+No new npm packages were added. All changes use existing Electron/Node APIs.
 
 ---
 
-## 3. Testergebnisse
+## 3. Test results
 
-| Befehl | Ergebnis |
-|--------|----------|
-| `npm run typecheck` | ✅ grün |
-| `npm run lint` | ✅ grün |
+| Command | Result |
+|---------|--------|
+| `npm run typecheck` | ✅ green |
+| `npm run lint` | ✅ green |
 | `npm test` | ✅ 312 passed, 6 skipped |
-| `npm run build` | ✅ grün |
-| `npx electron-builder --win --publish never` | ✅ grün |
+| `npm run build` | ✅ green |
+| `npx electron-builder --win --publish never` | ✅ green |
 
-Neue Testabdeckung:
+New test coverage:
 
-- `src/main/overlay-adapter.test.ts`: 14 Tests
-- `src/main/preload.test.ts`: 3 Tests
-- `src/main/tray.test.ts`: +3 Tests für `loadTrayIcon`
+- `src/main/overlay-adapter.test.ts`: 14 tests
+- `src/main/preload.test.ts`: 3 tests
+- `src/main/tray.test.ts`: +3 tests for `loadTrayIcon`
 
-Bestehende Tests sind unverändert grün geblieben.
-
----
-
-## 4. Manuelle Smoke-Tests
-
-Dieser Agent kann keine GUI-basierten Tests durchführen. Folgende Checks müssen auf echter Windows-Hardware verifiziert werden:
-
-1. **Z-Order:** Biber bleibt über der sichtbaren Taskleiste (`setAlwaysOnTop(true, 'normal')`). Falls nicht, Fallback auf `'pop-up-menu'` testen.
-2. **Taskleisten-Position:** Leiste nach oben/links/rechts verschieben; Biber bleibt innerhalb der Work-Area.
-3. **Auto-Hide:** Biber kann kurzzeitig von der eingeblendeten Leiste verdeckt werden — dokumentiertes Verhalten.
-4. **Tray-Icon:** Farbiges `assets/tray-icon.png` sichtbar; Rechtsklick-Menü funktioniert.
-5. **Klick-Through:** Mausklicks gehen weiterhin durch das Overlay.
-6. **Vollbild-App:** Biber bleibt sichtbar, stiehlt keinen Fokus.
+Existing tests remained green, unchanged.
 
 ---
 
-## 5. Offene Probleme / Follow-up
+## 4. Manual smoke tests
 
-- **Z-Order-Validierung:** Empirischer Test auf Windows 10/11 erforderlich, um `'normal'` vs. `'pop-up-menu'` endgültig zu entscheiden.
-- **Auto-Hide:** Eine robuste Lösung würde die Windows AppBar-API (`SHAppBarMessage`) benötigen. Dies wurde bewusst nicht umgesetzt, da es native Dependencies erfordert.
-- **Tray-Icon-Kontrast:** Farbiges Icon auf dunklem Windows-Tray-Hintergrund wurde nicht visuell geprüft. Phase 4 (BL-WIN-10/HiDPI) sollte ein Design-Gate vorsehen.
-- **Multi-Monitor:** Aktuell nur primäres Display (`screen.getPrimaryDisplay()`). Spätere Phase könnte Display-Wechsel behandeln.
-- **HiDPI/Scaling:** Nicht Teil dieser Phase; geplant für Phase 4.
+This agent cannot perform GUI-based tests. The following checks must be verified on real Windows hardware:
+
+1. **Z-order:** Beaver stays above the visible taskbar (`setAlwaysOnTop(true, 'normal')`). If not, test the `'pop-up-menu'` fallback.
+2. **Taskbar position:** Move the taskbar to the top/left/right; the beaver stays within the work area.
+3. **Auto-hide:** The beaver can briefly be obscured by the taskbar sliding in — documented behavior.
+4. **Tray icon:** Colored `assets/tray-icon.png` visible; right-click menu works.
+5. **Click-through:** Mouse clicks still pass through the overlay.
+6. **Fullscreen app:** Beaver stays visible and does not steal focus.
 
 ---
 
-## 6. Dateien, die angefasst wurden
+## 5. Open issues / follow-up
 
-| Datei | Änderung |
-|-------|----------|
-| `src/main/overlay-adapter.ts` | neu |
-| `src/main/overlay-adapter.test.ts` | neu |
-| `src/main/preload.test.ts` | neu |
-| `src/main/main.ts` | Overlay-Adapter-Integration, Bounds-IPC, Smoke-Test-Erweiterung |
+- **Z-order validation:** Empirical test on Windows 10/11 required to decide definitively between `'normal'` and `'pop-up-menu'`.
+- **Auto-hide:** A robust solution would require the Windows AppBar API (`SHAppBarMessage`). This was deliberately not implemented, as it requires native dependencies.
+- **Tray icon contrast:** The colored icon on a dark Windows tray background was not visually checked. Phase 4 (BL-WIN-10/HiDPI) should include a design gate.
+- **Multi-monitor:** Currently only the primary display (`screen.getPrimaryDisplay()`). A later phase could handle display switches.
+- **HiDPI/scaling:** Not part of this phase; planned for Phase 4.
+
+---
+
+## 6. Files touched
+
+| File | Change |
+|------|--------|
+| `src/main/overlay-adapter.ts` | new |
+| `src/main/overlay-adapter.test.ts` | new |
+| `src/main/preload.test.ts` | new |
+| `src/main/main.ts` | Overlay adapter integration, bounds IPC, smoke test extension |
 | `src/main/ipc-channels.ts` | `BOUNDS_CHANGED_CHANNEL` |
 | `src/main/preload.ts` | `onBoundsChanged` expose |
-| `src/renderer/renderer.ts` | Bounds-Change-Handler, Canvas-Resize aus IPC |
+| `src/renderer/renderer.ts` | Bounds-change handler, canvas resize from IPC |
 | `src/renderer/roam.ts` | `clampRoamStateToBounds` |
-| `src/main/tray.ts` | plattformspezifische Icon-Auswahl |
-| `src/main/tray.test.ts` | Tests für `loadTrayIcon` |
-| `.flightplan/Archive/phase-2-implementation-log.md` | neu (dieses Log) |
+| `src/main/tray.ts` | platform-specific icon selection |
+| `src/main/tray.test.ts` | Tests for `loadTrayIcon` |
+| `.flightplan/Archive/phase-2-implementation-log.md` | new (this log) |

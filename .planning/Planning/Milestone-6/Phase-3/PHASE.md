@@ -1,20 +1,20 @@
-# Phase 3 — QA & Design-Gates (#37–#41)
+# Phase 3 — QA & Design Gates (#37–#41)
 
-> Part of Milestone 6. Done when: Reale HiDPI-Screenshots (#37), Design-Gates für alle
-> Z1-Animationen (#38), Performance-Profiling (#39), E2E-Tests (#40) und manuelle
-> Akzeptanztests (#41) mit Verdicts abgelegt sind.
+> Part of Milestone 6. Done when: real HiDPI screenshots (#37), design gates for all
+> Z1 animations (#38), performance profiling (#39), E2E tests (#40), and manual
+> acceptance tests (#41) are filed with verdicts.
 
-**Status:** not-started (Stub — Detail-Definition zu Phasenbeginn mit Rodgi)
+**Status:** not-started (Stub — detailed definition at phase start with Rodgi)
 
-**Accountable:** Rodgi (alle reviewen mit) · **Agent:** pi
-**Zyklus:** Zyklus 1
-**Blocked by:** M5 Z1-Umfang (P1–P5 gebacken + verdrahtet)
-**Blocks:** Z1-Exit
-**Dauer (grob):** ~1 Woche
+**Accountable:** Rodgi (everyone reviews along) · **Agent:** pi
+**Cycle:** Cycle 1
+**Blocked by:** M5 Z1 scope (P1–P5 baked + wired)
+**Blocks:** Z1 exit
+**Duration (rough):** ~1 week
 
 ## Waves
-- [ ] WAVE-1 — HiDPI-Screenshots + Design-Gates für M5/P1–P5 (#37, #38)
-- [ ] WAVE-2 — Performance-Profiling, E2E, manuelle Akzeptanz (#39–#41)
+- [ ] WAVE-1 — HiDPI screenshots + design gates for M5/P1–P5 (#37, #38)
+- [ ] WAVE-2 — Performance profiling, E2E, manual acceptance (#39–#41)
 
 ## Notes
-- Verdicts unter `docs/design-reviews/` ablegen (Konvention).
+- File verdicts under `docs/design-reviews/` (convention).

@@ -1,60 +1,60 @@
-# Wave 3 — Fallschirm-Drop: Polish (Owner-Feedback 2026-07-20)
+# Wave 3 — Parachute Drop: Polish (Owner Feedback 2026-07-20)
 
-**Status:** not-started · Anlass: Owner-Sichtung der Assets/Integration; 4 Anpassungspunkte
+**Status:** not-started · Occasion: owner review of the assets/integration; 4 adjustment points
 
-## Chunks (Loop wie gehabt: plan → worker → pi-Verifikation)
-- [ ] P1 — **Weiß-Artefakte im Fallschirm entfernen (Assets):** → **CLAUDE CODE**
-      (Owner-Beschluss 2026-07-20: Asset-Bearbeitung/-Generierung grundsätzlich
-      durch Claude Code, wegen Comfy-Cloud-MCP + Tooling). Zwei Wege, Claude
-      Code entscheidet nach Machbarkeit:
-      (a) **Mechanisch (bevorzugt, keine Credits):** Near-White-Pass in
-      `scripts/gen-sprites/ingest-animation-frames.mjs` — Connected-Components
-      auf opake Near-White-Pixel (min(r,g,b) ≥ ~240, kalibrieren), NUR Regionen
-      ≥ Größen-Guard (z. B. 0,05 % der Rohframe-Fläche) entfernen, damit
-      Augen-Highlights/Bauch-Spritzer überleben; danach re-bake + re-intake +
-      Tests (kein opakes Near-White ≥ Guard; Bauch/Augen-Samples bleiben opak;
-      Determinismus/Byte-Match neu vergolden).
-      (b) **Regeneration:** parachute-wind-Frames per ComfyUI-Workflow neu
-      generieren (BiRefNet-Alpha entfernt eingeschlossenes Weiß an der Quelle;
-      Style-Anchoring + Seeds dokumentieren).
-      Ziel: nur Seile + rote Kanzel sichtbar, kein Weiß-Artefakt mehr.
-      Diagnose (bestätigt): Panel-Weiß ist eingeschlossen, Flood-Fill von den
-      Rändern erreicht es nicht.
-- [ ] P2 — **Biber beim Runterschweben größer (Runtime):** Skalierfaktor
-      während `gliding` (und ggf. `landing`), Vorschlag `GLIDE_SCALE = 1.5`
-      (PET_SCALE=1; drawFrame unterstützt scale bereits; Pixel-Art-Smoothing
-      prüfen: imageSmoothingEnabled=false → nearest-neighbor). Dirty-Rect/Pad
-      muss den größeren Footprint abdecken!
-- [ ] P3 — **Mehr Variation in der struggle-Animation:** ✅ Entscheid (c):
-      (a) **Claude Code** generiert 1–2 zusätzliche struggle-Strips via
-      Comfy-Cloud-MCP (Style-Anchoring! Seeds dokumentieren) + intake als
-      weitere Rows (`struggle-b`, `struggle-c`) — Auftrag in HANDOFF.md;
-      (b) **pi** baut den Runtime-Player: während `grabbed` läuft eine
-      rng-gesteuerte Sequenz aus 2–3 struggle-Rows (Zufallsreihenfolge,
-      saubere Übergänge am Loop-Ende, Seed-deterministisch testbar)
-- [ ] P4 — **Stärkere Wind-Varianz (Runtime, roam.ts):** zusätzlich zum Sway
-      ein persistenter horizontaler Wind-Drift: `glideDriftV` (px/s, rng aus
-      [-MAX, +MAX], neue Konstante `GLIDE_WIND_DRIFT_MAX_PX_S` ~25–40) schiebt
-      `glideBaseX` während des Flugs; optional Gust-Events (Drift wird
-      mid-flight neu gewürfelt, `GLIDE_GUST_INTERVAL_S`). Bounds-Clamping
-      bleibt hart. Tests: Drift-Richtung/-Betrag, Seed-Determinismus, Bounds.
+## Chunks (loop as usual: plan → worker → pi verification)
+- [ ] P1 — **Remove white artifacts in the parachute (assets):** → **CLAUDE CODE**
+      (owner decision 2026-07-20: asset editing/generation generally done
+      by Claude Code, because of Comfy Cloud MCP + tooling). Two paths, Claude
+      Code decides based on feasibility:
+      (a) **Mechanical (preferred, no credits):** near-white pass in
+      `scripts/gen-sprites/ingest-animation-frames.mjs` — connected components
+      on opaque near-white pixels (min(r,g,b) ≥ ~240, calibrate), remove ONLY
+      regions ≥ size guard (e.g. 0.05% of the raw frame area) so that
+      eye highlights/belly speckles survive; then re-bake + re-intake +
+      tests (no opaque near-white ≥ guard; belly/eye samples stay opaque;
+      re-golden determinism/byte match).
+      (b) **Regeneration:** regenerate parachute-wind frames via the ComfyUI
+      workflow (BiRefNet alpha removes enclosed white at the source;
+      document style anchoring + seeds).
+      Goal: only ropes + red canopy visible, no white artifact left.
+      Diagnosis (confirmed): panel white is enclosed; flood fill from the
+      edges does not reach it.
+- [ ] P2 — **Beaver larger while gliding down (runtime):** scale factor
+      during `gliding` (and possibly `landing`), proposal `GLIDE_SCALE = 1.5`
+      (PET_SCALE=1; drawFrame already supports scale; check pixel-art smoothing:
+      imageSmoothingEnabled=false → nearest-neighbor). Dirty rect/pad
+      must cover the larger footprint!
+- [ ] P3 — **More variation in the struggle animation:** ✅ decision (c):
+      (a) **Claude Code** generates 1–2 additional struggle strips via
+      Comfy Cloud MCP (style anchoring! document seeds) + intake as
+      additional rows (`struggle-b`, `struggle-c`) — assignment in HANDOFF.md;
+      (b) **pi** builds the runtime player: during `grabbed` an
+      rng-driven sequence of 2–3 struggle rows plays (random order,
+      clean transitions at loop end, seed-deterministically testable)
+- [ ] P4 — **Stronger wind variance (runtime, roam.ts):** in addition to the sway,
+      a persistent horizontal wind drift: `glideDriftV` (px/s, rng from
+      [-MAX, +MAX], new constant `GLIDE_WIND_DRIFT_MAX_PX_S` ~25–40) pushes
+      `glideBaseX` during flight; optional gust events (drift is
+      re-rolled mid-flight, `GLIDE_GUST_INTERVAL_S`). Bounds clamping
+      stays hard. Tests: drift direction/magnitude, seed determinism, bounds.
 
-## Offene Entscheidungen (Owner) — ENTSCHIEDEN 2026-07-20
-1. **P2 Skalierfaktor:** ✅ **1,5×** (GLIDE_SCALE = 1.5)
-2. **P3 Ansatz:** ✅ **(c) beides kombiniert** — 1–2 zusätzliche struggle-Strips
-   (neue Rows, z. B. `struggle-b`, `struggle-c`) per ComfyUI + Runtime-Player,
-   der während `grabbed` zufällig 2–3 der struggle-Animationen nacheinander
-   abspielt (rng-gesteuerte Sequenz, Variablen in roam.ts/renderer)
-3. **Asset-Erzeugung UND -Bearbeitung prinzipiell via Claude Code**
-   (Comfy-Cloud-MCP; Owner-Vermerk 2026-07-20, zweiter Vermerk gleicher Tag:
-   „das mit dem Bearbeiten muss Claude Code machen“). Das schließt P1 ein —
-   Claude Code wählt dort zwischen mechanischem Pipeline-Fix (a) und
-   Regeneration (b), je nachdem, was mit Workflow-Dateien/PixiJS-Tools
-   praktikabel ist. pi übernimmt weiterhin die Runtime-Chunks (P2, P3b, P4).
+## Open decisions (owner) — DECIDED 2026-07-20
+1. **P2 scale factor:** ✅ **1.5×** (GLIDE_SCALE = 1.5)
+2. **P3 approach:** ✅ **(c) both combined** — 1–2 additional struggle strips
+   (new rows, e.g. `struggle-b`, `struggle-c`) via ComfyUI + runtime player
+   that randomly plays 2–3 of the struggle animations in sequence during
+   `grabbed` (rng-driven sequence, variables in roam.ts/renderer)
+3. **Asset generation AND editing in principle via Claude Code**
+   (Comfy Cloud MCP; owner note 2026-07-20, second note same day:
+   "the editing part must be done by Claude Code"). This includes P1 —
+   Claude Code chooses there between mechanical pipeline fix (a) and
+   regeneration (b), depending on what is feasible with workflow files/PixiJS
+   tools. pi continues to take the runtime chunks (P2, P3b, P4).
 
-## Tracked Open Task (über diese Wave hinaus)
-- **Flug-Animationen pro Biber-Stadium:** Wenn der Biber wächst (teen/adult,
-  spätere Stages), müssen struggle/parachute-wind/land je Stadium neu erzeugt
-  + intake werden. Aktuell ist die Interaktion bewusst baby-only (C4-Gating).
-  → betrifft ROADMAP M2 Phase 5+ (jede Animations-Phase) und Phase 15
-  (Adult-Art); bei jeder künftigen Stage-Art-Phase mit einsammeln.
+## Tracked open task (beyond this wave)
+- **Flight animations per beaver stage:** when the beaver grows (teen/adult,
+  later stages), struggle/parachute-wind/land must be newly created
+  + ingested per stage. The interaction is currently deliberately baby-only (C4 gating).
+  → affects ROADMAP M2 Phase 5+ (every animation phase) and Phase 15
+  (adult art); collect with every future stage-art phase.

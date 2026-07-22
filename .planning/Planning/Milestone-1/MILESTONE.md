@@ -1,44 +1,44 @@
 # Milestone 1 — Windows-native App
 
-> Why it matters: Beaver Buddy läuft unter Windows 10/11 vollwertig — Overlay, Tray, Secret Store, Installer, Parität mit dem Upstream (`ai-beavers/beaver-buddy`).
+> Why it matters: Beaver Buddy runs fully on Windows 10/11 — overlay, tray, secret store, installer, parity with the upstream (`ai-beavers/beaver-buddy`).
 
 **Status:** done (2026-07-17)
 
 ## Phases
-- [x] Phase 1 — Windows-Infrastruktur: Secret Store (#1), Auto-Hide-Taskbar (#2), Icon-Provisorium (#3), Signing-Infra (#4a), Installer-Lokalisierung (#5), Shortcuts (#6)
-- [x] Phase 2 — Runde 2 Parität & Feinschliff (#46–#62, inkl. Upstream-Merge `d7acaf0`)
+- [x] Phase 1 — Windows infrastructure: Secret Store (#1), auto-hide taskbar (#2), icon placeholder (#3), signing infra (#4a), installer localization (#5), shortcuts (#6)
+- [x] Phase 2 — Round 2 parity & polish (#46–#62, incl. upstream merge `d7acaf0`)
 
 ## Success
-- Windows-Build grün: typecheck / lint / 441+ Tests / electron-builder ✅
-- `upstream/main` semantisch gemergt, Paritäts-Items #49–#62 abgeschlossen
+- Windows build green: typecheck / lint / 441+ tests / electron-builder ✅
+- `upstream/main` semantically merged, parity items #49–#62 completed
 
-## Offene Restpunkte (bewusst verschoben)
-- #3 Finaler Designer-Icon-Pass (Provisorium: programmatisch aus Sprite generiert)
-- #4b SmartScreen-freie Signatur (dokumentiert, kostenpflichtiges Zertifikat — Owner-Entscheidung)
-- #63/#64 optional, Owner-Entscheidung ausstehend
+## Open remaining items (deliberately deferred)
+- #3 Final designer icon pass (placeholder: programmatically generated from sprite)
+- #4b SmartScreen-free signature (documented, paid certificate — owner decision)
+- #63/#64 optional, owner decision pending
 
-## Belege
-- Detailplan & Abarbeitungsstand: `.flightplan/Reference/windows-native-flight-plan.md`
-- Phasen-Logs Runde 1: `.flightplan/Archive/phase-{1..5}-{plan,implementation-log,verification-report,completion}.md`
-- Paritäts-Berichte: `.flightplan/Archive/plans/parity/`
-- Design-Gates: `docs/design-reviews/`
+## Evidence
+- Detail plan & processing status: `.flightplan/Reference/windows-native-flight-plan.md`
+- Phase logs round 1: `.flightplan/Archive/phase-{1..5}-{plan,implementation-log,verification-report,completion}.md`
+- Parity reports: `.flightplan/Archive/plans/parity/`
+- Design gates: `docs/design-reviews/`
 
 ---
 
-## Decision record — Cross-platform scope (ehemals ADR 002)
+## Decision record — Cross-platform scope (formerly ADR 002)
 
-> Aus dem öffentlichen Repo hierher migriert (2026-07-18): Die Entscheidungs-Doku
-> lebt in der lokalen Planung; das Ergebnis ist öffentlich in README/CLAUDE.md/
-> CONTRIBUTING.md dokumentiert (Scope-Notes, Plattform-Hinweise).
-> Original-Datei: `docs/adr/002-cross-platform-scope.md` (entfernt).
+> Migrated here from the public repo (2026-07-18): the decision doc lives in
+> local planning; the outcome is publicly documented in README/CLAUDE.md/
+> CONTRIBUTING.md (scope notes, platform notes).
+> Original file: `docs/adr/002-cross-platform-scope.md` (removed).
 
 **Status:** Accepted · **Date:** 2026-07-15
-**Update 2026-07-21 (Teambesprechung):** macOS wird von „preserved, not actively
-extended" auf **aktiv ausgeliefert** hochgestuft — Beaver Buddy wird als
-**Multiplattform-App nativ für Windows UND macOS** ausgeliefert (Electron macht
-dieselbe Codebasis auf beiden OS möglich). Konsequenz: Release-Pipeline (M6/P4)
-baut + signiert beide Plattformen; macOS-Signing/Notarisierung braucht Apple-
-Developer-Zertifikat (Budget-Entscheid analog #4b).
+**Update 2026-07-21 (team meeting):** macOS is upgraded from "preserved, not
+actively extended" to **actively shipped** — Beaver Buddy ships as a
+**multi-platform app native for Windows AND macOS** (Electron makes the same
+codebase possible on both OSes). Consequence: the release pipeline (M6/P4)
+builds + signs both platforms; macOS signing/notarization needs an Apple
+Developer certificate (budget decision analogous to #4b).
 
 ### Context
 
@@ -84,8 +84,8 @@ platform-specific adapters where macOS-only behavior exists. The app will:
 
 - `PRD.md`, `CLAUDE.md`, and `README.md` were updated to reflect macOS + Windows
   support and the current Windows focus.
-- Build items were tracked in `.flightplan/Archive/WINDOWS_PORT_PLAN.md` — später
-  ersetzt durch `.flightplan/Reference/windows-native-flight-plan.md`; aktuelle Planung lebt in
+- Build items were tracked in `.flightplan/Archive/WINDOWS_PORT_PLAN.md` — later
+  replaced by `.flightplan/Reference/windows-native-flight-plan.md`; current planning lives in
   `.flightplan/`.
 - The existing macOS code paths are not removed; they are wrapped behind
   adapters so both platforms build from the same source.

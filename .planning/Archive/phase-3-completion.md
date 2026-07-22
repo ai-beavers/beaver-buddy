@@ -1,112 +1,112 @@
-# Phase 3: Windows Integrations — Abschlussdokument (BL-WIN-5)
+# Phase 3: Windows Integrations — Completion Document (BL-WIN-5)
 
-**Datum:** 2026-07-15
-**Build-Item:** BL-WIN-5 — Claude-Usage-Log-Pfade Windows-kompatibel machen
-**Status:** ✅ Abgeschlossen
+**Date:** 2026-07-15
+**Build item:** BL-WIN-5 — Make Claude usage log paths Windows-compatible
+**Status:** ✅ Completed
 
 ---
 
-## 1. Zusammenfassung
+## 1. Summary
 
-Phase 3 war auf das einzige Build-Item **BL-WIN-5** fokussiert: die
-plattformspezifische Auflösung der Claude-Code-Usage-Log-Verzeichnisse auf
-Windows. Das Ziel war, dass Beaver Buddy auf Windows Claude-Code-Logs korrekt
-findet, ohne das bestehende Verhalten auf macOS und Linux zu beschädigen.
+Phase 3 focused on the single build item **BL-WIN-5**: platform-specific
+resolution of the Claude Code usage log directories on Windows. The goal was
+for Beaver Buddy to correctly find Claude Code logs on Windows without
+breaking the existing behavior on macOS and Linux.
 
-Die Umsetzung wurde erfolgreich abgeschlossen. `discoverPaths()` erhielt einen
-optionalen `platform`-Parameter, auf `win32` wird ausschließlich der
-Legacy-Pfad `~/.claude` (aufgelöst zu `%USERPROFILE%\.claude`) geprüft, und auf
-`darwin`/`linux` bleibt das bisherige Verhalten mit XDG plus Legacy erhalten.
-`CLAUDE_CONFIG_DIR` bleibt auf allen Plattformen der Override mit höchster
-Priorität und akzeptiert auf Windows zusätzlich zum Komma auch Semikolon als
-Trennzeichen.
+The implementation was completed successfully. `discoverPaths()` received an
+optional `platform` parameter; on `win32` only the legacy path `~/.claude`
+(resolved to `%USERPROFILE%\.claude`) is checked, and on `darwin`/`linux` the
+previous behavior with XDG plus legacy is preserved. `CLAUDE_CONFIG_DIR`
+remains the highest-priority override on all platforms and additionally
+accepts semicolons as separators on Windows alongside commas.
 
 ---
 
 ## 2. BL-WIN-5 Status
 
-| Kriterium | Status |
+| Criterion | Status |
 |-----------|--------|
-| Windows: nur Legacy-Pfad `~/.claude` | ✅ |
-| macOS/Linux: XDG + Legacy erhalten | ✅ |
-| `CLAUDE_CONFIG_DIR` als Override mit höchster Priorität | ✅ |
-| Semikolon-Trennung für `CLAUDE_CONFIG_DIR` auf Windows | ✅ |
-| Plattformspezifische Tests für Windows und Nicht-Windows | ✅ |
-| Alle `discoverPaths`-Aufrufe in Tests explizit parametrisiert | ✅ |
-| Rückwärtskompatibilität zu `tracker.ts` | ✅ |
-| Keine neuen Dependencies | ✅ |
-| Codex-Tracking auf Windows nicht aktiviert | ✅ (bewusst zurückgestellt) |
+| Windows: legacy path `~/.claude` only | ✅ |
+| macOS/Linux: XDG + legacy preserved | ✅ |
+| `CLAUDE_CONFIG_DIR` as highest-priority override | ✅ |
+| Semicolon separation for `CLAUDE_CONFIG_DIR` on Windows | ✅ |
+| Platform-specific tests for Windows and non-Windows | ✅ |
+| All `discoverPaths` calls in tests explicitly parameterized | ✅ |
+| Backward compatibility with `tracker.ts` | ✅ |
+| No new dependencies | ✅ |
+| Codex tracking not enabled on Windows | ✅ (deliberately deferred) |
 
 ---
 
-## 3. Geänderte Dateien
+## 3. Changed Files
 
-Die folgenden Source-Dateien wurden im Rahmen von BL-WIN-5 geändert:
+The following source files were changed as part of BL-WIN-5:
 
 - `src/main/usage/paths.ts`
 - `src/main/usage/paths.test.ts`
 
-Im Rahmen dieser Dokumentations-Aktualisierung wurden zusätzlich folgende
-Dokumentationsdateien angepasst bzw. neu erstellt:
+As part of this documentation update, the following documentation files were
+also adjusted or newly created:
 
-- `.flightplan/Archive/WINDOWS_PORT_PLAN.md` — Status-Update, BL-WIN-5 als erledigt,
-  Phase-3-Abschnitt ergänzt.
-- `CLAUDE.md` — Windows-Pfadlogik und Semikolon-Separator dokumentiert.
-- `README.md` — Hinweise zu Claude-Code-Usage-Tracking auf Windows und
-  Codex-Tracking-Einschränkung ergänzt.
-- `.flightplan/Archive/phase-3-completion.md` — dieses Dokument.
+- `.flightplan/Archive/WINDOWS_PORT_PLAN.md` — status update, BL-WIN-5 marked
+  as done, Phase 3 section added.
+- `CLAUDE.md` — Windows path logic and semicolon separator documented.
+- `README.md` — notes on Claude Code usage tracking on Windows and the Codex
+  tracking limitation added.
+- `.flightplan/Archive/phase-3-completion.md` — this document.
 
 ---
 
-## 4. Verifikationsergebnisse
+## 4. Verification Results
 
-Die Verifikation wurde auf einem Windows-Entwicklungsrechner
-(`process.platform === 'win32'`) durchgeführt.
+Verification was performed on a Windows development machine
+(`process.platform === 'win32'`).
 
-| Befehl | Ergebnis |
-|--------|----------|
-| `npm run typecheck` | ✅ Erfolgreich |
-| `npm run lint` | ✅ Erfolgreich |
+| Command | Result |
+|---------|--------|
+| `npm run typecheck` | ✅ Successful |
+| `npm run lint` | ✅ Successful |
 | `npm test` | ✅ 323 passed \| 6 skipped (329 total) |
-| `npm run build` | ✅ Erfolgreich |
-| `npx electron-builder --win --publish never` | ✅ Erfolgreich |
+| `npm run build` | ✅ Successful |
+| `npx electron-builder --win --publish never` | ✅ Successful |
 
-Die 6 skipped Tests liegen in `scripts/gen-sprites/ingest-images.test.ts` und
-sind nicht Gegenstand von BL-WIN-5.
+The 6 skipped tests are in `scripts/gen-sprites/ingest-images.test.ts` and
+are not part of BL-WIN-5.
 
-Alle neuen und bestehenden Tests in `src/main/usage/paths.test.ts` sind grün
-(20 Tests).
-
----
-
-## 5. Verbleibende offene Punkte
-
-- **Codex-Tracking auf Windows:** Codex-Usage-Logs werden auf Windows weiterhin
-  nicht gelesen. Der offizielle Windows-Log-Pfad der Codex-CLI ist noch nicht
-  geklärt; dies bleibt ein Follow-up-Build-Item für Phase 5 oder später.
-- **Nicht gelistete Plattformen:** `discoverPaths` ohne expliziten
-  `platform`-Parameter castet `process.platform` auf den internen `Platform`-Typ.
-  Auf Plattformen außer `win32`, `darwin` und `linux` fällt das Laufzeitverhalten
-  auf XDG + Legacy zurück, was konsistent mit dem Status quo vor BL-WIN-5 ist.
-- **CI-Verifikation auf `ubuntu-latest` und `windows-latest`:** Lokal wurde auf
-  Windows getestet. Da alle `discoverPaths`-Aufrufe in den Tests explizit
-  parametrisiert sind, sollten die Tests auch auf Linux-CI-Knoten deterministisch
-  laufen. Ein erneuter CI-Lauf wird empfohlen.
+All new and existing tests in `src/main/usage/paths.test.ts` are green
+(20 tests).
 
 ---
 
-## 6. Nächste Phase
+## 5. Remaining Open Items
 
-**Phase 4: Polish & Release-Readiness (BL-WIN-8, BL-WIN-10)**
+- **Codex tracking on Windows:** Codex usage logs are still not read on
+  Windows. The official Windows log path of the Codex CLI is not yet
+  clarified; this remains a follow-up build item for Phase 5 or later.
+- **Unlisted platforms:** `discoverPaths` without an explicit `platform`
+  parameter casts `process.platform` to the internal `Platform` type. On
+  platforms other than `win32`, `darwin`, and `linux`, the runtime behavior
+  falls back to XDG + legacy, which is consistent with the status quo before
+  BL-WIN-5.
+- **CI verification on `ubuntu-latest` and `windows-latest`:** Testing was
+  done locally on Windows. Since all `discoverPaths` calls in the tests are
+  explicitly parameterized, the tests should also run deterministically on
+  Linux CI nodes. A fresh CI run is recommended.
 
-Ziele der nächsten Phase:
+---
 
-1. **BL-WIN-8** — Optional: HiDPI/Scaling für Windows-Displays prüfen und
-   gegebenenfalls verbessern, damit Pixel-Art bei 125 %/150 %/200 %-
-   Windows-Skalierung scharf bleibt.
-2. **BL-WIN-10** — Design-Gate, Screenshots, finale Doku-Updates für
+## 6. Next Phase
+
+**Phase 4: Polish & Release Readiness (BL-WIN-8, BL-WIN-10)**
+
+Goals of the next phase:
+
+1. **BL-WIN-8** — Optional: check and, if necessary, improve HiDPI/scaling for
+   Windows displays so pixel art stays sharp at 125 %/150 %/200 % Windows
+   scaling.
+2. **BL-WIN-10** — Design gate, screenshots, final documentation updates for
    README/PRD/CLAUDE.
 
-Die zurückgestellten Follow-up-Themen (BL-WIN-6 Secret-Store, BL-WIN-7 atomares
-Schreiben, Codex-Tracking auf Windows) bleiben in Phase 5 bis zur Klärung
-weiterer Abhängigkeiten.
+The deferred follow-up topics (BL-WIN-6 secret store, BL-WIN-7 atomic writes,
+Codex tracking on Windows) remain in Phase 5 pending clarification of further
+dependencies.

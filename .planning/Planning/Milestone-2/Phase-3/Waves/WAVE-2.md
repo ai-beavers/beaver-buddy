@@ -1,62 +1,62 @@
-# Wave 2 — Fallschirm-Drop: Runtime (Input-Capture, State-Machine, Glide, Landing)
+# Wave 2 — Parachute Drop: Runtime (Input Capture, State Machine, Glide, Landing)
 
-**Status:** done (2026-07-20) — alle 4 Chunks committed auf BL-17 (HEAD `3fe1e7d`); Carry-overs ganz unten.
+**Status:** done (2026-07-20) — all 4 chunks committed on BL-17 (HEAD `3fe1e7d`); carry-overs at the bottom.
 
-## Chunk-Plan (Loop: plan → review → implement → verify → doc)
-- [x] C1 — Click-Counter (4-s-Fenster) + `grabbed`-Phase in `roam.ts` + Tests ✅ 2026-07-20 (planner→worker→reviewer: 2 critical Fixes [festes Fenster statt sliding, Reset bei enterGrabbed] + 5 Test-Erweiterungen; 511 Tests grün, tsc/eslint clean)
-- [x] C2 — `gliding`-Physik (Wind-Sway) + `landing`-Phase + Tests ✅ 2026-07-20 (planner→worker→pi-Verifikation: 19 neue Tests, 476 grün; Commit `0076d22` auf BL-17. Neue Erkenntnisse im Plan: clampRoamStateToBounds phasenbewusst [Resize während Gleitflug], Rotation-Reset nach Climb)
-- [x] C3 — Input-Capture-Layer (Renderer-Pointer + `overlay-adapter.ts`) ✅ 2026-07-20 (1 IPC-Kanal `input:capture-mode`, hover-forward Initial, reine Logik input-capture.ts; pi-Review fixte Spec-Abweichung: gliding/landing = click-through auch bei Hover; 496 grün; Commit auf BL-17)
-- [x] C4 — Renderer-Verdrahtung + Integration + Pflichten ✅ 2026-07-20 (Sheet-Intake `assets/sprites/` 768×480/5 Rows via `assets:parachute` + Byte-Match-Reconciliation-Test; beaver-baby aus STAGE_SPECS entfernt; Stage-Gating baby-only; facing/rotation-Reset; interaction-model.md finalisiert; BL-17-Verdict **PASS mit 2 dokumentierten Limitations**; CDP-Screenshots pending manuell; Suite 500 grün)
+## Chunk plan (loop: plan → review → implement → verify → doc)
+- [x] C1 — Click counter (4-s window) + `grabbed` phase in `roam.ts` + tests ✅ 2026-07-20 (planner→worker→reviewer: 2 critical fixes [fixed window instead of sliding, reset on enterGrabbed] + 5 test extensions; 511 tests green, tsc/eslint clean)
+- [x] C2 — `gliding` physics (wind sway) + `landing` phase + tests ✅ 2026-07-20 (planner→worker→pi verification: 19 new tests, 476 green; commit `0076d22` on BL-17. New insights in the plan: clampRoamStateToBounds phase-aware [resize during glide], rotation reset after climb)
+- [x] C3 — Input capture layer (renderer pointer + `overlay-adapter.ts`) ✅ 2026-07-20 (1 IPC channel `input:capture-mode`, hover-forward initial, pure logic input-capture.ts; pi review fixed spec deviation: gliding/landing = click-through even on hover; 496 green; commit on BL-17)
+- [x] C4 — Renderer wiring + integration + mandatory items ✅ 2026-07-20 (sheet intake `assets/sprites/` 768×480/5 rows via `assets:parachute` + byte-match reconciliation test; beaver-baby removed from STAGE_SPECS; stage gating baby-only; facing/rotation reset; interaction-model.md finalized; BL-17 verdict **PASS with 2 documented limitations**; CDP screenshots pending manual; suite 500 green)
 
-## Abschluss-Notizen (2026-07-20)
-- BL-17: 8 Commits auf upstream/main (`d1ace44`..`3fe1e7d`).
-- Carry-over 1: Gallery-Re-Apply nach Merge PR #28–#30 (Eintrag aus Fork-Commit b6c97f1).
-- Carry-over 2: Owner-Sign-off struggle left-facing Frames (Verdict: pending).
-- Carry-over 3: Live-Screenshots manuell durch Owner (CDP hing in pi-Umgebung).
-- Carry-over 4: PR #31 aktualisieren (Push BL-17 + Body: enthält jetzt ALLE Slices inkl. Input-Wiring + Assets).
+## Closing notes (2026-07-20)
+- BL-17: 8 commits on upstream/main (`d1ace44`..`3fe1e7d`).
+- Carry-over 1: gallery re-apply after merge of PR #28–#30 (entry from fork commit b6c97f1).
+- Carry-over 2: owner sign-off on struggle left-facing frames (verdict: pending).
+- Carry-over 3: live screenshots manually by owner (CDP hung in pi environment).
+- Carry-over 4: update PR #31 (push BL-17 + body: now contains ALL slices incl. input wiring + assets).
 
 ## Prerequisites
-- [ ] WAVE-1 done (Rows `struggle`/`parachute-wind`/`land` im Sheet) — **nur für C4-Integration nötig**; C1–C3 sind asset-unabhängig
-- [x] `docs/interaction-model.md` als Spezifikation vorhanden (Draft seit 2026-07-20)
+- [ ] WAVE-1 done (rows `struggle`/`parachute-wind`/`land` in the sheet) — **only needed for C4 integration**; C1–C3 are asset-independent
+- [x] `docs/interaction-model.md` available as specification (draft since 2026-07-20)
 
 ## Tasks
-- [ ] **Input-Capture-Layer:** Pointer-Events im Renderer + Orchestrierung von
-      `setIgnoreMouseEvents` im Main-Prozess (`src/main/overlay-adapter.ts`):
-      Hover-Capture am Biber (Klicks sichtbar machen) → Full-Capture während
-      `grabbed` (nichts darunter klickbar) → Rückgabe an Click-through nach
-      der Landung
-- [ ] **Click-Counter:** 3 Klicks innerhalb eines 4-s-Gesamtfensters (Fenster
-      startet mit Klick 1, danach Reset); klickbar in jedem Roam-Zustand;
-      Hit-Test auf die Biber-Sprite-Fläche
-- [ ] **State-Machine (`src/renderer/roam.ts`, rein + unit-testbar):**
-      neue Phasen `grabbed` (folgt Cursor, struggle-Row, Roam pausiert),
-      `gliding` (parachute-wind-Row + Wind-Sway-Physik: sinusförmige
-      horizontale Drift + leichte Rotation, rng-gestreut, Fallgeschwindigkeit
-      getunt), `landing` (land-Row, danach `idle` → normaler Loop)
-- [ ] **Release:** Doppelklick während `grabbed` → Übergang in `gliding` an
-      der Cursor-Position
-- [ ] **Verdrahtung Renderer-Loop:** Sheet-Rows laden/registrieren, Animation
-      pro Phase, Bounds-Handling (Landung am unteren Rand)
-- [ ] **Tests:** Unit-Tests State-Machine (Übergänge, 4-s-Fenster, Reset,
-      Bounds/Landung, rng-deterministisch), Click-Counter-Tests, bestehende
-      Suite grün (`./node_modules/.bin/vitest run`, `tsc`, `eslint`)
-- [ ] **Design-Gate (#38):** Verdict unter `docs/design-reviews/`
-- [ ] **Registrierung:** neue Rows/Assets in `docs/asset-gallery.md`
-- [ ] **Doku:** `docs/interaction-model.md` gegen die Implementierung
-      verifizieren und finalisieren
+- [ ] **Input capture layer:** pointer events in the renderer + orchestration of
+      `setIgnoreMouseEvents` in the main process (`src/main/overlay-adapter.ts`):
+      hover capture on the beaver (make clicks visible) → full capture during
+      `grabbed` (nothing below clickable) → hand back to click-through after
+      the landing
+- [ ] **Click counter:** 3 clicks within a 4-s total window (window
+      starts with click 1, then reset); clickable in every roam state;
+      hit test on the beaver sprite area
+- [ ] **State machine (`src/renderer/roam.ts`, pure + unit-testable):**
+      new phases `grabbed` (follows cursor, struggle row, roam paused),
+      `gliding` (parachute-wind row + wind sway physics: sinusoidal
+      horizontal drift + slight rotation, rng-scattered, fall speed
+      tuned), `landing` (land row, then `idle` → normal loop)
+- [ ] **Release:** double-click during `grabbed` → transition into `gliding` at
+      the cursor position
+- [ ] **Renderer loop wiring:** load/register sheet rows, animation
+      per phase, bounds handling (landing at the bottom edge)
+- [ ] **Tests:** unit tests for the state machine (transitions, 4-s window, reset,
+      bounds/landing, rng-deterministic), click counter tests, existing
+      suite green (`./node_modules/.bin/vitest run`, `tsc`, `eslint`)
+- [ ] **Design gate (#38):** verdict under `docs/design-reviews/`
+- [ ] **Registration:** new rows/assets in `docs/asset-gallery.md`
+- [ ] **Docs:** verify `docs/interaction-model.md` against the implementation
+      and finalize
 
 ## Done when
-- Komplette Sequenz „3× klicken (≤4 s) → grabbed (zappelt, Full-Capture) →
-  Doppelklick → gliding (Wind-Sway) → landing → Roam-Loop" funktioniert live
-  in der Windows-App; Tests grün; Design-Gate + Galerie + Interaktions-Doku
-  erledigt.
+- The complete sequence "3× click (≤4 s) → grabbed (squirms, full capture) →
+  double-click → gliding (wind sway) → landing → roam loop" works live
+  in the Windows app; tests green; design gate + gallery + interaction docs
+  done.
 
 ## Notes
-- `roam.ts` bleibt frei von DOM/Canvas-Zugriff (reine Funktionen, injizierte rng).
-- `npx` ist geblockt (pi-safety-guard) → lokale Binaries `./node_modules/.bin/…`.
+- `roam.ts` stays free of DOM/Canvas access (pure functions, injected rng).
+- `npx` is blocked (pi safety guard) → local binaries `./node_modules/.bin/…`.
 
-## C4-Zusatz (aus PR-Aufteilung 2026-07-20)
-- [ ] **Gallery-Re-Apply:** `docs/asset-gallery.md` existiert noch nicht auf
-  upstream/main (kommt mit PR #28–#30). Der vorbereitete Galerie-Eintrag
-  („parachute-drop animations", Stand Fork-Commit b6c97f1) muss nach deren
-  Merge erneut angewendet werden — zusammen mit dem Sheet-Intake.
+## C4 addendum (from PR split 2026-07-20)
+- [ ] **Gallery re-apply:** `docs/asset-gallery.md` does not yet exist on
+  upstream/main (comes with PR #28–#30). The prepared gallery entry
+  ("parachute-drop animations", as of fork commit b6c97f1) must be re-applied
+  after their merge — together with the sheet intake.

@@ -1,91 +1,91 @@
-# Plan #46 — Sichtbarer „Fortschritt zurücksetzen“-Button im Growth-Settings-Fenster
+# Plan #46 — Visible "Reset progress" button in the Growth Settings window
 
-## 1. Ziel & Akzeptanzkriterien
+## 1. Goal & acceptance criteria
 
-Der User kann im „Growth Settings“-Fenster per Knopfdruck den Biber auf den Start zurücksetzen — im laufenden Betrieb, ohne App-Neustart und ohne State-Dir zu löschen.
+The user can reset the beaver to the start at the push of a button in the "Growth Settings" window — while the app is running, without an app restart and without deleting the state dir.
 
-Akzeptanzkriterien:
+Acceptance criteria:
 
-- Ein sichtbarer, klar abgegrenzter Button („Danger zone“) in `settings.html`, mit Zwei-Klick-Bestätigung (kein versehentlicher Reset).
-- Nach Auslösung: XP = 0, Level = 1, Stage = `baby`; die Hatch-Animation spielt sofort im Overlay erneut ab.
-- MRR-Secrets (Stripe/RevenueCat-Keys) und Growth-Settings (Mode, Connected-Flags) bleiben vollständig erhalten.
-- Tray-Pet-Label zeigt nach Reset sofort `Lv 1 — baby (0/100)`.
-- Kein Re-Award der Token-Historie: der laufende Usage-Tracker darf nach dem Reset nicht die gesamte Lifetime-Historie erneut als XP gutschreiben.
-- Nach App-Neustart bleibt der Reset bestehen (persistiert) und die Hatch läuft NICHT erneut (Onboarding-Flag bleibt `hatched: true`).
-- Kein neuer IPC-Wildwuchs: neuer Channel folgt exakt dem bestehenden Settings-Muster (Sender-Frame-Check, Handler Electron-frei testbar).
-- `npm test` (383 bestehende Tests + neue) grün, `typecheck` und `lint` sauber. Keine neuen Dependencies, `package.json`/`package-lock.json` unverändert.
+- A visible, clearly separated button ("Danger zone") in `settings.html`, with two-click confirmation (no accidental reset).
+- After triggering: XP = 0, Level = 1, Stage = `baby`; the hatch animation replays immediately in the overlay.
+- MRR secrets (Stripe/RevenueCat keys) and growth settings (mode, connected flags) remain fully intact.
+- The tray pet label shows `Lv 1 — baby (0/100)` immediately after the reset.
+- No re-award of the token history: after the reset the running usage tracker must not credit the entire lifetime history as XP again.
+- After an app restart the reset persists (persisted) and the hatch does NOT run again (the onboarding flag stays `hatched: true`).
+- No new IPC sprawl: the new channel follows the existing settings pattern exactly (sender-frame check, handler testable without Electron).
+- `npm test` (383 existing tests + new ones) green, `typecheck` and `lint` clean. No new dependencies, `package.json`/`package-lock.json` unchanged.
 
-## 2. Reset-Semantik
+## 2. Reset semantics
 
-State-Dateien im einzigen State-Dir (`app.getPath('userData')`, siehe `src/main/main.ts:191`):
+State files in the single state dir (`app.getPath('userData')`, see `src/main/main.ts:191`):
 
-| Datei / Ort | Inhalt | Aktion bei Reset |
+| File / location | Content | Action on reset |
 |---|---|---|
-| `xp-state.json` (`src/main/xp/store.ts`) | `xp`, `lastSeenLifetimeTokens`, `lastMrrAwardDate` | `xp` → 0, `lastMrrAwardDate` → `null`. **`lastSeenLifetimeTokens` bleibt unverändert** — das ist der forward-only Durable-Cursor des Trackers (`xp/engine.ts:89-100`); ein Zurücksetzen auf 0 würde beim nächsten Tracker-Tick die komplette Token-Historie erneut als XP gutschreiben und den Reset faktisch rückgängig machen. |
-| `onboarding-state.json` (`src/main/onboarding.ts`) | `hatched` | `{ hatched: true }` persistieren **bevor** die Hatch-Nachricht gesendet wird — exakt dieselbe Exactly-once-Disziplin wie der Launch-Pfad (`main.ts:197-203`): ein Kill mitten in der ~6s-Hatch führt nicht zum Re-Hatch beim nächsten Start. (`hatched: false` ist keine Option — es gibt keinen `hatch:done`-Rückkanal, die Datei würde nie wieder `true`.) |
-| `growth-settings.json` (`src/main/mrr/settings-store.ts`) | `mode`, `stripeConnected`, `revenuecatConnected` | **Unangetastet.** |
-| `secrets/<service>/*.enc` (Pfad-Bauer `src/main/mrr/secrets.ts:14-18`, Windows DPAPI/`safeStorage` `secrets.ts:25-35`) bzw. macOS-Keychain | Stripe/RevenueCat-Keys | **Unangetastet.** |
+| `xp-state.json` (`src/main/xp/store.ts`) | `xp`, `lastSeenLifetimeTokens`, `lastMrrAwardDate` | `xp` → 0, `lastMrrAwardDate` → `null`. **`lastSeenLifetimeTokens` stays unchanged** — this is the tracker's forward-only durable cursor (`xp/engine.ts:89-100`); resetting it to 0 would credit the entire token history as XP again on the next tracker tick and effectively undo the reset. |
+| `onboarding-state.json` (`src/main/onboarding.ts`) | `hatched` | Persist `{ hatched: true }` **before** the hatch message is sent — exactly the same exactly-once discipline as the launch path (`main.ts:197-203`): a kill in the middle of the ~6s hatch must not lead to a re-hatch on the next start. (`hatched: false` is not an option — there is no `hatch:done` back-channel, the file would never become `true` again.) |
+| `growth-settings.json` (`src/main/mrr/settings-store.ts`) | `mode`, `stripeConnected`, `revenuecatConnected` | **Untouched.** |
+| `secrets/<service>/*.enc` (path builder `src/main/mrr/secrets.ts:14-18`, Windows DPAPI/`safeStorage` `secrets.ts:25-35`) or macOS Keychain | Stripe/RevenueCat keys | **Untouched.** |
 
-Folgeentscheidungen:
+Resulting decisions:
 
-- **Kein App-Neustart nötig.** Alle State-Owner (`XpEngine`, Onboarding-Datei, Renderer-Hatch-State) können zur Laufzeit zurückgesetzt werden; kein Modul cached den Onboarding-Status nach dem Launch (er wird nur einmal in `main.ts:195` gelesen). Ein Neustart wäre schlechtere UX ohne jeden Korrrektheitsgewinn.
-- **MRR-Modus:** `lastMrrAwardDate = null` bedeutet: der nächste MRR-Poll darf das Tages-MRR dem frischen Biber erneut gutschreiben. Das ist konsistent mit „Neustart des Tiers“ und verhindert kein Double-Award desselben Tiers (altes Tier existiert nicht mehr).
-- **Kein Evolution-Signal beim Reset:** Der Stage-Wechsel adult/teen → baby ist ein Rückschritt, keine Evolution. Das vom Reset emittierte Pet-Update trägt **kein** `evolvingTo` — sonst feuert `main.ts:297-299` den `evolution`-Quip und der Renderer startet die Evolution-Sequenz (`renderer.ts:150-160`). Der Renderer synct die Stage bei Updates ohne `evolvingTo` direkt (`renderer.ts:170-174`), was während einer aktiven Hatch ebenfalls korrekt ist.
-- Der versteckte QA-Flag `--reset-hatch` (`main.ts:193-196`) bleibt unverändert bestehen (minimale Änderung; der Button ist keine Ersetzung, sondern die User-sichtbare Variante).
+- **No app restart needed.** All state owners (`XpEngine`, onboarding file, renderer hatch state) can be reset at runtime; no module caches the onboarding status after launch (it is read only once in `main.ts:195`). A restart would be worse UX with no correctness gain whatsoever.
+- **MRR mode:** `lastMrrAwardDate = null` means: the next MRR poll may credit the daily MRR to the fresh beaver again. That is consistent with "restart of the pet" and does not allow a double-award of the same pet (the old pet no longer exists).
+- **No evolution signal on reset:** the stage change adult/teen → baby is a regression, not an evolution. The pet update emitted by the reset carries **no** `evolvingTo` — otherwise `main.ts:297-299` fires the `evolution` quip and the renderer starts the evolution sequence (`renderer.ts:150-160`). On updates without `evolvingTo` the renderer syncs the stage directly (`renderer.ts:170-174`), which is also correct during an active hatch.
+- The hidden QA flag `--reset-hatch` (`main.ts:193-196`) remains unchanged (minimal change; the button is not a replacement but the user-visible variant).
 
-## 3. Architektur / Flow
+## 3. Architecture / flow
 
-Neuer Channel: **`settings:reset-progress`** (Konstante `SETTINGS_RESET_PROGRESS_CHANNEL`), ohne Payload — daher entfällt eine Erweiterung von `settings-validate.ts` (nichts zu validieren; der Renderer wird weiterhin nicht vertraut, der Sender-Frame-Check ist die Absicherung).
+New channel: **`settings:reset-progress`** (constant `SETTINGS_RESET_PROGRESS_CHANNEL`), without payload — therefore no extension of `settings-validate.ts` is needed (nothing to validate; the renderer is still not trusted, the sender-frame check is the safeguard).
 
-Renderer-Flow (settings.html):
+Renderer flow (settings.html):
 
-1. User klickt „Reset beaver…“ → Button armiert (Text wird zu „Sure? Click again to reset“, 5-s-Timeout disarmiert wieder).
-2. Zweiter Klick innerhalb des Fensters → `api.resetProgress()` → Ergebnis in `#status` („progress reset — hatch replaying“ / `error: …`).
+1. User clicks "Reset beaver…" → button arms (text becomes "Sure? Click again to reset", a 5-s timeout disarms it again).
+2. Second click within the window → `api.resetProgress()` → result in `#status` ("progress reset — hatch replaying" / `error: …`).
 
-Main-Flow:
+Main flow:
 
-1. `ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL)` → `handlers.resetProgress(event)` (in `createSettingsHandlers`): Sender-Frame-Check (`isFromSettingsWindow`), dann `await deps.onProgressReset()`, Erfolg `{ ok: true }`, Exception → `{ ok: false, error: 'reset failed' }`.
-2. `deps.onProgressReset` wird in `main.ts` (`openGrowthSettings`) verdrahtet und macht in dieser Reihenfolge:
+1. `ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL)` → `handlers.resetProgress(event)` (in `createSettingsHandlers`): sender-frame check (`isFromSettingsWindow`), then `await deps.onProgressReset()`, success `{ ok: true }`, exception → `{ ok: false, error: 'reset failed' }`.
+2. `deps.onProgressReset` is wired in `main.ts` (`openGrowthSettings`) and does, in this order:
    1. `await saveOnboardingState(stateDir, { hatched: true })`
-   2. `mainWindow?.webContents.send(HATCH_START_CHANNEL)` — Hatch **vor** dem Pet-Update, dieselbe Reihenfolge-Invariante wie `main.ts:336-340` (der Renderer unterdrückt während der Hatch die Evolution-Behandlung).
-   3. `await xpEngine.resetProgress()` — persistiert `xp-state.json` und emittiert das Update.
-3. Overlay- und Tray-Benachrichtigung laufen **automatisch** über die bestehende `xpEngine.onUpdate`-Verdrahtung (`main.ts:294-300`): `tray.refresh()` + `PET_CHANGED_CHANNEL`-Send. Kein neuer Code nötig.
-4. Renderer (`renderer.ts:183-192` / `148-176`) verarbeitet `onHatchStart` und das Pet-Update zur Laufzeit bereits korrekt (Hatch-State wird neu gesetzt, Lodge-Sheet ggf. nachgeladen, Stage synct direkt auf `baby`). **Einzige Renderer-Änderung (Ein-Zeilen-Fix, Orchestrierer-Entscheidung zu Verifikations-Befund 1):** in `onHatchStart` wird `evolutionState = null;` gesetzt — sonst verwirft der mit `!evolutionState` bewachte Direct-Sync-Zweig (`renderer.ts:170`) das Reset-Pet-Update bei zufällig aktiver Evolution (~2-s-Fenster) und der Renderer bliebe bis zum nächsten Pet-Update/Neustart auf teen/adult hängen. Die Prämisse „keine Renderer-Änderung" präzisiert sich damit auf genau diese eine Zeile.
+   2. `mainWindow?.webContents.send(HATCH_START_CHANNEL)` — hatch **before** the pet update, the same ordering invariant as `main.ts:336-340` (the renderer suppresses evolution handling during the hatch).
+   3. `await xpEngine.resetProgress()` — persists `xp-state.json` and emits the update.
+3. Overlay and tray notification run **automatically** via the existing `xpEngine.onUpdate` wiring (`main.ts:294-300`): `tray.refresh()` + `PET_CHANGED_CHANNEL` send. No new code needed.
+4. The renderer (`renderer.ts:183-192` / `148-176`) already processes `onHatchStart` and the pet update correctly at runtime (hatch state is set anew, the lodge sheet is reloaded if needed, the stage syncs directly to `baby`). **Only renderer change (one-line fix, orchestrator decision on verification finding 1):** in `onHatchStart`, `evolutionState = null;` is set — otherwise the direct-sync branch guarded by `!evolutionState` (`renderer.ts:170`) would discard the reset pet update if an evolution happens to be active (~2-s window), and the renderer would be stuck on teen/adult until the next pet update/restart. The premise "no renderer change" is thereby narrowed down to exactly this one line.
 
-Handler-Signatur (nach Muster `SettingsHandlers`):
+Handler signature (following the `SettingsHandlers` pattern):
 
 ```ts
 resetProgress(event: IpcMainInvokeEvent): Promise<unknown>;
 ```
 
-Neues Dep in `SettingsWindowDeps`:
+New dep in `SettingsWindowDeps`:
 
 ```ts
 readonly onProgressReset: () => Promise<void>;
 ```
 
-## 4. Konkrete Änderungsliste pro Datei
+## 4. Concrete change list per file
 
 ### `src/main/ipc-channels.ts`
-- Neue Konstante im Settings-Block: `export const SETTINGS_RESET_PROGRESS_CHANNEL = 'settings:reset-progress';`
+- New constant in the settings block: `export const SETTINGS_RESET_PROGRESS_CHANNEL = 'settings:reset-progress';`
 
 ### `src/main/mrr/settings-window.ts`
-- `SettingsWindowDeps`: Feld `onProgressReset: () => Promise<void>` hinzufügen.
-- `SettingsHandlers`: Methode `resetProgress(event): Promise<unknown>` hinzufügen.
-- `createSettingsHandlers`: `resetProgress` implementieren — `if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };`, dann `try { await deps.onProgressReset(); return { ok: true }; } catch { return { ok: false, error: 'reset failed' }; }`. Kommentar im Stil der Datei: Reset-Orchestrierung (XP, Onboarding, Hatch-Send) liegt beim Dep-Aufrufer in main.ts, nicht hier.
-- `registerHandlers`: `ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL, (event) => handlers.resetProgress(event));` + Import der Konstante.
-- `openSettingsWindow`: Fensterhöhe `480` → `540` (das neue Danger-zone-Fieldset braucht ~60 px; Fenster ist `resizable: false`, also muss die Höhe mitwachsen). Breite 420 bleibt.
+- `SettingsWindowDeps`: add field `onProgressReset: () => Promise<void>`.
+- `SettingsHandlers`: add method `resetProgress(event): Promise<unknown>`.
+- `createSettingsHandlers`: implement `resetProgress` — `if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };`, then `try { await deps.onProgressReset(); return { ok: true }; } catch { return { ok: false, error: 'reset failed' }; }`. Comment in the style of the file: reset orchestration (XP, onboarding, hatch send) lives with the dep caller in main.ts, not here.
+- `registerHandlers`: `ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL, (event) => handlers.resetProgress(event));` + import of the constant.
+- `openSettingsWindow`: window height `480` → `540` (the new danger-zone fieldset needs ~60 px; the window is `resizable: false`, so the height must grow with it). Width 420 stays.
 
 ### `src/main/mrr/settings-preload.ts`
-- Hand-gesynctes Literal: `const SETTINGS_RESET_PROGRESS_CHANNEL = 'settings:reset-progress'; // must match src/main/ipc-channels.ts`
-- Im `contextBridge.exposeInMainWorld('beaverBuddySettings', …)`: `resetProgress: (): Promise<unknown> => ipcRenderer.invoke(SETTINGS_RESET_PROGRESS_CHANNEL),`
-- Top-Kommentar („exposes exactly the three settings calls“) auf vier Calls aktualisieren.
+- Hand-synced literal: `const SETTINGS_RESET_PROGRESS_CHANNEL = 'settings:reset-progress'; // must match src/main/ipc-channels.ts`
+- In `contextBridge.exposeInMainWorld('beaverBuddySettings', …)`: `resetProgress: (): Promise<unknown> => ipcRenderer.invoke(SETTINGS_RESET_PROGRESS_CHANNEL),`
+- Update the top comment ("exposes exactly the three settings calls") to four calls.
 
 ### `src/renderer/renderer.ts`
-- Ein-Zeilen-Fix in `onHatchStart` (`renderer.ts:183-192`): `evolutionState = null;` direkt nach `hatchState = startHatch();`. Behebt Verifikations-Befund 1: eine zum Reset-Zeitpunkt zufällig laufende Evolution würde den Stage-Direct-Sync des Reset-Pet-Updates verwerfen (`renderer.ts:170` ist mit `!evolutionState` bewacht) und bei Evolution-Ende (`renderer.ts:406-412`) zurück auf teen/adult flippen — ein persistenter Stage-Mismatch bis zum nächsten Pet-Update/Neustart. Mit dem Fix terminiert ein `HATCH_START` jede laufende Evolution sofort; das danach eintreffende Update synct die Stage direkt auf `baby`.
+- One-line fix in `onHatchStart` (`renderer.ts:183-192`): `evolutionState = null;` right after `hatchState = startHatch();`. Fixes verification finding 1: an evolution that happens to be running at reset time would discard the stage direct-sync of the reset pet update (`renderer.ts:170` is guarded by `!evolutionState`) and flip back to teen/adult at evolution end (`renderer.ts:406-412`) — a persistent stage mismatch until the next pet update/restart. With the fix, a `HATCH_START` immediately terminates any running evolution; the update arriving afterwards syncs the stage directly to `baby`.
 
 ### `src/main/mrr/settings.html`
-- Neues Fieldset **unter** „Growth source“, vor `#status`:
+- New fieldset **below** "Growth source", before `#status`:
   ```html
   <fieldset>
     <legend>Reset</legend>
@@ -94,21 +94,21 @@ readonly onProgressReset: () => Promise<void>;
     </div>
   </fieldset>
   ```
-  (Kein separates CSS nötig; optional minimaler Inline-Style für Armierungs-Farbe, bestehender Stil reicht.)
-- Inline-JS (plain, kein Framework, keine Dependency — `confirm()` wird bewusst NICHT verwendet; das Zwei-Klick-Pattern ist deterministisch und im sandboxed Renderer garantiert verfügbar):
-  - Klick 1: Button armiert — Text `Sure? Click again to reset`, `setTimeout` (5 s) disarmiert (Text zurück, Flag false).
-  - Klick 2 (armiert): disarm + `const result = await api.resetProgress(); setStatus(result && result.ok ? 'progress reset — hatch replaying' : \`error: ${result && result.error}\`);`
-  - Kein `refresh()` nach Reset nötig (Settings-Werte ändern sich nicht).
-- **Rebuild nicht vergessen (Verifikations-Befund 3):** `settings.html` gelangt ausschließlich über `npm run build` (`scripts/build-assets.js`) nach `dist/main/mrr/settings.html`; `settings-window.ts` lädt nur die dist-Kopie. Vitest deckt dist nicht ab — ein veralteter dist-Stand fällt in Tests nicht auf. Nach der HTML-Änderung also zwingend `npm run build` ausführen (vor Sichtcheck/Smoke).
+  (No separate CSS needed; optional minimal inline style for the arming color, the existing style is sufficient.)
+- Inline JS (plain, no framework, no dependency — `confirm()` is deliberately NOT used; the two-click pattern is deterministic and guaranteed available in the sandboxed renderer):
+  - Click 1: button arms — text `Sure? Click again to reset`, `setTimeout` (5 s) disarms (text back, flag false).
+  - Click 2 (armed): disarm + `const result = await api.resetProgress(); setStatus(result && result.ok ? 'progress reset — hatch replaying' : \`error: ${result && result.error}\`);`
+  - No `refresh()` needed after reset (settings values do not change).
+- **Don't forget the rebuild (verification finding 3):** `settings.html` reaches `dist/main/mrr/settings.html` exclusively via `npm run build` (`scripts/build-assets.js`); `settings-window.ts` loads only the dist copy. Vitest does not cover dist — a stale dist state does not show up in tests. So after the HTML change, running `npm run build` is mandatory (before visual check/smoke).
 
 ### `src/main/xp/engine.ts`
-- Neue Methode `async resetProgress(): Promise<void>`:
-  - Setzt `this.state = { ...this.state, xp: 0, lastMrrAwardDate: null }` (Cursor `lastSeenLifetimeTokens` bleibt!), `await saveState(this.stateDir, this.state)`.
-  - Emittiert **ohne** `applyState` (dort würde bei Stage-Rückschritt `evolvingTo` gesetzt): `const update: PetUpdate = { level: 1, stage: 'baby' };` (bzw. aus `getState()` abgeleitet), `this.lastUpdate = update`, Listener benachrichtigen.
-  - Kommentar: warum kein `evolvingTo` (Reset ist keine Evolution — kein Evolution-Quip, keine Evolution-Sequenz; Renderer synct Stage direkt) und warum der Cursor bleibt (forward-only-Invariante, kein Re-Award der Historie).
+- New method `async resetProgress(): Promise<void>`:
+  - Sets `this.state = { ...this.state, xp: 0, lastMrrAwardDate: null }` (the cursor `lastSeenLifetimeTokens` stays!), `await saveState(this.stateDir, this.state)`.
+  - Emits **without** `applyState` (there `evolvingTo` would be set on stage regression): `const update: PetUpdate = { level: 1, stage: 'baby' };` (or derived from `getState()`), `this.lastUpdate = update`, notify listeners.
+  - Comment: why no `evolvingTo` (a reset is not an evolution — no evolution quip, no evolution sequence; the renderer syncs the stage directly) and why the cursor stays (forward-only invariant, no re-award of the history).
 
 ### `src/main/main.ts`
-- In `openGrowthSettings()` dem `openSettingsWindow({...})`-Call das neue Dep mitgeben:
+- In `openGrowthSettings()`, pass the new dep to the `openSettingsWindow({...})` call:
   ```ts
   onProgressReset: async () => {
     // Persist before send: same exactly-once discipline as the launch hatch
@@ -119,39 +119,39 @@ readonly onProgressReset: () => Promise<void>;
     await xpEngine.resetProgress(); // onUpdate wiring does tray.refresh() + PET_CHANGED
   },
   ```
-- Keine weiteren Änderungen (Tray-Refresh, PET_CHANGED laufen über `xpEngine.onUpdate`; `HATCH_START_CHANNEL`/`saveOnboardingState` sind bereits importiert).
+- No further changes (tray refresh, PET_CHANGED run via `xpEngine.onUpdate`; `HATCH_START_CHANNEL`/`saveOnboardingState` are already imported).
 
-### Nicht anzufassen
-- `src/main/mrr/settings-validate.ts` — Channel hat keinen Payload.
-- `src/renderer/*` außer dem oben genannten Ein-Zeilen-Fix in `renderer.ts` (`evolutionState = null;` in `onHatchStart`) — Re-Hatch und Stage-Sync funktionieren zur Laufzeit bereits.
-- `scripts/build-assets.js` — kopiert `settings.html` bereits nach `dist/main/mrr/`; Build-Pfad unverändert (aber: `npm run build` nach der HTML-Änderung ausführen, s. oben).
-- `package.json` / `package-lock.json` — keine neuen Dependencies.
+### Do not touch
+- `src/main/mrr/settings-validate.ts` — the channel has no payload.
+- `src/renderer/*` except the one-line fix in `renderer.ts` mentioned above (`evolutionState = null;` in `onHatchStart`) — re-hatch and stage sync already work at runtime.
+- `scripts/build-assets.js` — already copies `settings.html` to `dist/main/mrr/`; build path unchanged (but: run `npm run build` after the HTML change, see above).
+- `package.json` / `package-lock.json` — no new dependencies.
 
-## 5. Testplan
+## 5. Test plan
 
-### `src/main/xp/engine.test.ts` (erweitern, Muster der bestehenden describe-Blöcke)
-- `resetProgress` setzt XP/Level/Stage auf 0/1/`baby` und persistiert (`loadState(stateDir)` liefert danach `xp: 0`, `lastMrrAwardDate: null`).
-- `resetProgress` **erhält** `lastSeenLifetimeTokens` (vorher via `ingestLifetimeTokens` Cursor auf N setzen; nach Reset weiterhin N; ein erneutes `ingestLifetimeTokens(N)` awarded nichts erneut — der zentrale No-Re-Award-Test).
-- `resetProgress` emittiert genau ein Update `{ level: 1, stage: 'baby' }` **ohne** `evolvingTo` (Listener-Spy) und aktualisiert `getLastUpdate()`.
+### `src/main/xp/engine.test.ts` (extend, following the existing describe blocks)
+- `resetProgress` sets XP/level/stage to 0/1/`baby` and persists (`loadState(stateDir)` then yields `xp: 0`, `lastMrrAwardDate: null`).
+- `resetProgress` **preserves** `lastSeenLifetimeTokens` (set the cursor to N beforehand via `ingestLifetimeTokens`; still N after the reset; a repeated `ingestLifetimeTokens(N)` awards nothing again — the central no-re-award test).
+- `resetProgress` emits exactly one update `{ level: 1, stage: 'baby' }` **without** `evolvingTo` (listener spy) and updates `getLastUpdate()`.
 
-### `src/main/mrr/settings-window.test.ts` (erweitern)
-- Bestehenden Unauthorized-Test („rejected on all three handlers“) auf vier Handler erweitern: `resetProgress` gibt `{ ok: false, error: 'unauthorized' }` zurück und ruft das Dep nicht auf.
-- Erfolgspfad: autorisiert → Dep wird genau einmal aufgerufen, Rückgabe `{ ok: true }`.
-- Fehlerpfad: Dep wirft → `{ ok: false, error: 'reset failed' }`.
-- `deps()` im Test um `onProgressReset: vi.fn().mockResolvedValue(undefined)` ergänzen.
+### `src/main/mrr/settings-window.test.ts` (extend)
+- Extend the existing unauthorized test ("rejected on all three handlers") to four handlers: `resetProgress` returns `{ ok: false, error: 'unauthorized' }` and does not call the dep.
+- Success path: authorized → dep is called exactly once, returns `{ ok: true }`.
+- Error path: dep throws → `{ ok: false, error: 'reset failed' }`.
+- Add `onProgressReset: vi.fn().mockResolvedValue(undefined)` to `deps()` in the test.
 
-### `src/main/ipc-channels.test.ts` (erweitern)
-- Drift-Guard-Case: `settings-preload.ts`-Literal `SETTINGS_RESET_PROGRESS_CHANNEL` matcht die Konstante (exakt das Regex-Muster der drei bestehenden Settings-Cases).
+### `src/main/ipc-channels.test.ts` (extend)
+- Drift-guard case: the `settings-preload.ts` literal `SETTINGS_RESET_PROGRESS_CHANNEL` matches the constant (exactly the regex pattern of the three existing settings cases).
 
-### Manuell / Design-Gate
-- Vor Sichtcheck/Smoke zwingend `npm run build` ausführen, damit `dist/main/mrr/settings.html` aktuell ist (Verifikations-Befund 3; `npm start` baut implizit, aber der Sichtcheck gegen dist muss der Änderung folgen).
-- Einmaliger Sichtcheck des Settings-Fensters (420x540): kein Overflow, Danger-zone sichtbar, Zwei-Klick-Arming lesbar. Settings-Fenster ist eine sichtbare UI-Änderung → Screenshot + kurzer Verdict unter `docs/design-reviews/` (Konvention aus CLAUDE.md).
-- Smoke: App starten, XP injizieren (`--inject-xp`), Settings öffnen, Reset auslösen → Hatch spielt, Tray zeigt `Lv 1`, `xp-state.json` hat `xp: 0` mit unverändertem Cursor, `growth-settings.json` und `secrets/` unverändert.
+### Manual / design gate
+- Run `npm run build` before the visual check/smoke so that `dist/main/mrr/settings.html` is current (verification finding 3; `npm start` builds implicitly, but the visual check against dist must follow the change).
+- One-time visual check of the settings window (420x540): no overflow, danger zone visible, two-click arming readable. The settings window is a visible UI change → screenshot + short verdict under `docs/design-reviews/` (convention from CLAUDE.md).
+- Smoke: start the app, inject XP (`--inject-xp`), open settings, trigger reset → hatch plays, tray shows `Lv 1`, `xp-state.json` has `xp: 0` with unchanged cursor, `growth-settings.json` and `secrets/` unchanged.
 
-## 6. Risiken / Offenes
+## 6. Risks / open questions
 
-- **Fensterhöhe 480 → 540:** geschätzt, nicht vermessen; beim Sichtcheck prüfen, ob 540 reicht bzw. zu viel Leerraum entsteht, ggf. feinjustieren.
-- **Reset während laufender Evolution im Renderer (korrigiert gemäß Verifikations-Befund 1):** Der Direct-Sync-Zweig (`renderer.ts:170`) ist mit `!evolutionState` bewacht — trifft das Reset-Pet-Update ein, während eine Evolution (~2 s) aktiv ist, wird der Stage-Sync verworfen und `renderer.ts:406-412` setzt bei Evolution-Ende zurück auf teen/adult: persistenter Stage-Mismatch bis zum nächsten Pet-Update/Neustart (kein „paralleles Weiterlaufen"). **Entscheidung (Orchestrierer):** der Ein-Zeilen-Fix wird umgesetzt — `evolutionState = null;` in `onHatchStart` (s. §4 `src/renderer/renderer.ts`). Reset während laufender *Hatch* ist unkritisch: `hatchState` wird beim neuen `HATCH_START` einfach neu gesetzt.
-- **`lastMrrAwardDate = null`:** im MRR-Modus kann der nächste Poll das Tages-MRR dem frischen Biber erneut gutschreiben (gewollt, s. §2). Falls der Owner das nicht will, stattdessen `lastMrrAwardDate` erhalten — einzeilige Änderung an `resetProgress()`.
-- **Kein `hatch:done`-Rückkanal:** wie beim Launch-Pfad gilt — Kill während der Re-Hatch → beim nächsten Start keine Hatch. Als akzeptabel übernommen (bestehende Invariante).
-- Offen (niedrig): Ob der Reset-Button auch im Tray verlinkt werden soll — im Plan bewusst NICHT enthalten (Scope #46: Settings-Fenster).
+- **Window height 480 → 540:** estimated, not measured; check during the visual check whether 540 is enough or leaves too much empty space, fine-tune if needed.
+- **Reset during a running evolution in the renderer (corrected per verification finding 1):** the direct-sync branch (`renderer.ts:170`) is guarded by `!evolutionState` — if the reset pet update arrives while an evolution (~2 s) is active, the stage sync is discarded and `renderer.ts:406-412` resets to teen/adult at evolution end: a persistent stage mismatch until the next pet update/restart (not a "parallel continuation"). **Decision (orchestrator):** the one-line fix is implemented — `evolutionState = null;` in `onHatchStart` (see §4 `src/renderer/renderer.ts`). A reset during a running *hatch* is uncritical: `hatchState` is simply set anew on the new `HATCH_START`.
+- **`lastMrrAwardDate = null`:** in MRR mode the next poll may credit the daily MRR to the fresh beaver again (intended, see §2). If the owner does not want that, preserve `lastMrrAwardDate` instead — a one-line change to `resetProgress()`.
+- **No `hatch:done` back-channel:** as with the launch path — a kill during the re-hatch → no hatch on the next start. Accepted as acceptable (existing invariant).
+- Open (low): whether the reset button should also be linked in the tray — deliberately NOT included in the plan (scope #46: settings window).

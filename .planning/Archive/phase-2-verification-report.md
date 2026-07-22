@@ -1,80 +1,80 @@
 # Phase 2 Verification Report — Core Windows Experience
 
-**Datum:** 2026-07-15
-**Geprüfte Build-Items:** BL-WIN-3 (Overlay-Adapter für Windows), BL-WIN-4 (Tray-Adapter für Windows)
-**Verifier:** Verifikations-Agent
+**Date:** 2026-07-15
+**Checked build items:** BL-WIN-3 (Overlay adapter for Windows), BL-WIN-4 (Tray adapter for Windows)
+**Verifier:** Verification agent
 
 ---
 
-## 1. Zusammenfassung der geprüften Umsetzung
+## 1. Summary of the checked implementation
 
-Die Implementierung von Phase 2 wurde anhand des Plans (`.flightplan/Archive/phase-2-plan.md`), des kritischen Reviews (`.flightplan/Archive/phase-2-plan-review.md`) und des Implementationslogs (`.flightplan/Archive/phase-2-implementation-log.md`) geprüft. Die zentralen Architekturentscheidungen wurden wie vom Review empfohlen umgesetzt:
+The Phase 2 implementation was checked against the plan (`.flightplan/Archive/phase-2-plan.md`), the critical review (`.flightplan/Archive/phase-2-plan-review.md`), and the implementation log (`.flightplan/Archive/phase-2-implementation-log.md`). The central architecture decisions were implemented as recommended by the review:
 
-- `fitWindowToWorkArea` verwendet `setBounds(..., false)` (keine Animation).
-- Der Renderer verwendet explizite Bounds aus dem IPC-Kanal `state:bounds` statt `window.innerWidth/Height`.
-- WorkArea-Änderungen werden in `main.ts` dedupliziert.
-- `clampRoamStateToBounds` lebt in `roam.ts` und nutzt die bestehenden `maxX`/`groundY`-Helfer.
-- `setTemplateImage` wird nur auf `darwin` aufgerufen.
+- `fitWindowToWorkArea` uses `setBounds(..., false)` (no animation).
+- The renderer uses explicit bounds from the IPC channel `state:bounds` instead of `window.innerWidth/Height`.
+- Work-area changes are deduplicated in `main.ts`.
+- `clampRoamStateToBounds` lives in `roam.ts` and uses the existing `maxX`/`groundY` helpers.
+- `setTemplateImage` is only called on `darwin`.
 
-Build, Typecheck, Lint, Tests und Windows-Packaging laufen erfolgreich durch. Die neuen Unit-Tests decken den Overlay-Adapter, die IPC-Kette (`preload.ts`) und die Tray-Icon-Ladung ab.
+Build, typecheck, lint, tests, and Windows packaging all pass successfully. The new unit tests cover the overlay adapter, the IPC chain (`preload.ts`), and the tray icon loading.
 
-Allerdings zeigt `git status` zusätzliche Änderungen außerhalb des in Phase 2 erwarteten Dateisatzes. Diese stammen offensichtlich aus vorherigen Phasen/anderer Arbeit, sind aber für diese Verifikation als Abweichung vom erwarteten Änderungssatz zu vermerken.
-
----
-
-## 2. Punktuelle Prüfung pro Build-Item
-
-### BL-WIN-3: Overlay-Adapter für Windows
-
-| Kriterium | Status | Begründung |
-|-----------|--------|------------|
-| Adapter-Modul existiert | ✅ | `src/main/overlay-adapter.ts` neu angelegt. |
-| Taskleisten-Kantenerkennung | ✅ | `detectTaskbarEdge` prüft top/bottom/left/right/none. Tests für alle Fälle vorhanden. |
-| `workArea` als Bezugsgröße | ✅ | `getPrimaryWorkAreaInfo` und `getOverlayWindowBounds` nutzen `display.workArea`. |
-| Plattformspezifischer `setAlwaysOnTop`-Level | ✅ | `darwin` → `'floating'`; `win32`/`linux` → `'normal'`. |
-| Keine `setBounds`-Animation | ✅ | `fitWindowToWorkArea` ruft `win.setBounds(..., false)` auf. |
-| Bounds explizit via IPC an Renderer | ✅ | `BOUNDS_CHANGED_CHANNEL = 'state:bounds'`; Senden in `main.ts` bei Änderungen und initial nach `did-finish-load`. |
-| Renderer nutzt IPC-Bounds | ✅ | `renderer.ts` setzt `canvas.width/height` direkt aus dem Payload. |
-| WorkArea-Änderungen dedupliziert | ✅ | `main.ts` speichert `lastWorkArea` und aktualisiert nur bei tatsächlicher Änderung. |
-| `clampRoamStateToBounds` integriert | ✅ | In `roam.ts` implementiert und wiederverwendet `maxX`/`groundY`. |
-| Smoke-Test erweitert | ✅ | `--smoke` gibt `boundsMatchWorkArea` zurück. |
-| Auto-Hide-Erkennung | ⚠️ | Wie im Review kritisiert, kann `detectTaskbarEdge` Auto-Hide nicht zuverlässig erkennen (`workArea == bounds`). Wurde bewusst als dokumentierte Limitation akzeptiert. |
-| Z-Order auf echter Windows-Hardware verifiziert | ⚠️ | `'normal'` ist konservative Wahl; empirischer Test auf Windows 10/11 fehlt. Fallback `'pop-up-menu'` dokumentiert. |
-
-### BL-WIN-4: Tray-Adapter für Windows
-
-| Kriterium | Status | Begründung |
-|-----------|--------|------------|
-| Plattformspezifische Icon-Auswahl | ✅ | `loadTrayIcon` lädt auf `win32`/`linux` `tray-icon.png`, auf `darwin` `tray-iconTemplate.png`. |
-| `setTemplateImage` nur auf macOS | ✅ | Guard `process.platform === 'darwin'` vor `setTemplateImage`. |
-| Tray-Menü unverändert | ✅ | `buildMenuTemplate` und `createTray` enthalten keine plattformspezifischen Menü-Änderungen. |
-| Tests für Icon-Ladung | ✅ | `tray.test.ts` deckt `win32`, `darwin`, `linux` ab. |
+However, `git status` shows additional changes outside the file set expected for Phase 2. These apparently come from previous phases/other work, but must be noted for this verification as a deviation from the expected change set.
 
 ---
 
-## 3. Ergebnisse der ausgeführten Befehle
+## 2. Item-by-item check per build item
 
-| Befehl | Ergebnis |
-|--------|----------|
-| `npm run build` | ✅ Erfolgreich (`Assets built successfully.`) |
-| `npm run typecheck` | ✅ Erfolgreich (keine Fehler) |
-| `npm run lint` | ✅ Erfolgreich (keine Fehler) |
+### BL-WIN-3: Overlay adapter for Windows
+
+| Criterion | Status | Rationale |
+|-----------|--------|-----------|
+| Adapter module exists | ✅ | `src/main/overlay-adapter.ts` newly created. |
+| Taskbar edge detection | ✅ | `detectTaskbarEdge` checks top/bottom/left/right/none. Tests exist for all cases. |
+| `workArea` as reference size | ✅ | `getPrimaryWorkAreaInfo` and `getOverlayWindowBounds` use `display.workArea`. |
+| Platform-specific `setAlwaysOnTop` level | ✅ | `darwin` → `'floating'`; `win32`/`linux` → `'normal'`. |
+| No `setBounds` animation | ✅ | `fitWindowToWorkArea` calls `win.setBounds(..., false)`. |
+| Bounds explicitly sent to renderer via IPC | ✅ | `BOUNDS_CHANGED_CHANNEL = 'state:bounds'`; sent in `main.ts` on changes and initially after `did-finish-load`. |
+| Renderer uses IPC bounds | ✅ | `renderer.ts` sets `canvas.width/height` directly from the payload. |
+| Work-area changes deduplicated | ✅ | `main.ts` stores `lastWorkArea` and only updates on an actual change. |
+| `clampRoamStateToBounds` integrated | ✅ | Implemented in `roam.ts` and reuses `maxX`/`groundY`. |
+| Smoke test extended | ✅ | `--smoke` returns `boundsMatchWorkArea`. |
+| Auto-hide detection | ⚠️ | As criticized in the review, `detectTaskbarEdge` cannot reliably detect auto-hide (`workArea == bounds`). Deliberately accepted as a documented limitation. |
+| Z-order verified on real Windows hardware | ⚠️ | `'normal'` is the conservative choice; empirical test on Windows 10/11 is missing. Fallback `'pop-up-menu'` documented. |
+
+### BL-WIN-4: Tray adapter for Windows
+
+| Criterion | Status | Rationale |
+|-----------|--------|-----------|
+| Platform-specific icon selection | ✅ | `loadTrayIcon` loads `tray-icon.png` on `win32`/`linux`, `tray-iconTemplate.png` on `darwin`. |
+| `setTemplateImage` only on macOS | ✅ | Guard `process.platform === 'darwin'` before `setTemplateImage`. |
+| Tray menu unchanged | ✅ | `buildMenuTemplate` and `createTray` contain no platform-specific menu changes. |
+| Tests for icon loading | ✅ | `tray.test.ts` covers `win32`, `darwin`, `linux`. |
+
+---
+
+## 3. Results of the executed commands
+
+| Command | Result |
+|---------|--------|
+| `npm run build` | ✅ Successful (`Assets built successfully.`) |
+| `npm run typecheck` | ✅ Successful (no errors) |
+| `npm run lint` | ✅ Successful (no errors) |
 | `npm test` | ✅ 312 passed, 6 skipped |
-| `npx electron-builder --win --publish never` | ✅ Erfolgreich (NSIS + portable erstellt und signiert) |
+| `npx electron-builder --win --publish never` | ✅ Successful (NSIS + portable created and signed) |
 
-**Testabdeckung Phase 2:**
-- `src/main/overlay-adapter.test.ts`: 14 Tests
-- `src/main/preload.test.ts`: 3 Tests
-- `src/main/tray.test.ts`: +3 Tests für `loadTrayIcon`
+**Test coverage Phase 2:**
+- `src/main/overlay-adapter.test.ts`: 14 tests
+- `src/main/preload.test.ts`: 3 tests
+- `src/main/tray.test.ts`: +3 tests for `loadTrayIcon`
 
 ---
 
-## 4. Gefundene Fehler / Lücken / Abweichungen
+## 4. Found errors / gaps / deviations
 
-### 4.1 Unerwartete Dateiänderungen außerhalb des Phase-2-Scopes
-**Schweregrad:** Mittel
+### 4.1 Unexpected file changes outside the Phase 2 scope
+**Severity:** Medium
 
-`git status` zeigt neben den erwarteten Phase-2-Dateien weitere Modifikationen an:
+`git status` shows further modifications in addition to the expected Phase 2 files:
 
 ```
  M .github/workflows/ci.yml
@@ -91,44 +91,44 @@ Allerdings zeigt `git status` zusätzliche Änderungen außerhalb des in Phase 2
 ?? scripts/build-assets.js
 ```
 
-Diese Dateien sind nicht Teil der in Phase 2 zu ändernden Dateiliste. Sie dürften aus Phase 1 oder paralleler Arbeit stammen. Für die reine Phase-2-Verifikation sind sie als „unerwartet" zu kennzeichnen.
+These files are not part of the list of files to be changed in Phase 2. They likely come from Phase 1 or parallel work. For the pure Phase 2 verification they are to be marked as "unexpected".
 
-### 4.2 Auto-Hide-Taskleiste bleibt ungelöst
-**Schweregrad:** Niedrig – Mittel
+### 4.2 Auto-hide taskbar remains unsolved
+**Severity:** Low – Medium
 
-`detectTaskbarEdge` erkennt Auto-Hide nicht (workArea == bounds). Der Implementierungs-Agent hat dies bewusst als Limitation dokumentiert und keine native AppBar-API eingeführt. Akzeptabel im Kontext der Phase-2-Ziele, aber nicht vollständig gegen den ursprünglichen Plan (siehe Akzeptanzkriterien in `phase-2-plan.md`).
+`detectTaskbarEdge` does not detect auto-hide (workArea == bounds). The implementation agent deliberately documented this as a limitation and did not introduce a native AppBar API. Acceptable in the context of the Phase 2 goals, but not fully in line with the original plan (see acceptance criteria in `phase-2-plan.md`).
 
-### 4.3 Z-Order-Level `'normal'` nicht empirisch verifiziert
-**Schweregrad:** Mittel
+### 4.3 Z-order level `'normal'` not empirically verified
+**Severity:** Medium
 
-Der Code kommentiert korrekt, dass `'normal'` auf echter Windows-Hardware getestet werden muss. Dieser Verifikations-Agent kann keinen GUI-Test durchführen. Falls `'normal'` unter der Taskleiste liegt, ist der dokumentierte Fallback `'pop-up-menu'` vorgesehen.
+The code correctly comments that `'normal'` must be tested on real Windows hardware. This verification agent cannot perform a GUI test. If `'normal'` lies beneath the taskbar, the documented fallback `'pop-up-menu'` is provided.
 
-### 4.4 `display-metrics-changed` kann ohne WorkArea-Änderung feuern
-**Schweregrad:** Niedrig
+### 4.4 `display-metrics-changed` can fire without a work-area change
+**Severity:** Low
 
-Die Deduplizierung in `main.ts` fängt dies ab, aber `onWorkAreaChanged` selbst reagiert auf alle drei Events und ruft den Callback auf, auch wenn sich nichts geändert hat. Da `main.ts` filtert, ist dies praktisch kein Problem, wäre aber sauberer im Adapter selbst zu kapseln.
-
----
-
-## 5. Empfohlene Fixes / Follow-up
-
-1. **Git-Arbeitsbereich bereinigen:** Prüfen, ob die zusätzlichen Änderungen (CI, README, Assets aus Phase 1) bereits committet werden sollen, damit `git status` für Phase 2 nur die erwarteten Dateien anzeigt.
-2. **Manueller Windows-Smoke-Test:** Auf echter Windows-Hardware prüfen:
-   - Biber bleibt über der sichtbaren Taskleiste (`'normal'`).
-   - Taskleiste oben/links/rechts → Biber bleibt innerhalb der WorkArea.
-   - Auto-Hide: Dokumentiertes Verhalten bestätigen.
-   - Falls nötig: Fallback auf `'pop-up-menu'` testen und endgültig festlegen.
-3. **Optionale Verstärkung des Adapters:** `onWorkAreaChanged` könnte intern deduplizieren, damit der Callback nur bei echten Änderungen feuert.
-4. **Tray-Icon-Kontrast:** In Phase 4 (BL-WIN-10/HiDPI) visuelles Design-Gate für dunkle Taskleisten einplanen.
+The deduplication in `main.ts` catches this, but `onWorkAreaChanged` itself reacts to all three events and invokes the callback even when nothing has changed. Since `main.ts` filters, this is practically not a problem, but it would be cleaner to encapsulate it in the adapter itself.
 
 ---
 
-## 6. Gesamt-Status
+## 5. Recommended fixes / follow-up
+
+1. **Clean up the git working area:** Check whether the additional changes (CI, README, assets from Phase 1) should already be committed, so that `git status` for Phase 2 only shows the expected files.
+2. **Manual Windows smoke test:** Check on real Windows hardware:
+   - Beaver stays above the visible taskbar (`'normal'`).
+   - Taskbar top/left/right → beaver stays within the work area.
+   - Auto-hide: confirm the documented behavior.
+   - If needed: test the fallback to `'pop-up-menu'` and decide definitively.
+3. **Optional adapter strengthening:** `onWorkAreaChanged` could deduplicate internally so that the callback only fires on real changes.
+4. **Tray icon contrast:** Plan a visual design gate for dark taskbars in Phase 4 (BL-WIN-10/HiDPI).
+
+---
+
+## 6. Overall status
 
 **PASSED WITH WARNINGS**
 
-Die Implementierung entspricht dem Plan und den Review-Empfehlungen, alle automatisierten Checks sind grün, und die neuen Tests sind sinnvoll. Die Warnungen betreffen ausschließlich:
-- Laufzeitverhalten, die nur auf echter Windows-Hardware verifiziert werden können (Z-Order, Auto-Hide).
-- Zusätzliche Dateiänderungen im Arbeitsbereich, die außerhalb des Phase-2-Scopes liegen.
+The implementation matches the plan and the review recommendations, all automated checks are green, and the new tests are sensible. The warnings concern only:
+- Runtime behavior that can only be verified on real Windows hardware (Z-order, auto-hide).
+- Additional file changes in the working area that lie outside the Phase 2 scope.
 
-Eine Freigabe für Phase 2 ist unter der Bedingung empfohlen, dass die genannten manuellen Smoke-Tests auf Windows zeitnah durchgeführt werden.
+Approval for Phase 2 is recommended on the condition that the listed manual smoke tests on Windows are carried out promptly.

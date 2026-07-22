@@ -1,20 +1,20 @@
 # Build Item Template
 
-## Titel
-<!-- Kurzer Titel im Format [BL-NN] Kurzbeschreibung -->
+## Title
+<!-- Short title in the format [BL-NN] short description -->
 
-## Ziel
-<!-- Was soll erreicht werden? -->
+## Goal
+<!-- What should be achieved? -->
 
-## Akzeptanzkriterien
-- [ ] Kriterium 1
-- [ ] Kriterium 2
+## Acceptance Criteria
+- [ ] Criterion 1
+- [ ] Criterion 2
 
-## Betroffene Dateien
-<!-- Liste der zu ändernden/erstellenden Dateien -->
+## Affected Files
+<!-- List of files to change/create -->
 
-## Risiken / Abhängigkeiten
-<!-- z. B. blockiert durch ADR, andere Items, externe APIs -->
+## Risks / Dependencies
+<!-- e.g. blocked by ADR, other items, external APIs -->
 
-## Testplan
-<!-- Wie wird das Item lokal verifiziert? -->
+## Test Plan
+<!-- How is the item verified locally? -->

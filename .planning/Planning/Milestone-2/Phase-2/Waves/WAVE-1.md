@@ -1,37 +1,37 @@
-# Wave 1 — „PixelArt Builder" klonen & erste neue Parts
+# Wave 1 — Clone "PixelArt Builder" & first new parts
 
-**Status:** done (2026-07-19, verifiziert)
+**Status:** done (2026-07-19, verified)
 
 ## Prerequisites
-- [x] ComfyUI-MCP-Zugriff aktiv
-- [x] Vorlage-Workflow „PixelArt Builder" vorhanden
-- [x] Puppet Studio lauffähig (Phase 1 done)
+- [x] ComfyUI MCP access active
+- [x] "PixelArt Builder" template workflow available
+- [x] Puppet Studio functional (Phase 1 done)
 
 ## Tasks
-- [x] „PixelArt Builder" im ComfyUI duplizieren und als neue Vorlage sichern
-      — Cloud-Inventory dokumentiert `pixelart-builder.json` + Parts-Variante
+- [x] Duplicate "PixelArt Builder" in ComfyUI and save as a new template
+      — cloud inventory documents `pixelart-builder.json` + parts variant
       `pixelart-parts-builder.json` (docs/comfyui-avatar-generation.md)
-- [x] Größenparameter an die Studio-Rigs anpassen (Ziel: 96×96-Tiles, einzelne
-      Parts auf transparentem Hintergrund) — Alpha-Output verifiziert; 96×96-Ziel
-      wird per `ingest-parts.mjs` (alpha-bbox trim + premultiplied downscale auf
-      Rig-Proportionen) erfüllt
-- [x] Test-Generierung: komplettes Part-Set für `beaver-baby`-Rig (tail, legBack,
-      body, legFront, head, eyeOpen, eyeClosed, canopy) — Run 2026-07-17,
-      Rohdaten `assets-src/comfyui/parts-run-1/`
-- [x] Parts nach `assets-src/parts/beaver-baby/` übernehmen
-      (`tools/puppet-studio/ingest-parts.mjs`) — 8 Parts, Rig-Pivots getunt
-- [x] Im Studio prüfen: idle/walk/parachute mit echten Parts, dann Bake-Probe —
-      Bake 2026-07-18: `assets-src/baked/beaver-baby/sheet.png` (768×288,
-      3 Rows: idle 8 / walk 4 / parachute 8) + Frames im App-Format;
-      Smoke-Test 2026-07-19: Studio-Server liefert UI, Rig-JSON und alle
-      8 Parts fehlerfrei (HTTP 200)
+- [x] Adjust size parameters to the studio rigs (target: 96×96 tiles, individual
+      parts on transparent background) — alpha output verified; 96×96 target
+      achieved via `ingest-parts.mjs` (alpha-bbox trim + premultiplied downscale
+      to rig proportions)
+- [x] Test generation: complete part set for the `beaver-baby` rig (tail, legBack,
+      body, legFront, head, eyeOpen, eyeClosed, canopy) — run 2026-07-17,
+      raw data `assets-src/comfyui/parts-run-1/`
+- [x] Import parts into `assets-src/parts/beaver-baby/`
+      (`tools/puppet-studio/ingest-parts.mjs`) — 8 parts, rig pivots tuned
+- [x] Verify in studio: idle/walk/parachute with real parts, then bake trial —
+      bake 2026-07-18: `assets-src/baked/beaver-baby/sheet.png` (768×288,
+      3 rows: idle 8 / walk 4 / parachute 8) + frames in app format;
+      smoke test 2026-07-19: studio server serves UI, rig JSON, and all
+      8 parts without errors (HTTP 200)
 
 ## Done when
-- Neuer Workflow erzeugt ein vollständiges Part-Set im gleichen Stil; Studio
-  zeigt die echten Parts fehlerfrei in allen drei Rezepten. ✅
+- New workflow produces a complete part set in the same style; the studio
+  shows the real parts without errors in all three recipes. ✅
 
-## Carry-over (nicht Teil dieser Wave, vor dem NÄCHSTEN Generierungs-Run)
-- Style-Prompt-Anchoring: explizite Referenz auf Palette/Outline/Right-Facing
-  aus `assets/STYLE.md` in den Parts-Builder-Prompt (offene Modification #2 in
-  docs/comfyui-avatar-generation.md). Braucht Comfy-Cloud-MCP-Session oder
-  manuellen UI-Eingriff — in pi ist aktuell kein MCP konfiguriert.
+## Carry-over (not part of this wave, before the NEXT generation run)
+- Style prompt anchoring: explicit reference to palette/outline/right-facing
+  from `assets/STYLE.md` in the parts builder prompt (open modification #2 in
+  docs/comfyui-avatar-generation.md). Needs a Comfy Cloud MCP session or
+  manual UI intervention — no MCP is currently configured in pi.

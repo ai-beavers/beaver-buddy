@@ -1,68 +1,68 @@
 # Beaver Buddy — Phase 5: Completion Report
 
-**Datum:** 2026-07-15
-**Status:** Teilweise abgeschlossen
+**Date:** 2026-07-15
+**Status:** Partially completed
 
 ---
 
-## 1. Was wurde erreicht?
+## 1. What was achieved?
 
-Phase 5 behandelte drei zurückgestellte Follow-up-Items aus dem Windows-Port:
+Phase 5 covered three deferred follow-up items from the Windows port:
 
-| Item | Thema | Status |
+| Item | Topic | Status |
 |------|-------|--------|
-| **BL-WIN-7** | Robusteres atomares Schreiben auf Windows | ✅ Abgeschlossen |
-| **Codex-Tracking** | Windows-Log-Pfade für Codex | ✅ Abgeschlossen |
-| **BL-WIN-6** | Windows Secret-Store / MRR-Mode | ⏸️ Zurückgestellt |
+| **BL-WIN-7** | More robust atomic writes on Windows | ✅ Completed |
+| **Codex tracking** | Windows log paths for Codex | ✅ Completed |
+| **BL-WIN-6** | Windows secret store / MRR mode | ⏸️ Deferred |
 
-Die App ist auf Windows voll funktionsfähig (Overlay, Tray, Animationen, Claude-Code-Token-Tracking). Zwei der drei Follow-ups wurden umgesetzt; BL-WIN-6 bleibt bis zur Admin-Entscheidung offen.
+The app is fully functional on Windows (overlay, tray, animations, Claude Code token tracking). Two of the three follow-ups were implemented; BL-WIN-6 remains open pending the admin decision.
 
 ---
 
-## 2. Status der einzelnen Items
+## 2. Status of the individual items
 
-### BL-WIN-7 — Atomares Schreiben Windows-nativ ✅
+### BL-WIN-7 — Windows-native atomic writes ✅
 
-- `atomicWriteFile` in `src/main/atomic-file.ts` wurde asynchron (`async`) mit Retry-Backoff umgebaut.
-- Verwendet `fs.promises.writeFile` + `fs.promises.rename`.
-- Retry-Logik: 4 Versuche mit Delays `[0, 10, 50, 100]` ms.
-- Retriable Fehler: `EPERM`, `EBUSY`.
-- Nicht retriable Fehler: `EACCES` (und alle anderen).
-- Temp-Datei bleibt im Zielverzeichnis (`${filePath}.tmp-...`), um Same-Volume-Rename-Atomarität zu garantieren.
-- Temp-Cleanup im `finally`.
-- Alle synchronen Aufrufer und Tests wurden auf `async` umgestellt.
+- `atomicWriteFile` in `src/main/atomic-file.ts` was reworked to be asynchronous (`async`) with retry backoff.
+- Uses `fs.promises.writeFile` + `fs.promises.rename`.
+- Retry logic: 4 attempts with delays `[0, 10, 50, 100]` ms.
+- Retriable errors: `EPERM`, `EBUSY`.
+- Non-retriable errors: `EACCES` (and all others).
+- The temp file stays in the target directory (`${filePath}.tmp-...`) to guarantee same-volume rename atomicity.
+- Temp cleanup in `finally`.
+- All synchronous callers and tests were migrated to `async`.
 
-### Codex-Tracking — Windows-Log-Pfade ✅
+### Codex tracking — Windows log paths ✅
 
-- `src/main/usage/paths.ts` prüft auf Windows diese Kandidatenpfade in Priorität:
-  1. `CODEX_HOME` (Override)
+- `src/main/usage/paths.ts` checks these candidate paths on Windows, in priority order:
+  1. `CODEX_HOME` (override)
   2. `%LOCALAPPDATA%\Codex`
   3. `%APPDATA%\Codex`
-  4. `~/.codex` (Legacy)
-- Der erste existierende Pfad wird verwendet.
-- `normalizePlatform(process.platform)` fällt für unbekannte Plattformen defensiv auf `linux` zurück.
-- Windows-Codex-Tests wurden in `src/main/usage/paths.test.ts` ergänzt.
+  4. `~/.codex` (legacy)
+- The first existing path is used.
+- `normalizePlatform(process.platform)` defensively falls back to `linux` for unknown platforms.
+- Windows Codex tests were added in `src/main/usage/paths.test.ts`.
 
-### BL-WIN-6 — Windows Secret-Store / MRR-Mode ⏸️
+### BL-WIN-6 — Windows secret store / MRR mode ⏸️
 
-- **Nicht umgesetzt.** Admin-Entscheidung zum Secret-Store-Backend steht aus.
-- **Blocker:**
-  - `CLAUDE.md` beschränkt neue Dependencies.
-  - Windows Credential Manager erfordert Native-Addon (`CredWriteW`/`CredReadW`/`CredDeleteW`), was ADR und Sicherheits-Review erfordert.
-  - `electron.safeStorage` + verschlüsselte JSON in `userData` ist einfacher, verstößt aber historisch gegen die Regel „secrets never in app-support dir".
-  - `cmdkey.exe` kann generische Credentials nicht lesen.
-  - `keychain.ts` ist funktionsbasiert; ein Refactor zu Interface + Factory + plattformspezifischen Implementierungen würde viele Aufrufer ändern.
-- **Empfehlung:** Unter den aktuellen `CLAUDE.md`-Restriktionen ist `electron.safeStorage` + verschlüsselte JSON in `userData` die realistische Standardlösung. Windows Credential Manager mit Native-Addon nur bei expliziter Admin-Entscheidung.
-- **Auswirkung:** Der MRR-Mode (Stripe/RevenueCat) ist auf Windows vorerst nicht verfügbar. Die App läuft ohne Credentials weiterhin vollständig.
+- **Not implemented.** Admin decision on the secret-store backend is pending.
+- **Blockers:**
+  - `CLAUDE.md` restricts new dependencies.
+  - Windows Credential Manager requires a native addon (`CredWriteW`/`CredReadW`/`CredDeleteW`), which requires an ADR and a security review.
+  - `electron.safeStorage` + encrypted JSON in `userData` is simpler, but historically violates the rule "secrets never in app-support dir".
+  - `cmdkey.exe` cannot read generic credentials.
+  - `keychain.ts` is function-based; a refactor to interface + factory + platform-specific implementations would change many callers.
+- **Recommendation:** Under the current `CLAUDE.md` restrictions, `electron.safeStorage` + encrypted JSON in `userData` is the realistic default solution. Windows Credential Manager with a native addon only with an explicit admin decision.
+- **Impact:** MRR mode (Stripe/RevenueCat) is not available on Windows for now. The app continues to run fully without credentials.
 
 ---
 
-## 3. Geänderte Dateien
+## 3. Changed files
 
-### Source-Dateien (zur Information; nicht Teil dieser Dokumentationsaufgabe)
+### Source files (for information; not part of this documentation task)
 
 - `src/main/atomic-file.ts`
-- `src/main/atomic-file.test.ts` (neu)
+- `src/main/atomic-file.test.ts` (new)
 - `src/main/onboarding.ts`
 - `src/main/onboarding.test.ts`
 - `src/main/xp/store.ts`
@@ -82,71 +82,71 @@ Die App ist auf Windows voll funktionsfähig (Overlay, Tray, Animationen, Claude
 - `src/main/usage/paths.ts`
 - `src/main/usage/paths.test.ts`
 
-### Dokumentationsdateien (durch diese Aufgabe aktualisiert)
+### Documentation files (updated by this task)
 
 - `.flightplan/Archive/WINDOWS_PORT_PLAN.md`
 - `README.md`
-- `.flightplan/Archive/phase-5-completion.md` (dieses Dokument)
+- `.flightplan/Archive/phase-5-completion.md` (this document)
 
 ---
 
-## 4. Ergebnisse der Verifikation
+## 4. Verification results
 
-Alle Befehle wurden auf Windows (Git Bash) ausgeführt:
+All commands were run on Windows (Git Bash):
 
 ```bash
-npm run typecheck  # ✅ grün
-npm run lint       # ✅ grün
-npm test           # ✅ 37 Test-Dateien, 341 passed, 6 skipped
-npm run build      # ✅ grün
-npx electron-builder --win --publish never  # ✅ grün
+npm run typecheck  # ✅ green
+npm run lint       # ✅ green
+npm test           # ✅ 37 test files, 341 passed, 6 skipped
+npm run build      # ✅ green
+npx electron-builder --win --publish never  # ✅ green
 ```
 
-Ergebnis des Verifikations-Agenten: **PASSED WITH WARNINGS**
+Verification agent result: **PASSED WITH WARNINGS**
 
-- BL-WIN-7 und Codex-Tracking korrekt umgesetzt.
-- BL-WIN-6 angemessen zurückgestellt.
-- Verbleibende Warnungen sind keine Blocker (u. a. unhandled-rejection-Risiko bei
-  `UsageTracker.refresh()`, optionale Mock-Typen in `atomic-file.test.ts`).
-
----
-
-## 5. Verbleibende offene Punkte / Blocker
-
-1. **BL-WIN-6 — Admin-Entscheidung ausstehend:**
-   - Termin mit Projekt-Administrator zur Festlegung des Windows-Secret-Store-Backends.
-   - Nach Entscheidung: Refactor von `keychain.ts` zu Interface + Factory +
-     plattformspezifischen Implementierungen; Aktivierung des MRR-Mode auf Windows.
-
-2. **Empirische Verifizierungen:**
-   - Windows-Testinstallation von Codex, um die Kandidatenpfade zu bestätigen.
-   - Visueller Smoke-Test des Windows-Installers/Explorers/Task-Manager-Icons.
-   - Echter HiDPI-Smoke-Test auf Windows-Hardware bei 100 %, 125 %, 150 % und 200 %.
-
-3. **Finales Master-Icon / Design-Pass:**
-   - Professionelles App-Icon und Tray-Icon nachliefern.
-   - Vorläufige `assets/icon.ico` und `assets/tray-icon.png` ersetzen.
-
-4. **Niedrig-priorisierte Warnungen:**
-   - `UsageTracker.refresh()` sollte async Callbacks entweder awaited oder
-     abgesichert behandeln.
-   - `atomic-file.test.ts` Mock-Typen optional bereinigen.
+- BL-WIN-7 and Codex tracking correctly implemented.
+- BL-WIN-6 appropriately deferred.
+- Remaining warnings are not blockers (including unhandled-rejection risk in
+  `UsageTracker.refresh()`, optional mock types in `atomic-file.test.ts`).
 
 ---
 
-## 6. Projekt-Gesamtstatus
+## 5. Remaining open items / blockers
 
-Der Windows-Port ist umgesetzt. Phase 1–4 sind vollständig abgeschlossen. Phase 5
-ist teilweise abgeschlossen:
+1. **BL-WIN-6 — admin decision pending:**
+   - Meeting with the project administrator to decide on the Windows secret-store backend.
+   - After the decision: refactor `keychain.ts` to interface + factory +
+     platform-specific implementations; enable MRR mode on Windows.
 
-- ✅ BL-WIN-7 (atomares Schreiben) abgeschlossen.
-- ✅ Codex-Tracking (Windows-Kandidatenpfade) abgeschlossen.
-- ⏸️ BL-WIN-6 (Secret-Store / MRR-Mode) zurückgestellt.
+2. **Empirical verifications:**
+   - Windows test installation of Codex to confirm the candidate paths.
+   - Visual smoke test of the Windows installer/Explorer/Task Manager icons.
+   - Real HiDPI smoke test on Windows hardware at 100%, 125%, 150%, and 200%.
 
-Die App baut, testet und packt sich auf Windows erfolgreich. Die verbleibenden
-offenen Punkte sind dokumentiert und blockieren keinen allgemeinen Windows-Release,
-aber BL-WIN-6 muss vor Aktivierung des MRR-Mode auf Windows gelöst werden.
+3. **Final master icon / design pass:**
+   - Deliver a professional app icon and tray icon.
+   - Replace the provisional `assets/icon.ico` and `assets/tray-icon.png`.
+
+4. **Low-priority warnings:**
+   - `UsageTracker.refresh()` should either await async callbacks or
+     handle them defensively.
+   - Optionally clean up mock types in `atomic-file.test.ts`.
 
 ---
 
-*Keine Commits durchgeführt. Alle Änderungen liegen lokal vor.*
+## 6. Overall project status
+
+The Windows port is implemented. Phases 1–4 are fully completed. Phase 5
+is partially completed:
+
+- ✅ BL-WIN-7 (atomic writes) completed.
+- ✅ Codex tracking (Windows candidate paths) completed.
+- ⏸️ BL-WIN-6 (secret store / MRR mode) deferred.
+
+The app builds, tests, and packages successfully on Windows. The remaining
+open items are documented and do not block a general Windows release,
+but BL-WIN-6 must be resolved before enabling MRR mode on Windows.
+
+---
+
+*No commits made. All changes are local.*
