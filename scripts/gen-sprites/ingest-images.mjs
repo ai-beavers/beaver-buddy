@@ -401,7 +401,15 @@ export function spliceRow(sheet, meta, rowName, tiles, tileHeight = meta.tile) {
 //
 // Baby is built by ingest-animation-frames.mjs (parachute drop / BL-17);
 // it is intentionally absent from this list so the still-frame ingest only
-// rebuilds teen.
+// rebuilds teen/young-baby/older-teen.
+//
+// beaver-young-baby (BL-6/T1) and beaver-older-teen (BL-6/T2) are new
+// in-between figures, not yet wired into Stage/stageForLevel (WAVE-2) — an
+// unwired sheet is inert, so committing them is safe ahead of that wiring.
+// Both are full-frame Comfy Cloud generations, dual-reference-conditioned
+// (young-baby: committed baby idle tile + teen idle tile; older-teen:
+// committed teen idle tile + adult idle tile) so each reads BETWEEN its two
+// neighbors rather than as a new character — see assets/STYLE.md Provenance.
 export const STAGE_SPECS = [
   {
     name: 'beaver-teen',
@@ -411,6 +419,26 @@ export const STAGE_SPECS = [
     rows: [
       { name: 'idle', files: ['teen-idle-right.png'] },
       { name: 'walk', files: ['teen-to-right-1.png', 'teen-to-right-2.png'] },
+    ],
+  },
+  {
+    name: 'beaver-young-baby',
+    tile: TILE,
+    fps: FPS,
+    targetContentHeightPx: 76,
+    rows: [
+      { name: 'idle', files: ['young-baby-idle-right.png'] },
+      { name: 'walk', files: ['young-baby-to-right-1.png', 'young-baby-to-right-2.png'] },
+    ],
+  },
+  {
+    name: 'beaver-older-teen',
+    tile: TILE,
+    fps: FPS,
+    targetContentHeightPx: 94,
+    rows: [
+      { name: 'idle', files: ['older-teen-idle-right.png'] },
+      { name: 'walk', files: ['older-teen-to-right-1.png', 'older-teen-to-right-2.png'] },
     ],
   },
 ];
@@ -466,6 +494,14 @@ export function ingestStage(stageSpec, srcDir) {
   return { png, meta, scale };
 }
 
+// Optional CLI arg picks one stage by name (e.g. `assets:young-baby` ==
+// `ingest-images.mjs beaver-young-baby`) so a new figure's script doesn't
+// require every OTHER stage's source frames to also exist locally; that
+// explicit-arg path still fails loudly (raw ENOENT) if ITS OWN source frames
+// are missing. Omitting the arg (`assets:ingest`) rebuilds every stage but
+// skips (with a one-line notice) any stage whose source frames aren't
+// present locally, since it's normal for only one stage's gitignored
+// assets-src/beaver/ frames to exist on a given machine (BL-11 norm).
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = path.join(import.meta.dirname, '..', '..');
@@ -474,7 +510,22 @@ if (isMain) {
     throw new Error(`missing ${srcDir} — copy the source images there first (gitignored, not part of the repo)`);
   }
 
-  for (const stageSpec of STAGE_SPECS) {
+  const stageArg = process.argv[2];
+  const stageSpecs = stageArg ? STAGE_SPECS.filter((spec) => spec.name === stageArg) : STAGE_SPECS;
+  if (stageArg && stageSpecs.length === 0) {
+    throw new Error(`unknown stage "${stageArg}" (expected one of: ${STAGE_SPECS.map((s) => s.name).join(', ')})`);
+  }
+
+  for (const stageSpec of stageSpecs) {
+    if (!stageArg) {
+      const missingFile = [...new Set(stageSpec.rows.flatMap((row) => row.files))].find(
+        (file) => !fs.existsSync(path.join(srcDir, file)),
+      );
+      if (missingFile) {
+        console.log(`skipping ${stageSpec.name}: assets-src/beaver/${missingFile} not found`);
+        continue;
+      }
+    }
     const { png, meta, scale } = ingestStage(stageSpec, srcDir);
     const pngPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.png`);
     const metaPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.json`);

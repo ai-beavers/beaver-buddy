@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAdultPlaceholder } from './build-adult-placeholder.ts';
+import { assertSafeToOverwrite, buildAdultPlaceholder } from './build-adult-placeholder.ts';
 
 // The committed teen sheet is the only input — like build-icons.test.ts
 // there is no gitignored assets-src/ dependency, so this suite runs on
@@ -26,5 +26,17 @@ describe('buildAdultPlaceholder', () => {
     expect(meta.rows.map((row) => row.name)).toEqual(['idle', 'walk']);
     expect(meta.rows[0].frames).toBe(1);
     expect(meta.rows[1].frames).toBe(2);
+  });
+});
+
+describe('assertSafeToOverwrite', () => {
+  it('allows a sheet with only idle/walk rows', () => {
+    expect(() => assertSafeToOverwrite([{ name: 'idle' }, { name: 'walk' }])).not.toThrow();
+  });
+
+  it('refuses a sheet with rows beyond idle/walk (would be clobbered)', () => {
+    expect(() =>
+      assertSafeToOverwrite([{ name: 'idle' }, { name: 'walk' }, { name: 'struggle' }]),
+    ).toThrow(/idle\/walk/);
   });
 });

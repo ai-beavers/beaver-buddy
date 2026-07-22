@@ -55,11 +55,11 @@ export const BABY = {
 };
 
 // Adult frames are the same 3 poses on a bigger, wider-limbed rig (BL-18).
-// Restored idle/walk (build-adult-placeholder.ts) upscale teen content to
-// fill the full 96px tile, so the anim rows are targeted taller than baby's
-// own heights to read as the same size beaver — computeStageScale's width
-// term remains the clipping guard (see ingest-images.mjs) if a height gets
-// bumped further.
+// idle/walk are now final art (BL-6/T3, replacing the earlier teen-upscale
+// placeholder), sized to fill the full 96px tile, so the anim rows are
+// targeted taller than baby's own heights to read as the same size beaver —
+// computeStageScale's width term remains the clipping guard (see
+// ingest-images.mjs) if a height gets bumped further.
 //
 // parachute-wind carries its own tileHeight (BL-19): sharing the square 96px
 // tile forced the beaver's body to shrink so the canopy above it would also
@@ -308,15 +308,57 @@ export function buildAdultStretchSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_STRETCH);
 }
 
+// Final idle/walk (BL-6/T3): replaces the teen-upscale placeholder rows
+// with authored-pixel art, via the SAME buildAdultRowSheet/spliceRow path as
+// watering/drink/sleep/stretch above (idle is a 1x1 "grid", walk a 2x1
+// grid) rather than a bespoke builder — spliceRow finds each row by name and
+// preserves the other 8 rows' bytes exactly, same as every prior append/
+// replace here. Continuity is the acceptance bar (BL-18 was rejected as
+// generic/off-model): both rows are reference-conditioned on the single
+// image every other adult row is already anchored to (the committed adult
+// reference re-used by filename, per docs/dev-guardrails.md — fresh uploads
+// are blocked in this environment), a Comfy Cloud Nano Banana Pro
+// (GeminiImage2Node) run per row, on a green (#00FF00) chroma-key
+// background. targetContentHeightPx: 96 matches the committed idle tile's
+// own measured full-tile content height (edge-to-edge, no padding — same
+// value ADULT_STRETCH's standing frames were measured against).
+export const ADULT_IDLE = {
+  rowName: 'idle',
+  sourceDir: 'adult-idle',
+  frames: 1,
+  gridCols: 1,
+  gridRows: 1,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultIdleSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_IDLE);
+}
+
+export const ADULT_WALK = {
+  rowName: 'walk',
+  sourceDir: 'adult-walk',
+  frames: 2,
+  gridCols: 2,
+  gridRows: 1,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultWalkSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_WALK);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
-// way (watering, drink, sleep, stretch, future BL-8..12 rows just add a
-// config here).
+// way (watering, drink, sleep, stretch, idle, walk, future BL-8..12 rows
+// just add a config here).
 const ADULT_ROWS = {
   'adult-watering': ADULT_WATERING,
   'adult-drink': ADULT_DRINK,
   'adult-sleep': ADULT_SLEEP,
   'adult-stretch': ADULT_STRETCH,
+  'adult-idle': ADULT_IDLE,
+  'adult-walk': ADULT_WALK,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

@@ -29,13 +29,32 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![baby beaver sheet](../assets/sprites/beaver-baby.png)
 
-- **Files:** `assets/sprites/beaver-baby.png` + `.json` — 192×192 sheet, 96×96
+- **Files:** `assets/sprites/beaver-baby.png` + `.json` — 768×480 sheet, 96×96
   tiles, fps hint 8
-- **Animations:** `idle` (1 frame), `walk` (2 frames)
-- **Provenance:** user-generated art, ingested via
+- **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
+  (8), `land` (8)
+- **Provenance:** `idle`/`walk` are user-generated art, ingested via
   `scripts/gen-sprites/ingest-images.mjs` (BL-11); colors ship as generated
-  (palette rule waived by owner decision — see STYLE.md)
+  (palette rule waived by owner decision — see STYLE.md). `struggle`/
+  `parachute-wind`/`land` are appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs baby` (`npm run
+  assets:parachute`, BL-17) for the parachute-drop sequence.
 - **Status:** final
+
+### Beaver — young baby
+
+![young baby beaver sheet](../assets/sprites/beaver-young-baby.png)
+
+- **Files:** `assets/sprites/beaver-young-baby.png` + `.json` — 192×192
+  sheet, 96×96 tiles, fps hint 8
+- **Animations:** `idle` (1 frame), `walk` (2 frames)
+- **Provenance:** full-frame Comfy Cloud generation (`vertexai/nano-banana-2`
+  via `partner_generate`), dual reference-conditioned on the committed baby +
+  teen idle tiles (base64 data-URI images) so it reads BETWEEN them,
+  `targetContentHeightPx: 76`. Ingested via
+  `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:young-baby`,
+  BL-6/T1). See STYLE.md for full provenance.
+- **Status:** committed, not yet wired into `Stage`/`stageForLevel` (WAVE-2)
 
 ### Beaver — teen
 
@@ -48,6 +67,21 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   `scripts/gen-sprites/ingest-images.mjs` (BL-11)
 - **Status:** final
 
+### Beaver — older teen
+
+![older teen beaver sheet](../assets/sprites/beaver-older-teen.png)
+
+- **Files:** `assets/sprites/beaver-older-teen.png` + `.json` — 192×192
+  sheet, 96×96 tiles, fps hint 8
+- **Animations:** `idle` (1 frame), `walk` (2 frames)
+- **Provenance:** full-frame Comfy Cloud generation (`vertexai/nano-banana-2`
+  via `partner_generate`), dual reference-conditioned on the committed teen +
+  adult idle tiles (base64 data-URI images) so it reads BETWEEN them,
+  `targetContentHeightPx: 94`. Ingested via
+  `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:older-teen`,
+  BL-6/T2). See STYLE.md for full provenance.
+- **Status:** committed, not yet wired into `Stage`/`stageForLevel` (WAVE-2)
+
 ### Beaver — adult
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
@@ -57,9 +91,22 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
   `stretch` (8, ONE-SHOT wake-up transition, not a loop)
-- **Provenance:** golden generated art (BL-18). `idle`/`walk` ingested via
-  `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:ingest-adult`);
-  `struggle`/`parachute-wind`/`land` appended via
+- **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
+  teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
+  Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
+  same adult reference image every other row below is anchored to. A prior
+  BL-18 attempt at golden idle/walk art was rejected by the owner as
+  generic/off-model and reverted to the placeholder
+  (`scripts/gen-sprites/build-adult-placeholder.ts`,
+  `npm run assets:adult-placeholder`) — root cause was insufficient reference
+  conditioning; BL-6/T3 fixed that. Ingested via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-idle` /
+  `adult-walk` (`buildAdultRowSheet`/`spliceRow`, byte-preserving for every
+  other row) and pinned by an unconditional committed-sheet byte-pin test
+  (`ingest-animation-frames.test.ts`) so CI fails if
+  `npm run assets:adult-placeholder` is ever re-run against the committed
+  sheet — that command must NOT be re-run now that idle/walk are final (see
+  STYLE.md). `struggle`/`parachute-wind`/`land` appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`); `type` appended via `scripts/gen-sprites/ingest-typing.mjs`
   (`npm run assets:typing`); `watering`, `drink`, `sleep`, and `stretch`

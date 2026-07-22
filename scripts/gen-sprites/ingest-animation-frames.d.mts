@@ -49,9 +49,13 @@ export const ADULT_WATERING: AdultRowConfig;
 export const ADULT_DRINK: AdultRowConfig;
 export const ADULT_SLEEP: AdultRowConfig;
 export const ADULT_STRETCH: AdultRowConfig;
+export const ADULT_IDLE: AdultRowConfig;
+export const ADULT_WALK: AdultRowConfig;
 
 export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
 export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
 export function buildAdultDrinkSheet(repoRoot: string): AdultRowResult;
 export function buildAdultSleepSheet(repoRoot: string): AdultRowResult;
 export function buildAdultStretchSheet(repoRoot: string): AdultRowResult;
+export function buildAdultIdleSheet(repoRoot: string): AdultRowResult;
+export function buildAdultWalkSheet(repoRoot: string): AdultRowResult;

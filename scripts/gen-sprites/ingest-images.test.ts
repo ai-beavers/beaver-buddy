@@ -149,3 +149,76 @@ describe('STAGE_SPECS row assignment (BL-12)', () => {
     for (const file of walkRow?.files ?? []) expect(file).toMatch(/-to-right-\d\.png$/);
   });
 });
+
+// Committed-sheet checks for the two new BL-6 figures (beaver-young-baby,
+// beaver-older-teen). Unlike the ingest-images describe block above, these
+// run unconditionally: they read only the already-committed
+// assets/sprites/*.{png,json} — never the gitignored assets-src/beaver/
+// source frames — so they hold on every checkout/CI, not just a dev machine
+// that happens to have the source images locally.
+describe('committed new-figure sheets (BL-6)', () => {
+  const newFigures = ['beaver-young-baby', 'beaver-older-teen'];
+
+  it.each(newFigures)('%s: STAGE_SPECS has a name-based entry with idle(1)+walk(2) rows', (name) => {
+    const spec = STAGE_SPECS.find((s) => s.name === name);
+    expect(spec).toBeDefined();
+    expect(spec?.rows.map((row) => row.name)).toEqual(['idle', 'walk']);
+    expect(spec?.rows.find((row) => row.name === 'idle')?.files).toHaveLength(1);
+    expect(spec?.rows.find((row) => row.name === 'walk')?.files).toHaveLength(2);
+  });
+
+  it.each(newFigures)('%s: committed PNG dimensions match the committed JSON (192x192, 96px tile)', (name) => {
+    const pngPath = new URL(`../../assets/sprites/${name}.png`, import.meta.url);
+    const metaPath = new URL(`../../assets/sprites/${name}.json`, import.meta.url);
+    const committedPng = fs.readFileSync(pngPath);
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      sheetWidth: number;
+      sheetHeight: number;
+      rows: { name: string; frames: number }[];
+    };
+
+    expect(meta.tile).toBe(96);
+    expect(meta.sheetWidth).toBe(192);
+    expect(meta.sheetHeight).toBe(192);
+    expect(meta.rows).toEqual([
+      { name: 'idle', frames: 1 },
+      { name: 'walk', frames: 2 },
+    ]);
+
+    const decoded = decodePng(committedPng);
+    expect(decoded.width).toBe(meta.sheetWidth);
+    expect(decoded.height).toBe(meta.sheetHeight);
+  });
+
+  it.each(newFigures)('%s: every frame has opaque content, and each row is grounded', (name) => {
+    const pngPath = new URL(`../../assets/sprites/${name}.png`, import.meta.url);
+    const metaPath = new URL(`../../assets/sprites/${name}.json`, import.meta.url);
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: { name: string; frames: number }[];
+    };
+    const { tile } = meta;
+
+    meta.rows.forEach((row, rowIndex) => {
+      let anyBottomRowOpaque = false;
+      for (let frame = 0; frame < row.frames; frame += 1) {
+        const originX = frame * tile;
+        const originY = rowIndex * tile;
+        let opaqueCount = 0;
+        for (let y = 0; y < tile; y += 1) {
+          for (let x = 0; x < tile; x += 1) {
+            const alpha = decoded.data[((originY + y) * decoded.width + originX + x) * 4 + 3];
+            if (alpha > 0) {
+              opaqueCount += 1;
+              if (y === tile - 1) anyBottomRowOpaque = true;
+            }
+          }
+        }
+        expect(opaqueCount, `${name}.${row.name}[${frame}] is empty`).toBeGreaterThan(0);
+      }
+      expect(anyBottomRowOpaque, `${name}.${row.name}: no frame touches the tile bottom`).toBe(true);
+    });
+  });
+});
