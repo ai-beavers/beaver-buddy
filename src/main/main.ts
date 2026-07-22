@@ -246,7 +246,13 @@ app.whenReady().then(async () => {
   // usageTracker is assigned below; getUsageSources reads the live ref.
   let usageTracker: UsageTracker | null = null;
   function applyUsageEnabled(next: SettingsState): void {
-    usageTracker?.setEnabledSources({ claude: next.claudeEnabled, codex: next.codexEnabled });
+    usageTracker?.setEnabledSources({
+      claude: next.claudeEnabled,
+      codex: next.codexEnabled,
+      pi: next.piEnabled ?? false,
+      kimi: next.kimiEnabled ?? false,
+      opencode: next.opencodeEnabled ?? false,
+    });
   }
   function openGrowthSettings(): void {
     openSettingsWindow({
@@ -290,12 +296,13 @@ app.whenReady().then(async () => {
           usageTracker?.getSourcesSnapshot() ?? {
             claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
             codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+            pi: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+            kimi: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
+            opencode: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
           }
         );
       },
-      onUsageEnabledChanged: ({ claudeEnabled, codexEnabled }) => {
-        usageTracker?.setEnabledSources({ claude: claudeEnabled, codex: codexEnabled });
-      },
+      onUsageEnabledChanged: applyUsageEnabled,
     });
   }
 
@@ -345,6 +352,9 @@ app.whenReady().then(async () => {
   usageTrackerInstance.setEnabledSources({
     claude: growthSettings.claudeEnabled,
     codex: growthSettings.codexEnabled,
+    pi: growthSettings.piEnabled ?? false,
+    kimi: growthSettings.kimiEnabled ?? false,
+    opencode: growthSettings.opencodeEnabled ?? false,
   });
   usageTrackerInstance.start();
   await xpEngine.attachTracker(usageTrackerInstance);

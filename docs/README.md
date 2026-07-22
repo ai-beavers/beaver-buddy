@@ -24,6 +24,7 @@ Visual design gates per build item — screenshots + verdicts:
 
 - [`asset-gallery.md`](asset-gallery.md) — catalog of every figure/animation asset (registration required)
 - [`comfyui-avatar-generation.md`](comfyui-avatar-generation.md) — ComfyUI parts pipeline into the studio
+- [`animation-authoring.md`](animation-authoring.md) — quickstart for ComfyUI + PixiJS puppet studio animation authoring
 - [`../assets/STYLE.md`](../assets/STYLE.md) — sprite style guide + provenance (binding)
 
 ## Operations

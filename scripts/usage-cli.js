@@ -1,6 +1,6 @@
 // Dev-only CLI (like scripts/gen-sprites) — not part of the app runtime.
 // Prints derived daily + lifetime token totals from the real machine's
-// Claude Code / Codex usage logs, for the ccusage ±5% cross-check and
+// supported coding-agent usage logs, for the ccusage ±5% cross-check and
 // debugging. Runs against the compiled output: `npm run usage:cli`.
 //
 // Derived counts only — this prints aggregate token numbers, never raw log
@@ -9,6 +9,7 @@
 const { UsageTracker } = require('../dist/main/usage/tracker');
 
 const tracker = new UsageTracker();
+tracker.setEnabledSources({ claude: true, codex: true, pi: true, kimi: true, opencode: true });
 tracker.refresh();
 const totals = tracker.getTotals();
 
