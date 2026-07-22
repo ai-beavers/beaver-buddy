@@ -29,6 +29,24 @@ npm ci          # exact, locked dependencies — never `npm install` for setup
 npm start       # build + launch the overlay
 ```
 
+### Agent skills
+
+The repo vendors agent skills in `skills/` (currently the PixiJS v8 set; more,
+e.g. ComfyUI skills, land there once they leave the local review loop). Agents
+only pick skills up from `.agents/skills/`, which is gitignored — so before
+working with agents in this project, install them once after cloning:
+
+```sh
+npm run skills:install
+```
+
+- The installer copies each `skills/<name>/` to `.agents/skills/<name>/` and
+  skips skills that already exist locally, so local edits are never overwritten
+  (`node scripts/install-skills.mjs --force` resets to the committed versions).
+- Iterate on skills freely in `.agents/skills/` — nothing there is ever
+  committed. When a skill is stable and worth sharing, copy it back into
+  `skills/` and open a PR.
+
 ## 3. Create a branch
 
 Never commit directly to `main`. Branch off an up-to-date `main`:
