@@ -235,24 +235,20 @@ nature: curled-up sleep (frame 1, continuous with the committed sleep pose)
 straight up overhead in a big stretch with a wide yawn → arms lowered back
 down to a calm neutral standing pose (frame 8, continuous with the idle
 stance). Generated via Comfy Cloud Nano Banana 2 (`GeminiNanoBanana2`,
-`vertexai/nano-banana-2` family — the same partner model the drink/sleep rows
-used, referred to elsewhere in this doc as "Nano Banana Pro"/`GeminiImage2Node`),
-DUAL reference-conditioned (BL-5's own new requirement, not a single
-reference like watering/drink/sleep): the committed adult idle tile AND the
-committed `assets-src/reference/adult-sleep-pose.png` sleep-pose tile, batched
-into one `images` input via a `Batch Images` node so the model sees both the
-character design and the exact pose to wake from, on a green (`#00FF00`)
-chroma-key background. Uploads went through `ctx_execute`'s `fetch` (direct
-`curl`/`upload_file` shell dispatch is blocked in this environment, per
-`docs/dev-guardrails.md`); output download used the same `ctx_execute fetch`
-route rather than the emitted `curl` download command, for the same reason.
-**Scale-trap check** (BL-19 parachute-wind precedent considered but not
+`vertexai/nano-banana-2` family — a distinct node from the `GeminiImage2Node`
+used elsewhere in this doc), DUAL reference-conditioned (BL-5's own new
+requirement, not a single reference like watering/drink/sleep): the committed
+adult idle tile AND the committed
+`assets-src/reference/adult-sleep-pose.png` sleep-pose tile, batched into one
+`images` input via a `Batch Images` node so the model sees both the character
+design and the exact pose to wake from, on a green (`#00FF00`) chroma-key
+background. **Scale-trap check** (BL-19 parachute-wind precedent considered but not
 needed here): the row's tallest raw cropped content turned out to be the
 standing frames' own tail-to-ear span (~762px pre-scale at generation
 resolution), shared evenly by the arms-up AND arms-down standing frames — the
 raised arms never reach above ear height in this generation, so there's no
 single taller arms-up silhouette forcing a smaller shared scale. Measured
-empirically before promoting (per the plan's requirement): at
+empirically before promoting: at
 `targetContentHeightPx: 96` (default 96px `rowHeight`, no override), the
 standing frames land at exactly the committed idle tile's own content height
 (96px, full-tile edge-to-edge — the idle sprite has zero vertical padding),

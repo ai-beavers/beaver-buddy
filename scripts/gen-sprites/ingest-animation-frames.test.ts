@@ -477,10 +477,9 @@ describe.skipIf(!hasSleepSource)('ingest-animation-frames sleep regeneration', (
 // watering/drink/sleep above, via the shared buildAdultRowSheet config.
 // Stretch is a ONE-SHOT wake-up transition (like `land`), not a loop — no
 // wraparound gate; frame1-vs-sleep-pose and frame8-vs-idle continuity are
-// checked as side-by-side diffs (eyeballed, saved under the scratchpad
-// contact-sheets dir per the plan), not a pixel-identity assertion, since
-// frame 1 is newly generated art conditioned on the sleep pose, not a copy
-// of it.
+// checked as side-by-side diffs (eyeballed, saved under scratch — not
+// committed here), not a pixel-identity assertion, since frame 1 is newly
+// generated art conditioned on the sleep pose, not a copy of it.
 describe('ingest-animation-frames stretch row (adult)', () => {
   const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
   const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
