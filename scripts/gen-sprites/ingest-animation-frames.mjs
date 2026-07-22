@@ -185,66 +185,95 @@ export function buildBabySheet(repoRoot) {
   return buildStageSheet(repoRoot, BABY);
 }
 
-// Adult watering-can loop: appended directly onto the already-committed
-// beaver-adult sheet, NOT folded into ADULT.animations above. Rebuilding the
-// whole adult stage from ADULT.animations would require struggle/parachute-
-// wind/land's own gitignored Comfy run dirs to also exist locally, and Comfy
-// generation isn't deterministic — re-baking them on a machine that lacks
-// those dumps would silently replace already-shipped pixels. This mirrors
-// ingest-typing.mjs's "append one row to the committed sheet, preserving
-// every other row byte-for-byte" pattern (both now share spliceRow, which
-// finds the target row by name rather than assuming it's a contiguous
-// prefix or the physical last row — needed because this row and
-// ingest-typing's `type` row both append onto the same sheet over time), but
-// reads a single 4-col x 2-row grid image (like the type row's source sheet)
-// instead of per-file frames.
+// Adult single-grid rows (watering, drink, ...): each appended directly onto
+// the already-committed beaver-adult sheet, NOT folded into ADULT.animations
+// above. Rebuilding the whole adult stage from ADULT.animations would
+// require struggle/parachute-wind/land's own gitignored Comfy run dirs to
+// also exist locally, and Comfy generation isn't deterministic — re-baking
+// them on a machine that lacks those dumps would silently replace
+// already-shipped pixels. This mirrors ingest-typing.mjs's "append one row
+// to the committed sheet, preserving every other row byte-for-byte" pattern
+// (all three now share spliceRow, which finds the target row by name rather
+// than assuming it's a contiguous prefix or the physical last row — needed
+// because rows keep getting appended onto the same sheet over time), reading
+// a single gridCols x gridRows grid image (like the type row's source sheet)
+// instead of per-file frames. `rowHeight` defaults to TILE; pass it when a
+// pose needs a taller tile (BL-19 precedent on the animated rows).
+export function buildAdultRowSheet(repoRoot, config) {
+  const pngPath = path.join(repoRoot, 'assets', 'sprites', ADULT.shippedPng);
+  const jsonPath = pngPath.replace(/\.png$/, '.json');
+  const shipped = decodePng(fs.readFileSync(pngPath));
+  const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+
+  const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', config.sourceDir, 'sheet.png');
+  const grid = decodePng(fs.readFileSync(sheetPath));
+  const cropped = [];
+  for (let row = 0; row < config.gridRows; row += 1) {
+    for (let col = 0; col < config.gridCols; col += 1) {
+      const cell = extractGridCell(grid, col, row, config.gridCols, config.gridRows);
+      cropped.push(cropToBbox(chromaKeyGreen(cell)));
+    }
+  }
+  const rowHeight = config.rowHeight ?? TILE;
+  const scale = computeStageScale(cropped, TILE, config.targetContentHeightPx);
+  const tiles = cropped.map((img) => {
+    const destW = Math.max(1, Math.round(img.width * scale));
+    const destH = Math.max(1, Math.round(img.height * scale));
+    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE, rowHeight);
+  });
+
+  const { width, height, data, meta } = spliceRow(shipped, shippedMeta, config.rowName, tiles, rowHeight);
+  return { png: encodeRgbaPng({ width, height, data }), meta, scale };
+}
+
 export const ADULT_WATERING = {
-  name: 'watering',
-  run: 'adult-watering',
+  rowName: 'watering',
+  sourceDir: 'adult-watering',
+  frames: 8,
   gridCols: 4,
   gridRows: 2,
   targetContentHeightPx: 88,
 };
 
 export function buildAdultWateringSheet(repoRoot) {
-  const pngPath = path.join(repoRoot, 'assets', 'sprites', ADULT.shippedPng);
-  const jsonPath = pngPath.replace(/\.png$/, '.json');
-  const shipped = decodePng(fs.readFileSync(pngPath));
-  const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-
-  const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', ADULT_WATERING.run, 'sheet.png');
-  const grid = decodePng(fs.readFileSync(sheetPath));
-  const cropped = [];
-  for (let row = 0; row < ADULT_WATERING.gridRows; row += 1) {
-    for (let col = 0; col < ADULT_WATERING.gridCols; col += 1) {
-      const cell = extractGridCell(grid, col, row, ADULT_WATERING.gridCols, ADULT_WATERING.gridRows);
-      cropped.push(cropToBbox(chromaKeyGreen(cell)));
-    }
-  }
-  const scale = computeStageScale(cropped, TILE, ADULT_WATERING.targetContentHeightPx);
-  const tiles = cropped.map((img) => {
-    const destW = Math.max(1, Math.round(img.width * scale));
-    const destH = Math.max(1, Math.round(img.height * scale));
-    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE);
-  });
-
-  const { width, height, data, meta } = spliceRow(shipped, shippedMeta, ADULT_WATERING.name, tiles);
-  return { png: encodeRgbaPng({ width, height, data }), meta, scale };
+  return buildAdultRowSheet(repoRoot, ADULT_WATERING);
 }
+
+// Coffee-drink loop (BL-3): beaver lifts a mug, sips, steam wisps —
+// reference-conditioned on the committed adult beaver, same green
+// chroma-key + 4x2 grid convention as watering.
+export const ADULT_DRINK = {
+  rowName: 'drink',
+  sourceDir: 'adult-drink',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 88,
+};
+
+export function buildAdultDrinkSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_DRINK);
+}
+
+// CLI names for the single-grid adult rows, keyed the same way STAGES keys
+// the multi-animation stages — one ADULT_ROWS entry per row appended this
+// way (watering, drink, future BL-8..12 rows just add a config here).
+const ADULT_ROWS = { 'adult-watering': ADULT_WATERING, 'adult-drink': ADULT_DRINK };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = path.join(import.meta.dirname, '..', '..');
   const stageArg = process.argv[2] ?? 'baby';
-  if (stageArg === 'adult-watering') {
-    const { png, meta, scale } = buildAdultWateringSheet(repoRoot);
+  if (ADULT_ROWS[stageArg]) {
+    const rowConfig = ADULT_ROWS[stageArg];
+    const { png, meta, scale } = buildAdultRowSheet(repoRoot, rowConfig);
     fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.png'), png);
     fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.json'), `${JSON.stringify(meta, null, 2)}\n`);
-    console.log(`appended beaver-adult watering row (${meta.sheetWidth}x${meta.sheetHeight}, scale ${scale.toFixed(4)})`);
+    console.log(`appended beaver-adult ${rowConfig.rowName} row (${meta.sheetWidth}x${meta.sheetHeight}, scale ${scale.toFixed(4)})`);
   } else {
     const config = STAGES[stageArg];
     if (!config) {
-      throw new Error(`unknown stage "${stageArg}" (expected one of: ${[...Object.keys(STAGES), 'adult-watering'].join(', ')})`);
+      throw new Error(`unknown stage "${stageArg}" (expected one of: ${[...Object.keys(STAGES), ...Object.keys(ADULT_ROWS)].join(', ')})`);
     }
     const { png, meta, scales } = buildStageSheet(repoRoot, config);
     const outDir = path.join(repoRoot, 'assets-src', 'baked', config.bakedDirName);

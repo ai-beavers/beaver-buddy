@@ -29,20 +29,25 @@ export const ADULT: StageAnimConfig;
 export function buildStageSheet(repoRoot: string, config: StageAnimConfig): StageSheetResult;
 export function buildBabySheet(repoRoot: string): StageSheetResult;
 
-export interface AdultWateringSpec {
-  readonly name: string;
-  readonly run: string;
+export interface AdultRowConfig {
+  readonly rowName: string;
+  readonly sourceDir: string;
+  readonly frames: number;
   readonly gridCols: number;
   readonly gridRows: number;
   readonly targetContentHeightPx: number;
+  readonly rowHeight?: number;
 }
 
-export interface AdultWateringResult {
+export interface AdultRowResult {
   readonly png: Buffer;
   readonly meta: SheetMeta;
   readonly scale: number;
 }
 
-export const ADULT_WATERING: AdultWateringSpec;
+export const ADULT_WATERING: AdultRowConfig;
+export const ADULT_DRINK: AdultRowConfig;
 
-export function buildAdultWateringSheet(repoRoot: string): AdultWateringResult;
+export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
+export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
+export function buildAdultDrinkSheet(repoRoot: string): AdultRowResult;
