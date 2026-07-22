@@ -52,25 +52,29 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×896 sheet,
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×992 sheet,
   96×96 tiles, fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
-  (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8)
+  (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
+  `stretch` (8, ONE-SHOT wake-up transition, not a loop)
 - **Provenance:** golden generated art (BL-18). `idle`/`walk` ingested via
   `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:ingest-adult`);
   `struggle`/`parachute-wind`/`land` appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`); `type` appended via `scripts/gen-sprites/ingest-typing.mjs`
-  (`npm run assets:typing`); `watering`, `drink`, and `sleep` appended via
-  `scripts/gen-sprites/ingest-animation-frames.mjs adult-watering` /
-  `adult-drink` / `adult-sleep` (`npm run assets:adult-watering` BL-1/T2,
-  `npm run assets:adult-drink` BL-3, `npm run assets:adult-sleep` BL-4)
-  — all three share the config-driven `buildAdultRowSheet` builder — Nano
-  Banana Pro, reference-conditioned on the committed adult sprite, green
+  (`npm run assets:typing`); `watering`, `drink`, `sleep`, and `stretch`
+  appended via `scripts/gen-sprites/ingest-animation-frames.mjs adult-watering` /
+  `adult-drink` / `adult-sleep` / `adult-stretch` (`npm run
+  assets:adult-watering` BL-1/T2, `npm run assets:adult-drink` BL-3, `npm run
+  assets:adult-sleep` BL-4, `npm run assets:adult-stretch` BL-5) — all four
+  share the config-driven `buildAdultRowSheet` builder — Comfy Cloud Nano
+  Banana, reference-conditioned on the committed adult sprite, green
   chroma-key background. `sleep` is a curled-up idle loop (no settle
   transition) with a committed BL-5 handoff reference tile at
   `assets-src/reference/adult-sleep-pose.png` (frame 8 of 8, fewest zzz
-  wisps) — see STYLE.md provenance.
+  wisps). `stretch` wakes up from that same sleep-pose tile (dual
+  reference-conditioned on it AND the adult idle tile) and settles back to
+  the idle stance — see STYLE.md provenance.
 - **Status:** final
 
 ### Tree — growth stages
