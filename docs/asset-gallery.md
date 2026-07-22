@@ -52,19 +52,21 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×704 sheet,
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×800 sheet,
   96×96 tiles, fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
-  (8), `land` (8), `type` (8), `watering` (8)
+  (8), `land` (8), `type` (8), `watering` (8), `drink` (8)
 - **Provenance:** golden generated art (BL-18). `idle`/`walk` ingested via
   `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:ingest-adult`);
   `struggle`/`parachute-wind`/`land` appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`); `type` appended via `scripts/gen-sprites/ingest-typing.mjs`
-  (`npm run assets:typing`); `watering` appended via
-  `scripts/gen-sprites/ingest-animation-frames.mjs adult-watering` (`npm run
-  assets:adult-watering`, BL-1/T2) — Nano Banana Pro, reference-conditioned
-  on the committed adult sprite, green chroma-key background
+  (`npm run assets:typing`); `watering` and `drink` appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-watering` / `adult-drink`
+  (`npm run assets:adult-watering` BL-1/T2, `npm run assets:adult-drink` BL-3)
+  — both share the config-driven `buildAdultRowSheet` builder — Nano Banana
+  Pro, reference-conditioned on the committed adult sprite, green chroma-key
+  background
 - **Status:** final
 
 ### Tree — growth stages

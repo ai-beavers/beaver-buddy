@@ -17,7 +17,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "assets:adult-placeholder": "node scripts/gen-sprites/build-adult-placeholder.ts",
-    "assets:adult": "node scripts/gen-sprites/ingest-animation-frames.mjs adult && node scripts/gen-sprites/ingest-typing.mjs && node scripts/gen-sprites/ingest-animation-frames.mjs adult-watering",
+    "assets:adult": "node scripts/gen-sprites/ingest-animation-frames.mjs adult && node scripts/gen-sprites/ingest-typing.mjs && node scripts/gen-sprites/ingest-animation-frames.mjs adult-watering && node scripts/gen-sprites/ingest-animation-frames.mjs adult-drink",
     "assets:typing": "node scripts/gen-sprites/ingest-typing.mjs",
     "assets:build": "node scripts/gen-sprites/build.ts",
     "assets:icons": "node scripts/gen-sprites/build-icons.ts",
@@ -25,6 +25,7 @@
     "assets:parachute": "node scripts/gen-sprites/ingest-animation-frames.mjs baby",
     "assets:adult-anims": "node scripts/gen-sprites/ingest-animation-frames.mjs adult",
     "assets:adult-watering": "node scripts/gen-sprites/ingest-animation-frames.mjs adult-watering",
+    "assets:adult-drink": "node scripts/gen-sprites/ingest-animation-frames.mjs adult-drink",
     "usage:cli": "npm run build && node scripts/usage-cli.js",
     "skills:install": "node scripts/install-skills.mjs"
   },
