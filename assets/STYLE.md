@@ -153,6 +153,27 @@ everywhere else); only the ingested sheets are committed. Right-facing
 frames only — the user's left-facing images are unused (see Facing &
 mirroring above).
 
+**`beaver-young-baby.png`/`beaver-older-teen.png`** (BL-6/T1-T2, 2026-07-22):
+two new in-between growth-stage sheets, not yet wired into `Stage`/
+`stageForLevel` (WAVE-2) — an unwired sheet is inert, so committing them is
+safe ahead of that wiring. Both are full-frame Comfy Cloud generations via
+`partner_generate` (`vertexai/nano-banana-2`), DUAL reference-conditioned by
+passing the two neighboring stages' already-committed idle tiles as base64
+data-URI images so the result reads BETWEEN them rather than as a new
+character: `beaver-young-baby` conditions on the committed baby + teen idle
+tiles (`targetContentHeightPx: 76` — interpolated between baby's and teen's
+own locked scales, cheap to re-ingest at another value); `beaver-older-teen`
+conditions on the committed teen + adult idle tiles (`targetContentHeightPx:
+94` — interpolated the same way). Both ship `idle(1)`/`walk(2)` only (teen
+precedent, app-complete minimum; interaction rows are a WAVE-2 follow-up
+once stage wiring lands), on a 192×192 sheet like teen. Ingested via the
+existing `scripts/gen-sprites/ingest-images.mjs` pipeline (new `STAGE_SPECS`
+entries, unchanged mechanics) — `npm run assets:young-baby` / `npm run
+assets:older-teen`; the CLI now accepts an optional stage-name arg so
+building one new figure doesn't require the other stages' gitignored source
+frames to also exist locally. No human cleanup beyond the mechanical
+pipeline.
+
 `idle(1)`/`walk(2)` (BL-6/T3, 2026-07-22, FINAL ART): reference-conditioned
 Comfy Cloud Nano Banana Pro (`GeminiImage2Node`) generations, replacing the
 teen-upscale placeholder for good. A first BL-18 pass at golden idle/walk art
