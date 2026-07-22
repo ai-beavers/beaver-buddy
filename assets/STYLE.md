@@ -92,10 +92,10 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
 - **Beaver stages**: `idle(1), walk(N)` for teen; baby/adult additionally
   carry `struggle(8), parachute-wind(8), land(8)` for the parachute-drop
   sequence (BL-17/BL-18). Adult also carries `type(8)` — the "sit and type on a
-  laptop" loop for `roam.ts`'s `working` state — and `watering(8)`/`drink(8)`
-  loops. `beaver-baby.png`/`beaver-teen.png`/`beaver-adult.png`: walk×2. fps
-  hint: 8. The idle pose never appears in a walk row — walk cycles are step
-  frames only.
+  laptop" loop for `roam.ts`'s `working` state — and `watering(8)`/`drink(8)`/
+  `sleep(8)` loops. `beaver-baby.png`/`beaver-teen.png`/`beaver-adult.png`:
+  walk×2. fps hint: 8. The idle pose never appears in a walk row — walk cycles
+  are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
   frames are 8×8 particles centered in the 48×48 tile (rows/cols 20–27, also
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
@@ -119,7 +119,11 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   of that by `scripts/gen-sprites/ingest-animation-frames.mjs adult-drink`
   (`npm run assets:adult-drink`, BL-3) via the same config-driven
   `buildAdultRowSheet` helper watering now shares, growing the sheet to
-  768×800; see Provenance.
+  768×800; see Provenance. `sleep(8)` — a curled-up idle LOOP, no
+  settle/lie-down transition frame — is appended on top of that by
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-sleep` (`npm run
+  assets:adult-sleep`, BL-4) via the same `buildAdultRowSheet` helper,
+  growing the sheet to 768×896; see Provenance.
 - **Tree growth stages** (`tree-stage-1.png`/`tree-stage-2.png`/`tree-stage-3.png`,
   BL-1/T1): one row each, `sway(12)`, baked at fps 8 by the puppet studio
   (`tools/puppet-studio/`) — 96×96 tile, sheet 1152×96. Not a multi-row sheet
@@ -190,6 +194,34 @@ gridCols, gridRows, targetContentHeightPx}` — watering and drink are now two
 config entries sharing one function) — same byte-preserving append pattern,
 growing the sheet to 768×800. No human cleanup beyond the mechanical
 pipeline.
+
+`sleep(8)` (BL-4, 2026-07-22): a 4×2 grid (8 frames) of a curled-up sleeping
+LOOP (no settle/lie-down transition — matches every other looping row; a
+one-shot fall-asleep transition can be added as its own row later), gentle
+breathing rise/fall and pulsing pale-blue "zzz" wisps that grow through
+frames 1→4 and shrink back down through frames 5→8 so the frame-8→frame-1
+seam reads as a continuous pulse restarting, not a jump. Generated via Comfy
+Cloud Nano Banana Pro (`GeminiImage2Node`), reference-conditioned on the same
+already-uploaded adult reference image the drink/watering/parachute-wind
+generations used (reused by filename, no new upload — direct uploads are
+blocked in this environment, per `docs/dev-guardrails.md`), on a green
+(`#00FF00`) chroma-key background. The first generation attempt drew thin
+black divider lines between grid cells that touched every cell's edge and
+poisoned `cropToBbox` (pinning every frame's crop to the full cell); a second
+attempt without divider lines came back oriented as 2 columns × 4 rows
+instead of the requested 4×2; the prompt was tightened to explicitly forbid
+divider lines AND pin the 4-column/2-row landscape layout, which produced
+the shipped grid. Ingested by `scripts/gen-sprites/ingest-animation-frames.mjs
+adult-sleep` (`npm run assets:adult-sleep`) via `buildAdultRowSheet` — same
+byte-preserving append pattern as watering/drink — growing the sheet to
+768×896. No human cleanup beyond the mechanical pipeline.
+
+**BL-5 handoff reference** (`assets-src/reference/adult-sleep-pose.png`,
+BL-4): a committed, post-ingest 96×96 copy of the sleep row's frame index 7
+(frame 8 of 8 — the pose with the fewest/faintest zzz wisps, so BL-5's
+wake-up/stretch generation conditions on the sleeping beaver's pose, not on
+transient particle art), verified pixel-identical to that frame in the
+committed sheet by a dedicated test (`ingest-animation-frames.test.ts`).
 
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
