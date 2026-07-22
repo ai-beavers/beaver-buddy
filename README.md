@@ -228,9 +228,15 @@ The essentials:
   justify it in the PR body (what it does, why ~50 lines of our own can't, and its
   license — **MIT / Apache-2.0 / BSD only**).
 - **Merges are `--merge`** (no squash, no rebase). Only a human merges to `main`.
+- **Working with agents?** Install the vendored agent skills once after cloning:
+  `npm run skills:install` (copies `skills/` → `.agents/skills/`, which is gitignored).
+  Local skill iterations stay untracked; a stable skill is shared by copying it back
+  into `skills/` and opening a PR.
 - **Security & privacy are non-negotiable** — no secrets in the repo, no telemetry,
   and never log or commit real prompts, repo paths, usernames, or account identifiers.
   See [`SECURITY.md`](SECURITY.md) to report a vulnerability privately.
+- **Animation authoring** — see [docs/animation-authoring.md](docs/animation-authoring.md)
+  for the ComfyUI + PixiJS puppet studio workflow.
 
 New to the project? Good first areas are quips (`src/main/quips/`) and sprite/animation
 polish (`assets/`, `src/renderer/`).

@@ -17,9 +17,10 @@ assets-src/*
 !assets-src/parts/
 !assets-src/reference/
 
-# Local /fp-new-projekt slash-command template files. Imported for local
-# scaffolding only; never committed.
-.fp-new-projekt/
+# Local agent-skill install location. The committed source of truth lives in
+# skills/ and is installed via `npm run skills:install` (see CONTRIBUTING.md).
+# Local skill iterations (Flightplan, ComfyUI, ...) stay untracked here.
+.agents/skills/
 
 # Code-signing certificates never enter the repo; dev PFX files stay local,
 # CI certs live in GitHub Actions secrets (docs/code-signing.md).

@@ -1,8 +1,10 @@
 # CLAUDE.md — Beaver Buddy
 
 Read first, every session. `PRD.md` is the product source of truth; this file is the
-guardrails. Most work here is executed by autonomous /build items — these rules are
-written to be enforceable without a human in the loop.
+guardrails. `README.md` (project overview) and `CONTRIBUTING.md` (contribution
+mechanics, including agent-skill installation) are part of the codebase — consult
+them when their topics come up. Most work here is executed by autonomous /build
+items — these rules are written to be enforceable without a human in the loop.
 
 Before touching the sprite pipeline, the grab/parachute interaction, or
 generating animation art, skim [`docs/dev-guardrails.md`](docs/dev-guardrails.md)
@@ -30,6 +32,15 @@ extended.
   installs use `npm ci` (lockfile committed and authoritative).
 - ADR 001 (the R1 reuse research) must be merged before any item that depends on
   shell or asset-pipeline decisions starts.
+
+## Agent skills
+
+- The committed source of truth for agent skills is `skills/` (currently the
+  PixiJS v8 set). Install them once per checkout with `npm run skills:install`,
+  which copies them into `.agents/skills/` — only there are they visible to agents.
+- `.agents/skills/` is gitignored and local-only: skill iterations (Flightplan,
+  ComfyUI, drafts) happen there and are never committed. Sharing a stable skill =
+  copying it into `skills/` in its own PR.
 
 ## Electron hardening (P1 invariants, checked in review)
 
@@ -201,19 +212,17 @@ fixed or documented as known limitations.
 - ADRs (`docs/adr/NNN-title.md`) are for costly or hard-to-reverse cross-cutting
   decisions (renderer approach, state schema, asset pipeline) — not every choice.
 
-## Planning & Flightplan (local-only)
+## Planning & docs — `.planning/` (committed) + `.flightplan/` (local master)
 
-Detailed planning lives in **local, gitignored files** — linked here so every
-agent session can find them. They exist on the maintainer's machine only; never
-`git add` them, and never copy their contents into committed docs or PRs.
+The **team-facing planning docs are committed under `.planning/`** — agents and
+contributors read them there (see `AGENTS.md` → "Project planning docs"):
+`KICKOFF.md` (start), `STATE.md`, `ROADMAP.md` (milestones/phases/dependencies),
+`Planning/Milestone-N/…`, `Meetings/`, `Reference/` (item specs #1–#64), `Archive/`.
 
-- `.fp-new-projekt/windows-native-flight-plan.md` — the detailed item plan
-  (Windows port #1–#62 done; next: #26 MRR mode, #8–#18 animations, #7 final
-  adult art).
-- Flightplan state lives under `.flightplan/` (one directory, gitignored):
-  `STATE.md` (digest: Now/Next), `ROADMAP.md` (milestones/phases),
-  `HANDOFF.md` (session resume), `NOTE.md` (idea/task inbox), plus the
-  `Planning/` (Milestone/Phase/Wave) and `Debugging/` templates.
+The **Flightplan master lives under `.flightplan/` — local and gitignored** on the
+maintainer's machine. Rodgi edits there and **syncs into `.planning/`**; agents must
+never edit `.planning/` planning state directly and never `git add` `.flightplan/`.
+
 - The Flightplan workflow runs via `/fp-status`, `/fp-note`, `/fp-pause`,
   `/fp-resume`. The skills live locally under `.claude/skills/` and
   `.agents/skills/` (gitignored agent tooling, not project content) and are

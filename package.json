@@ -24,7 +24,8 @@
     "assets:ingest": "node scripts/gen-sprites/ingest-images.mjs",
     "assets:parachute": "node scripts/gen-sprites/ingest-animation-frames.mjs baby",
     "assets:adult-anims": "node scripts/gen-sprites/ingest-animation-frames.mjs adult",
-    "usage:cli": "npm run build && node scripts/usage-cli.js"
+    "usage:cli": "npm run build && node scripts/usage-cli.js",
+    "skills:install": "node scripts/install-skills.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
