@@ -153,13 +153,43 @@ everywhere else); only the ingested sheets are committed. Right-facing
 frames only — the user's left-facing images are unused (see Facing &
 mirroring above).
 
-Adult `idle`/`walk` are not independently generated: they're a mechanical
-nearest-neighbor upscale of the committed teen sheet
-(`scripts/gen-sprites/build-adult-placeholder.ts`) so the adult reads as a
-bigger beaver with zero authored pixels — the same placeholder used before
-BL-18. A first BL-18 pass replaced this with golden Comfy-generated idle/walk
-art; the owner rejected it as generic and off-model, so it was reverted and
-the placeholder restored.
+`idle(1)`/`walk(2)` (BL-6/T3, 2026-07-22, FINAL ART): reference-conditioned
+Comfy Cloud Nano Banana Pro (`GeminiImage2Node`) generations, replacing the
+teen-upscale placeholder for good. A first BL-18 pass at golden idle/walk art
+was rejected by the owner as generic and off-model and reverted to the
+placeholder (`scripts/gen-sprites/build-adult-placeholder.ts`,
+`npm run assets:adult-placeholder`); the root cause, per
+`docs/dev-guardrails.md`, was insufficient reference conditioning. This pass
+fixes that by conditioning on the SAME already-uploaded adult reference image
+every other adult row (`struggle`/`parachute-wind`/`land`/`type`/`watering`/
+`drink`/`sleep`/`stretch`) is already anchored to — the single most
+consistency-preserving reference available, since those 8 rows are the
+ones the owner has already accepted as on-model. Idle is a single standing
+pose (1x1 "grid"); walk is a 2-frame side-view cycle (2x1 grid, contact +
+passing poses) generated in one image with an explicit no-divider-line
+instruction (the BL-4 sleep-row gotcha: a seam between grid cells can poison
+`cropToBbox`). Both on a green (`#00FF00`) chroma-key background. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-idle` and
+`adult-walk` via `buildAdultRowSheet`/`spliceRow` — same byte-preserving
+replace-by-name pattern as watering/drink/sleep/stretch, at
+`targetContentHeightPx: 96` (the committed idle tile's own measured
+full-tile content height, edge-to-edge, no padding — same value
+`ADULT_STRETCH` was measured against). Continuity gate (candidate idle/walk
+vs. all 8 existing rows, and before/after vs. the placeholder) was checked as
+post-ingest 96x96 side-by-side strips on a magenta backdrop, eyeballed
+against the BL-18 failure mode (same character? same shading/palette? same
+proportions?) — passed cleanly: consistent fur color, tail cross-hatch
+texture, ear shape, tooth/eye-highlight details, and outline weight across
+every row. No human cleanup beyond the mechanical pipeline.
+
+**`assets:adult-placeholder` must NOT be re-run against the committed
+`beaver-adult.png`** now that idle/walk are final art: it would silently
+clobber these rows back to the teen-upscale placeholder. `build-adult-
+placeholder.ts` itself stays in the tree (its own retirement is a WAVE-2
+item; other code may still reference it as a generation utility), but running
+its CLI and committing the result over the shipped adult sheet is a
+regression, not a refresh — an unconditional committed-sheet byte-pin test
+(`ingest-animation-frames.test.ts`) catches an accidental clobber commit.
 
 `struggle`/`parachute-wind`/`land` rows for baby and adult are appended
 separately by `scripts/gen-sprites/ingest-animation-frames.mjs` from Comfy

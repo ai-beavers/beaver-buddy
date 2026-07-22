@@ -1,7 +1,8 @@
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_DRINK, ADULT_SLEEP, ADULT_STRETCH, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultSleepSheet, buildAdultStretchSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_DRINK, ADULT_IDLE, ADULT_SLEEP, ADULT_STRETCH, ADULT_WALK, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultStretchSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -17,6 +18,8 @@ const hasWateringSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADUL
 const hasDrinkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_DRINK.sourceDir}/sheet.png`, import.meta.url));
 const hasSleepSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_SLEEP.sourceDir}/sheet.png`, import.meta.url));
 const hasStretchSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_STRETCH.sourceDir}/sheet.png`, import.meta.url));
+const hasIdleSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_IDLE.sourceDir}/sheet.png`, import.meta.url));
+const hasWalkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WALK.sourceDir}/sheet.png`, import.meta.url));
 
 // Cumulative y-offset of a row found by name, not position — rows keep
 // getting appended after each other (watering, then drink, ...), so no test
@@ -535,5 +538,74 @@ describe.skipIf(!hasStretchSource)('ingest-animation-frames stretch regeneration
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultStretchSheet(repoRoot).png.equals(buildAdultStretchSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Final idle/walk (BL-6/T3): the teen-upscale placeholder rows are replaced
+// with reference-conditioned Comfy art via the same buildAdultRowSheet/
+// spliceRow path as watering/drink/sleep/stretch above. This is the
+// owner-taste item (BL-18 golden art was rejected as generic/off-model and
+// reverted to the placeholder) — the committed idle/walk bytes below are the
+// ONLY art this repo's history has ever passed the continuity gate on, so
+// they're pinned unconditionally (no gating on assets-src/, unlike the
+// regeneration block below): a future `assets:adult-placeholder` re-run
+// would silently clobber these rows with the teen upscale again, and this
+// hash pin is what turns that accidental commit into a failing test instead
+// of a silent regression. See assets/STYLE.md provenance for the generation
+// details (single-reference Comfy Cloud Nano Banana Pro run, conditioned on
+// the adult reference image every other adult row is already anchored to).
+describe('ingest-animation-frames idle/walk (adult, final art — BL-6/T3)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  function sha256(bytes: Uint8ClampedArray): string {
+    return crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+  }
+
+  it('idle/walk frame counts are unchanged by the promotion (still 1/2, no tile-height override)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { rows: readonly { name: string; frames: number; height?: number }[] };
+    expect(meta.rows[0]).toEqual({ name: 'idle', frames: 1 });
+    expect(meta.rows[1]).toEqual({ name: 'walk', frames: 2 });
+  });
+
+  it('pins the committed idle/walk tile bytes so an accidental assets:adult-placeholder re-run fails CI', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; rows: readonly { name: string; frames: number; height?: number }[] };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+
+    const idle = extractTile(decoded, 0, 0, meta.tile);
+    const walk0 = extractTile(decoded, 0, 1, meta.tile);
+    const walk1 = extractTile(decoded, 1, 1, meta.tile);
+
+    // Pinned 2026-07-22 at promotion time (BL-6/T3). Bump ONLY on a
+    // deliberate, gated regeneration (see the block below) that was itself
+    // re-run through the continuity gate — never on an accidental rerun of
+    // the retired placeholder script.
+    expect(sha256(idle)).toBe('70271fd9ac013c29f70b837369483154ce8fcc65ad3b0d3ac6e5534f0db7ec78');
+    expect(sha256(walk0)).toBe('64e359cdfc08a2a303e0eb96aa89a45cc992ccab571573abdc05220dce37487f');
+    expect(sha256(walk1)).toBe('3df9c976efd1e14bf72ebb131a58f94f54a5936a0cab765f6f79adeedcee0177');
+  });
+});
+
+describe.skipIf(!hasIdleSource)('ingest-animation-frames idle regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultIdleSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultIdleSheet(repoRoot).png.equals(buildAdultIdleSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+describe.skipIf(!hasWalkSource)('ingest-animation-frames walk regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultWalkSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultWalkSheet(repoRoot).png.equals(buildAdultWalkSheet(repoRoot).png)).toBe(true);
   });
 });
