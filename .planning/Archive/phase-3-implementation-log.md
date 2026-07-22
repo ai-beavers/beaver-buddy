@@ -1,72 +1,72 @@
-# Phase 3: Windows Integrations — Implementierungslog (BL-WIN-5)
+# Phase 3: Windows Integrations — Implementation Log (BL-WIN-5)
 
-**Datum:** 2026-07-15
-**Build-Item:** BL-WIN-5 — Claude-Usage-Log-Pfade Windows-kompatibel machen
-**Geänderte Dateien:**
+**Date:** 2026-07-15
+**Build item:** BL-WIN-5 — Make Claude usage log paths Windows-compatible
+**Changed files:**
 - `src/main/usage/paths.ts`
 - `src/main/usage/paths.test.ts`
 
 ---
 
-## 1. Was wurde geändert
+## 1. What Was Changed
 
 ### `src/main/usage/paths.ts`
 
-- Neuer `Platform`-Type auf `'win32' | 'darwin' | 'linux'` eingeschränkt.
-- `claudeConfigDirs(env, home, platform)` erhält einen dritten `platform`-Parameter.
-  - `CLAUDE_CONFIG_DIR` bleibt Override mit höchster Priorität, plattformübergreifend.
-  - Auf `win32` wird ausschließlich der Legacy-Pfad `~/.claude` geprüft.
-  - Auf `darwin`/`linux` bleibt das bisherige Verhalten (XDG `~/.config/claude` + Legacy) erhalten.
-- `discoverPaths(env, home, platform)` erhält einen optionalen dritten Parameter mit Default `process.platform` (als `Platform` gecastet), um Rückwärtskompatibilität zu `tracker.ts` zu wahren.
-- `CLAUDE_CONFIG_DIR` akzeptiert nun zusätzlich zum dokumentierten Komma auch Semikolon als Trennzeichen (`split(/[,;]/`).
-  - Begründung: Semikolon ist der konventionelle PATH-Trenner auf Windows. Ein Doppelpunkt wurde bewusst nicht unterstützt, weil er mit Windows-Laufwerksbuchstaben (`C:\`) kollidieren würde.
+- New `Platform` type restricted to `'win32' | 'darwin' | 'linux'`.
+- `claudeConfigDirs(env, home, platform)` received a third `platform` parameter.
+  - `CLAUDE_CONFIG_DIR` remains the highest-priority override, cross-platform.
+  - On `win32` only the legacy path `~/.claude` is checked.
+  - On `darwin`/`linux` the previous behavior (XDG `~/.config/claude` + legacy) is preserved.
+- `discoverPaths(env, home, platform)` received an optional third parameter with default `process.platform` (cast to `Platform`) to preserve backward compatibility with `tracker.ts`.
+- `CLAUDE_CONFIG_DIR` now accepts semicolons as separators in addition to the documented comma (`split(/[,;]/`).
+  - Rationale: semicolon is the conventional PATH separator on Windows. A colon was deliberately not supported because it would collide with Windows drive letters (`C:\`).
 
 ### `src/main/usage/paths.test.ts`
 
-- Alle `discoverPaths`-Aufrufe werden nun mit einem expliziten `platform`-Parameter aufgerufen.
-- Plattformneutrale Claude-Tests laufen parametrisiert über `win32`, `darwin` und `linux`.
-- Der XDG-Test („prefers XDG and legacy together when both exist") wurde auf `darwin`/`linux` beschränkt.
-- Neue Windows-spezifische Tests unter `discoverPaths — Claude on Windows`:
-  - Ignoriert XDG und nutzt Legacy auf `win32`.
-  - Liefert leeres Array, wenn nur XDG existiert.
-  - `CLAUDE_CONFIG_DIR` Override mit einem Pfad auf `win32`.
-  - `CLAUDE_CONFIG_DIR` Multi-Path-Override mit Semikolon-Trennung auf `win32`.
-- Codex-Tests wurden ebenfalls mit einem festen `platform`-Parameter (`'linux'`) parametrisiert, bleiben aber inhaltlich unverändert.
+- All `discoverPaths` calls are now made with an explicit `platform` parameter.
+- Platform-neutral Claude tests run parameterized over `win32`, `darwin`, and `linux`.
+- The XDG test ("prefers XDG and legacy together when both exist") was restricted to `darwin`/`linux`.
+- New Windows-specific tests under `discoverPaths — Claude on Windows`:
+  - Ignores XDG and uses legacy on `win32`.
+  - Returns an empty array when only XDG exists.
+  - `CLAUDE_CONFIG_DIR` override with a single path on `win32`.
+  - `CLAUDE_CONFIG_DIR` multi-path override with semicolon separation on `win32`.
+- Codex tests were also parameterized with a fixed `platform` parameter (`'linux'`) but remain otherwise unchanged.
 
 ---
 
-## 2. Entscheidungen
+## 2. Decisions
 
-| Entscheidung | Begründung |
-|--------------|------------|
-| Plattform als injizierter Parameter (Variante B) | Konsistent mit bestehender Teststrategie (injiziertes `env` und `home`); kein `process.platform`-Mock nötig. |
-| `Platform` auf drei Werte eingeschränkt | Type-Safety; Review-Befund verlangte kein `\| string`. |
-| Auf `win32` nur Legacy-Pfad | Entspricht der dokumentierten Annahme, dass Claude Code unter Windows `%USERPROFILE%\.claude` verwendet. XDG existiert auf Windows nicht. |
-| `CLAUDE_CONFIG_DIR` zusätzlich Semikolon-tolerant | Review-Beforderte Multi-Path-Test auf Windows; Semikolon ist der Windows-PATH-Standard und zerstört keine Windows-Pfade. |
-| Kein Doppelpunkt als Trennzeichen | Würde Windows-Laufwerksbuchstaben (`C:\`) falsch parsen. |
-| `tracker.ts` nicht geändert | `discoverPaths` bleibt rückwärtskompatibel durch optionalen Parameter mit Default. |
-| Keine neuen Dependencies | Nur `node:fs`, `node:os`, `node:path` verwendet. |
+| Decision | Rationale |
+|----------|-----------|
+| Platform as an injected parameter (Variant B) | Consistent with the existing test strategy (injected `env` and `home`); no `process.platform` mock needed. |
+| `Platform` restricted to three values | Type safety; the review finding did not require `\| string`. |
+| Legacy path only on `win32` | Matches the documented assumption that Claude Code uses `%USERPROFILE%\.claude` on Windows. XDG does not exist on Windows. |
+| `CLAUDE_CONFIG_DIR` additionally semicolon-tolerant | The review called for a multi-path test on Windows; semicolon is the Windows PATH standard and does not break Windows paths. |
+| No colon as separator | Would misparse Windows drive letters (`C:\`). |
+| `tracker.ts` not changed | `discoverPaths` stays backward-compatible via the optional parameter with default. |
+| No new dependencies | Only `node:fs`, `node:os`, `node:path` used. |
 
 ---
 
-## 3. Testergebnisse
+## 3. Test Results
 
-Lokale Verifikation auf Windows-Entwicklungsrechner (`process.platform === 'win32'`):
+Local verification on a Windows development machine (`process.platform === 'win32'`):
 
 ```bash
-npm run typecheck   # ✅ erfolgreich
-npm run lint        # ✅ erfolgreich
+npm run typecheck   # ✅ successful
+npm run lint        # ✅ successful
 npm test            # ✅ 323 passed | 6 skipped (329 total)
-npm run build       # ✅ erfolgreich
+npm run build       # ✅ successful
 ```
 
-Alle neuen und bestehenden Tests in `src/main/usage/paths.test.ts` sind grün (20 Tests).
+All new and existing tests in `src/main/usage/paths.test.ts` are green (20 tests).
 
 ---
 
-## 4. Offene Probleme / Hinweise
+## 4. Open Issues / Notes
 
-- **CI-Verifikation auf `ubuntu-latest` und `windows-latest`:** Lokal wurde auf Windows getestet. Da alle `discoverPaths`-Aufrufe explizit parametrisiert sind, sollten die Tests auch auf Linux-CI-Knoten deterministisch laufen. Ein erneuter CI-Lauf ist empfohlen.
-- **Doppelpunkt als `CLAUDE_CONFIG_DIR`-Trennzeichen:** Bewusst nicht implementiert, um Windows-Pfade nicht zu zerstören. Falls zukünftig ein echter Bedarf besteht, müsste eine plattformabhängige Trennlogik mit Laufwerkserkennung eingeführt werden.
-- **Andere Plattformen (`freebsd`, `openbsd`, etc.):** `discoverPaths` castet `process.platform` auf `Platform`. Bei Aufruf ohne Parameter auf nicht gelisteten Plattformen entsteht ein TypeScript-Cast; das Laufzeitverhalten fällt auf XDG + Legacy zurück, was konsistent mit dem Status quo vor BL-WIN-5 ist. Für typsichere Aufrufe sollten Aufrufer eine der drei unterstützten Plattformen übergeben.
-- **UsageTracker-Plattform-Injektion:** `tracker.ts` ruft `discoverPaths(this.env, this.home)` ohne Plattform auf. Das ist für BL-WIN-5 ausreichend, da der Default `process.platform` greift. Für zukünftige Windows-Integrationstests könnte `UsageTracker` optional einen `platform`-Parameter erhalten.
+- **CI verification on `ubuntu-latest` and `windows-latest`:** Testing was done locally on Windows. Since all `discoverPaths` calls are explicitly parameterized, the tests should also run deterministically on Linux CI nodes. A fresh CI run is recommended.
+- **Colon as `CLAUDE_CONFIG_DIR` separator:** Deliberately not implemented to avoid breaking Windows paths. If a real need arises in the future, platform-dependent separator logic with drive-letter detection would have to be introduced.
+- **Other platforms (`freebsd`, `openbsd`, etc.):** `discoverPaths` casts `process.platform` to `Platform`. When called without the parameter on unlisted platforms, this produces a TypeScript cast; the runtime behavior falls back to XDG + legacy, which is consistent with the status quo before BL-WIN-5. For type-safe calls, callers should pass one of the three supported platforms.
+- **UsageTracker platform injection:** `tracker.ts` calls `discoverPaths(this.env, this.home)` without a platform. That is sufficient for BL-WIN-5, since the default `process.platform` applies. For future Windows integration tests, `UsageTracker` could optionally receive a `platform` parameter.

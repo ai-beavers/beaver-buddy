@@ -1,21 +1,21 @@
-# Phase 3 — Persistenz & Profil (Namensgebung, Achievements)
+# Phase 3 — Persistence & Profile (Naming, Achievements)
 
-> Part of Milestone 4. Done when: Profil (Name, Level, XP, Achievements) lokal und
-> restart-sicher gespeichert ist; Nutzer vergeben beim ersten Start einen Namen;
-> erste Achievements (7/30 Tage aktiv) feuern korrekt.
+> Part of Milestone 4. Done when: the profile (name, level, XP, achievements) is stored
+> locally and survives restarts; users assign a name on first launch; the first
+> achievements (7/30 days active) fire correctly.
 
-**Status:** not-started (Stub — Detail-Definition zu Phasenbeginn mit Rodgi)
+**Status:** not-started (stub — detailed definition at phase start with Rodgi)
 
 **Accountable:** Rodgi · **Agent:** pi
-**Zyklus:** Zyklus 1
-**Blocked by:** M4/P2 (Level-Modell)
+**Cycle:** Cycle 1
+**Blocked by:** M4/P2 (level model)
 **Blocks:** —
-**Dauer (grob):** ~1 Woche
+**Duration (rough):** ~1 week
 
 ## Waves
-- [ ] WAVE-1 — Lokale Profil-Persistenz (Konfig-Datei, atomic-file, Migrations-fähig für spätere Auth/DB)
-- [ ] WAVE-2 — Namensgebung-Flow beim ersten Start + Achievements (7/30 Tage), Tests
+- [ ] WAVE-1 — Local profile persistence (config file, atomic-file, migration-ready for later auth/DB)
+- [ ] WAVE-2 — Naming flow on first launch + achievements (7/30 days), tests
 
 ## Notes
-- Keine Auth in Zyklus 1 (Meeting 02:11:46); Account-Verknüpfung ist post-Z1.
-- Namensgebung = Pokémon-Prinzip; Marke „AI Beaver" bleibt übergeordnet.
+- No auth in cycle 1 (meeting 02:11:46); account linking is post-C1.
+- Naming = Pokémon principle; the "AI Beaver" brand remains the umbrella.

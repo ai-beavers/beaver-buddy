@@ -1,111 +1,111 @@
-# Plan — Flightplan Re-Onboarding & Zyklus-1-Planung
+# Plan — Flightplan Re-Onboarding & Cycle-1 Planning
 
-> Kontext: Die alte Flightplan-Version hat `.flightplan/` nicht sauber sortiert; das Meeting
-> vom 21.07.2026 (`.fp-new-projekt/MEETINGS-TRANSCRIPTS/`) definiert erstmals **Zyklus 1**,
-> der in keiner Planungsdatei abgebildet ist. Die laufende M2/P3-Fallschirm-Arbeit
-> (WAVE-3 bei Claude Code) wird **pausiert** und später fortgeführt.
+> Context: The old Flightplan version did not sort `.flightplan/` cleanly; the meeting
+> of 2026-07-21 (`.fp-new-projekt/MEETINGS-TRANSCRIPTS/`) defines **Cycle 1** for the first time,
+> which is not reflected in any planning file. The ongoing M2/P3 parachute work
+> (WAVE-3 with Claude Code) is **paused** and will be continued later.
 >
-> **Team (3 Contributors):**
-> - **Rodgi (Owner)** — überall dabei; Schwerpunkt: Features mit aufbauen, bei Animationen
->   mithelfen, **genaue Definition der State-Logik**; Gesamt-Review & Owner-Entscheide
-> - **Vlady** — **Sprite-Animationen** (steuert Claude Code/ComfyUI-Generierung, Asset-Review)
-> - **Jurij** — **Event-Logik & hart Technisches** (State Machine, Tracking, IPC, Architektur)
-> - **Agenten-Regel (verbindlich): pi = nur Rodgi** · **Claude Code = Vlady & Jurij, überall**
->   (nicht nur Assets; weiterhin einziger Agent mit Comfy-Cloud-MCP)
+> **Team (3 contributors):**
+> - **Rodgi (Owner)** — involved everywhere; focus: building features together, helping
+>   with animations, **precise definition of the state logic**; overall review & owner decisions
+> - **Vlady** — **sprite animations** (drives Claude Code/ComfyUI generation, asset review)
+> - **Jurij** — **event logic & hard tech** (state machine, tracking, IPC, architecture)
+> - **Agent rule (binding): pi = Rodgi only** · **Claude Code = Vlady & Jurij, everywhere**
+>   (not just assets; still the only agent with Comfy Cloud MCP)
 >
-> Aufgaben werden so verteilt, dass sich die Arbeit nicht überschneidet:
-> genau **ein menschlicher Accountable pro Phase**, parallele Arbeit nur an disjunkten Phasen.
+> Tasks are distributed so that work does not overlap:
+> exactly **one human Accountable per phase**, parallel work only on disjoint phases.
 
-## Schritt 0 — Laufende Phase sauber pausieren (fp-pause)
+## Step 0 — Pause the running phase cleanly (fp-pause)
 
-- `HANDOFF.md` umschreiben: Status „WAVE-3 PAUSIERT (Owner-Beschluss)". Resume-Pfad
-  exakt dokumentieren: Claude Code macht später P1 (Weiß-Artefakte) + P3a (struggle-b/c)
-  via `/fp-resume` weiter; pi danach P2/P4/P3b. Spec bleibt `WAVE-3.md`.
-- `STATE.md`: Now/Next auf „Re-Onboarding & Zyklus-1-Planung" setzen; P3 als „pausiert".
-- `Planning/Milestone-2/Phase-3/PHASE.md`: Status → `in-progress (pausiert)`.
+- Rewrite `HANDOFF.md`: status „WAVE-3 PAUSED (owner decision)". Document the resume path
+  exactly: Claude Code later continues P1 (white artifacts) + P3a (struggle-b/c)
+  via `/fp-resume`; pi then P2/P4/P3b. Spec remains `WAVE-3.md`.
+- `STATE.md`: set Now/Next to „re-onboarding & Cycle-1 planning"; P3 as „paused".
+- `Planning/Milestone-2/Phase-3/PHASE.md`: status → `in-progress (paused)`.
 
-## Schritt 1 — Aufräumen & Migration (Re-Onboarding)
+## Step 1 — Cleanup & migration (re-onboarding)
 
-Ziel-Struktur (alles lokal/gitignored, Konvention bleibt):
+Target structure (all local/gitignored, convention stays):
 
 ```
 .flightplan/
   STATE.md · ROADMAP.md · HANDOFF.md · NOTE.md
-  Meetings/2026-07-21-planung/   ← Transkript-Rohtext + Zusammenfassung + Animations-Rohtext
-  Reference/windows-native-flight-plan.md   ← aktive Item-Quelle #1–#64
-  Archive/                        ← .fp-new-projekt-Restbestand (phase-*.md, plans/, …)
-  Planning/Milestone-N/Phase-N/…  (unverändert)
+  Meetings/2026-07-21-planung/   ← raw transcript text + summary + animations raw text
+  Reference/windows-native-flight-plan.md   ← active item source #1–#64
+  Archive/                        ← .fp-new-projekt remainder (phase-*.md, plans/, …)
+  Planning/Milestone-N/Phase-N/…  (unchanged)
   Reviews/ · Debugging/
 ```
 
-- `MEETINGS-TRANSCRIPTS/` → `.flightplan/Meetings/2026-07-21-planung/` (Dateinamen
-  normalisieren: `transcript-raw.md`, `summary.md`, `animations-rohtext.md`).
+- `MEETINGS-TRANSCRIPTS/` → `.flightplan/Meetings/2026-07-21-planung/` (normalize
+  filenames: `transcript-raw.md`, `summary.md`, `animations-rohtext.md`).
 - `windows-native-flight-plan.md` → `.flightplan/Reference/`.
-- Rest von `.fp-new-projekt/` → `.flightplan/Archive/`; danach `.fp-new-projekt/` löschen.
-- **Referenzen aktualisieren:** ROADMAP.md, MILESTONE.md (M1–M4), NOTE.md; `.gitignore` prüfen.
-- **NOTE.md bereinigen:** F2 als erledigt markieren; Inbox-Dubletten entfernen; neue
-  Meeting-Items als Inbox aufnehmen (Level/XP, Recording Agent, Namensgebung, Achievements,
-  Prestige, Sicherheitsmechanismus, Account-Verknüpfung später, kosmetische Monetarisierung).
-- **Debugging/README.md** fixen (Verweis auf nicht-existentes `Planning/Debugging/`).
+- Remainder of `.fp-new-projekt/` → `.flightplan/Archive/`; then delete `.fp-new-projekt/`.
+- **Update references:** ROADMAP.md, MILESTONE.md (M1–M4), NOTE.md; check `.gitignore`.
+- **Clean up NOTE.md:** mark F2 as done; remove inbox duplicates; add new
+  meeting items to the inbox (Level/XP, Recording Agent, naming, achievements,
+  prestige, safety mechanism, account linking later, cosmetic monetization).
+- **Fix Debugging/README.md** (reference to non-existent `Planning/Debugging/`).
 
-## Schritt 2 — Zyklus-1 in ROADMAP.md verankern
+## Step 2 — Anchor Cycle 1 in ROADMAP.md
 
-- **Zyklus-1-Header** mit Exit-Kriterien (Meeting 21.07.):
-  1. Funktionierende, herunterladbare App (Windows-Installer)
-  2. 100 Downloads
-  3. 7 zusätzliche Contributors (aktuell: 3 — Owner, Vladi, Juri)
-- Jeder Milestone erhält Zyklus-Markierung + **Owner-Feld** (Team-Verantwortlicher).
-- Referenzblock (Quelle: `Meetings/…/summary.md`): XP = Input+Output-Tokens (ohne Cache),
-  tagesaggregiert pro Modell, lokale Konfig-Datei (keine Auth in Z1), Level 1–32
-  (1–16 ≈ Baby→Teen), Interaktionen ab ~Level 8, Prestige post-Z1, Character-Map-JSON,
-  Trennung Ereignislogik ↔ Charakteranimation.
+- **Cycle-1 header** with exit criteria (meeting 2026-07-21):
+  1. Working, downloadable app (Windows installer)
+  2. 100 downloads
+  3. 7 additional contributors (currently: 3 — Owner, Vladi, Juri)
+- Every milestone gets a cycle marker + **owner field** (team responsible).
+- Reference block (source: `Meetings/…/summary.md`): XP = input+output tokens (excluding cache),
+  daily-aggregated per model, local config file (no auth in Z1), levels 1–32
+  (1–16 ≈ baby→teen), interactions from ~level 8, prestige post-Z1, character-map JSON,
+  separation of event logic ↔ character animation.
 
-## Schritt 3 — Milestones gemeinsam definieren (Team-Walkthrough)
+## Step 3 — Define milestones together (team walkthrough)
 
-**Reihenfolge (Option B, aus Meeting-Signalen + Abhängigkeiten abgeleitet — Draft,
-wird im Walkthrough finalisiert) — mit Team-Zuordnung:**
+**Order (option B, derived from meeting signals + dependencies — draft,
+finalized in the walkthrough) — with team assignment:**
 
-| # | Milestone | Kern | Accountable | Agent | Zyklus |
+| # | Milestone | Core | Accountable | Agent | Cycle |
 |---|---|---|---|---|---|
-| M1 | Windows-native App ✅ | done | Rodgi | pi | Z1 (erledigt) |
-| M2 | Asset-Pipeline & Animationen | P1/P2 ✅ · **P3 Fallschirm pausiert** | Vlady + Rodgi | Claude Code (+ pi) | laufend |
-| M3 | Recording Agent & Benachrichtigungen | Zentrales Z1-Feature: Event-Erkennung (Agent fertig/Input nötig), Event↔Animation strikt getrennt, Sicherheitsmechanismus; Darstellung zunächst via Bubble/Quip | **Jurij** | Claude Code | Z1 |
-| M4 | Level-, XP- & Profil-System | Token-Tracking (aggregiert/pro Modell), XP-Prototyp, Level-Tabelle 1–32, State-Logik der Stufen, Character-Map-JSON, lokale Persistenz, Namensgebung, Achievements | **Rodgi** (Jurij berät Datenmodell) | pi | Z1 |
-| M5 | Animationen (Rest) | ehem. M2 P4–P15 — „eine Animation pro Phase“; WAVE-1 Assets = Vlady + Claude Code, WAVE-2 Runtime = Rodgi + pi | **Vlady** | Claude Code | Z1 (gestaffelt) |
-| M6 | Contribution-Readiness & Release | Contributor-/API-/Asset-Builder-Doku, Settings/Tray, QA-Gates, Release-Pipeline → **Z1-Exit** | **Rodgi** (alle reviewen) | pi | Z1 |
-| — | Post-Zyklus 1 | Auth/Account, Prestige, Monetarisierung, MRR #26, Quips/State-Machine-Erweiterungen, Owner-Entscheide #3/#4b/#63/#64 | — | — | post |
+| M1 | Windows-native app ✅ | done | Rodgi | pi | Z1 (done) |
+| M2 | Asset pipeline & animations | P1/P2 ✅ · **P3 parachute paused** | Vlady + Rodgi | Claude Code (+ pi) | ongoing |
+| M3 | Recording Agent & notifications | central Z1 feature: event detection (agent done/input needed), event↔animation strictly separated, safety mechanism; display initially via bubble/quip | **Jurij** | Claude Code | Z1 |
+| M4 | Level, XP & profile system | token tracking (aggregated/per model), XP prototype, level table 1–32, state logic of the stages, character-map JSON, local persistence, naming, achievements | **Rodgi** (Jurij advises on data model) | pi | Z1 |
+| M5 | Animations (rest) | formerly M2 P4–P15 — „one animation per phase"; WAVE-1 assets = Vlady + Claude Code, WAVE-2 runtime = Rodgi + pi | **Vlady** | Claude Code | Z1 (staggered) |
+| M6 | Contribution readiness & release | contributor/API/asset-builder docs, settings/tray, QA gates, release pipeline → **Z1 exit** | **Rodgi** (everyone reviews) | pi | Z1 |
+| — | Post-Cycle 1 | auth/account, prestige, monetization, MRR #26, quips/state machine extensions, owner decisions #3/#4b/#63/#64 | — | — | post |
 
-**Vorgehen im Walkthrough (interaktiv mit dem Team):**
-1. Milestone-Reihenfolge bestätigen/anpassen (Tabelle oben).
-2. Pro Milestone: Zweck in 2–3 Sätzen (team-verständlich) + Phasen-Liste definieren.
-   Phasen bleiben bewusst grob; Detail-Definition wie gehabt zu Phasenbeginn.
-3. **Zeitschätzung:** pro Phase grobe Größe (S/M/L + Tage-Schätzung), Milestone-Dauer
-   daraus aggregiert; Realitäts-Check gegen Z1-Zeithorizont (~2 Monate laut Meeting).
-4. **Team-Matrix (verbindlich):** siehe Tabelle — Jurij = M3, Rodgi = M4 + M6,
-   Vlady = M5. Regeln: genau ein Accountable pro Phase; Rodgi hilft überall mit,
-   ist aber nie versteckter Zweit-Owner. **Agenten-Regel: pi nutzt ausschließlich
-   Rodgi; Vlady & Jurij arbeiten in allen Milestones mit Claude Code.** Agenten
-   arbeiten nur auf Anweisung des jeweiligen Phase-Owners.
-5. **Blocker-/Abhängigkeits-Dokumentation (Pflicht, direkt in Flightplan):**
-   - Jede `PHASE.md` bekommt Pflichtfeld **`Blocked by:`** (Phasen-Liste oder „none“, mit Grund).
-   - Jede `MILESTONE.md` bekommt Abschnitt **Dependencies** (blocked by / blocks).
-   - `ROADMAP.md` enthält eine kompakte **Dependency-Übersicht** (Tabelle), damit das
-     Team auf einen Blick sieht, was wen blockiert.
-   - `STATE.md`-Blockers-Feld bleibt die kurze operative Sicht.
-6. Ergebnis in `ROADMAP.md` + `Planning/Milestone-N/MILESTONE.md` (Why/Phases/Success/
-   Owner/Dauer/Dependencies) schreiben; alte M3/M4 auflösen und Items umhängen.
+**Procedure in the walkthrough (interactive with the team):**
+1. Confirm/adjust milestone order (table above).
+2. Per milestone: define purpose in 2–3 sentences (team-comprehensible) + phase list.
+   Phases stay deliberately coarse; detailed definition as usual at phase start.
+3. **Time estimate:** rough size per phase (S/M/L + day estimate), milestone duration
+   aggregated from that; reality check against the Z1 time horizon (~2 months per meeting).
+4. **Team matrix (binding):** see table — Jurij = M3, Rodgi = M4 + M6,
+   Vlady = M5. Rules: exactly one Accountable per phase; Rodgi helps everywhere
+   but is never a hidden second owner. **Agent rule: only Rodgi uses pi;
+   Vlady & Jurij work with Claude Code in all milestones.** Agents
+   work only on instruction from the respective phase owner.
+5. **Blocker/dependency documentation (mandatory, directly in Flightplan):**
+   - Every `PHASE.md` gets a mandatory **`Blocked by:`** field (phase list or „none", with reason).
+   - Every `MILESTONE.md` gets a **Dependencies** section (blocked by / blocks).
+   - `ROADMAP.md` contains a compact **dependency overview** (table) so the
+     team sees at a glance what blocks whom.
+   - The `STATE.md` blockers field remains the short operational view.
+6. Write the result into `ROADMAP.md` + `Planning/Milestone-N/MILESTONE.md` (Why/Phases/Success/
+   Owner/Duration/Dependencies); dissolve old M3/M4 and reassign items.
 
-## Schritt 4 — Verifikation & Handoff
+## Step 4 — Verification & handoff
 
-- Selbst-Check: alle `.fp-new-projekt`-Verweise aufgelöst? ROADMAP schlank? NOTE.md ohne
-  Dubletten? STATE/HANDOFF konsistent? Jede Phase hat genau einen Owner?
-- `STATE.md` final: „Re-Onboarding done · Zyklus 1 definiert · M2/P3 pausiert" +
-  Next = erste Phase des ersten neuen Milestones detaillieren.
-- Kein Code-Eingriff, keine Git-Commits (Planungsdateien sind gitignored).
+- Self-check: all `.fp-new-projekt` references resolved? ROADMAP lean? NOTE.md without
+  duplicates? STATE/HANDOFF consistent? Does every phase have exactly one owner?
+- `STATE.md` final: „re-onboarding done · Cycle 1 defined · M2/P3 paused" +
+  next = detail the first phase of the first new milestone.
+- No code changes, no git commits (planning files are gitignored).
 
-## Ausführung
+## Execution
 
-- Schritte 0–2: `worker`-Subagent + `reviewer`-Check, Orchestrator verifiziert Referenzen.
-- Schritt 3: interaktiv mit dem Team (kein Subagent — Entscheidungen gehören den Menschen);
-  Agent schreibt die Ergebnisse nach Freigabe in die Dateien.
-- Schritt 4: `reviewer`-Subagent als finaler Konsistenz-Check.
+- Steps 0–2: `worker` subagent + `reviewer` check, orchestrator verifies references.
+- Step 3: interactive with the team (no subagent — decisions belong to the humans);
+  the agent writes the results into the files after approval.
+- Step 4: `reviewer` subagent as final consistency check.

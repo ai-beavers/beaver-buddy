@@ -1,54 +1,54 @@
-# Phase 3: Windows Integrations — Verifikationsbericht (BL-WIN-5)
+# Phase 3: Windows Integrations — Verification Report (BL-WIN-5)
 
-**Datum:** 2026-07-15
-**Build-Item:** BL-WIN-5 — Claude-Usage-Log-Pfade Windows-kompatibel machen
-**Geprüfte Dateien:**
+**Date:** 2026-07-15
+**Build item:** BL-WIN-5 — Make Claude usage log paths Windows-compatible
+**Reviewed files:**
 - `src/main/usage/paths.ts`
 - `src/main/usage/paths.test.ts`
-**Referenzdokumente:**
+**Reference documents:**
 - `.flightplan/Archive/phase-3-plan.md`
 - `.flightplan/Archive/phase-3-plan-review.md`
 - `.flightplan/Archive/phase-3-implementation-log.md`
 
 ---
 
-## 1. Zusammenfassung der geprüften Umsetzung
+## 1. Summary of the Reviewed Implementation
 
-BL-WIN-5 wurde in `src/main/usage/paths.ts` und `src/main/usage/paths.test.ts` umgesetzt. Die Implementierung injiziert die Plattform als dritten Parameter in `discoverPaths` und `claudeConfigDirs`, behält `CLAUDE_CONFIG_DIR` als Override mit höchster Priorität bei und schränkt auf `win32` die Suche auf den Legacy-Pfad `~/.claude` ein. Auf `darwin`/`linux` bleibt das bisherige Verhalten XDG + Legacy erhalten. Alle Tests wurden explizit parametrisiert, sodass sie plattformunabhängig deterministisch laufen.
-
----
-
-## 2. Punktuelle Prüfung für BL-WIN-5
-
-| Kriterium | Status | Begründung |
-|-----------|--------|------------|
-| Windows: nur Legacy-Pfad `~/.claude` | ✅ | `claudeConfigDirs` prüft `if (platform === 'win32')` und gibt nur `[legacy]` zurück. |
-| macOS/Linux: XDG + Legacy | ✅ | Im `else`-Zweig werden `~/.config/claude` und `~/.claude` geprüft. |
-| `CLAUDE_CONFIG_DIR` als Override mit höchster Priorität | ✅ | Wird vor der Plattformlogik ausgewertet, komma- und zusätzlich semikolon-getrennt. |
-| Alle `discoverPaths`-Aufrufe in Tests explizit mit `platform` parametrisiert | ✅ | Kein Aufruf in `paths.test.ts` ohne dritten Parameter. |
-| XDG-Tests auf `darwin`/`linux` beschränkt | ✅ | `describe.each(['darwin', 'linux'] as const)` für den XDG-Test. |
-| `Platform`-Type auf `'win32' | 'darwin' | 'linux'` eingeschränkt | ✅ | `export type Platform = 'win32' | 'darwin' | 'linux';` |
-| Rückwärtskompatibilität von `discoverPaths` | ✅ | Optionaler Parameter mit Default `process.platform as Platform`; `tracker.ts` unverändert. |
-| Semikolon-Trennung für `CLAUDE_CONFIG_DIR` | ✅ (Abweichung vom Plan) | Nicht im ursprünglichen Plan, aber sinnvoll dokumentiert (`split(/[,;]/)`). |
-| Codex auf Windows nicht aktiviert | ✅ | Codex-Logik unverändert; Tests verwenden `'linux'`. |
+BL-WIN-5 was implemented in `src/main/usage/paths.ts` and `src/main/usage/paths.test.ts`. The implementation injects the platform as a third parameter into `discoverPaths` and `claudeConfigDirs`, keeps `CLAUDE_CONFIG_DIR` as the highest-priority override, and on `win32` restricts the search to the legacy path `~/.claude`. On `darwin`/`linux`, the previous XDG + legacy behavior is preserved. All tests were explicitly parameterized so they run deterministically regardless of platform.
 
 ---
 
-## 3. Ergebnisse der ausgeführten Befehle
+## 2. Item-by-Item Check for BL-WIN-5
 
-Alle Befehle wurden auf dem Windows-Entwicklungsrechner (`process.platform === 'win32'`) ausgeführt.
+| Criterion | Status | Rationale |
+|-----------|--------|-----------|
+| Windows: legacy path `~/.claude` only | ✅ | `claudeConfigDirs` checks `if (platform === 'win32')` and returns only `[legacy]`. |
+| macOS/Linux: XDG + legacy | ✅ | The `else` branch checks `~/.config/claude` and `~/.claude`. |
+| `CLAUDE_CONFIG_DIR` as highest-priority override | ✅ | Evaluated before the platform logic, comma- and additionally semicolon-separated. |
+| All `discoverPaths` calls in tests explicitly parameterized with `platform` | ✅ | No call in `paths.test.ts` without the third parameter. |
+| XDG tests restricted to `darwin`/`linux` | ✅ | `describe.each(['darwin', 'linux'] as const)` for the XDG test. |
+| `Platform` type restricted to `'win32' | 'darwin' | 'linux'` | ✅ | `export type Platform = 'win32' | 'darwin' | 'linux';` |
+| Backward compatibility of `discoverPaths` | ✅ | Optional parameter with default `process.platform as Platform`; `tracker.ts` unchanged. |
+| Semicolon separation for `CLAUDE_CONFIG_DIR` | ✅ (deviation from plan) | Not in the original plan, but sensibly documented (`split(/[,;]/)`). |
+| Codex not enabled on Windows | ✅ | Codex logic unchanged; tests use `'linux'`. |
+
+---
+
+## 3. Results of the Executed Commands
+
+All commands were executed on the Windows development machine (`process.platform === 'win32'`).
 
 ### 3.1 `npm run typecheck`
 ```
 > tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json
 ```
-**Status:** ✅ Erfolgreich
+**Status:** ✅ Successful
 
 ### 3.2 `npm run lint`
 ```
 > eslint .
 ```
-**Status:** ✅ Erfolgreich
+**Status:** ✅ Successful
 
 ### 3.3 `npm test`
 ```
@@ -56,16 +56,16 @@ Test Files  34 passed (34)
      Tests  323 passed | 6 skipped (329)
   Duration  2.35s
 ```
-**Status:** ✅ Erfolgreich
+**Status:** ✅ Successful
 
-Hinweis: Die 6 skipped Tests liegen in `scripts/gen-sprites/ingest-images.test.ts` und sind nicht Gegenstand von BL-WIN-5.
+Note: The 6 skipped tests are in `scripts/gen-sprites/ingest-images.test.ts` and are not part of BL-WIN-5.
 
 ### 3.4 `npm run build`
 ```
 > tsc && tsc -p src/renderer/tsconfig.json && node scripts/build-assets.js
 Assets built successfully.
 ```
-**Status:** ✅ Erfolgreich
+**Status:** ✅ Successful
 
 ### 3.5 `npx electron-builder --win --publish never`
 ```
@@ -73,7 +73,7 @@ Assets built successfully.
 • building        target=nsis file=release\Beaver Buddy Setup 0.1.0.exe archs=x64
 • building        target=portable file=release\Beaver Buddy 0.1.0.exe archs=x64
 ```
-**Status:** ✅ Erfolgreich
+**Status:** ✅ Successful
 
 ### 3.6 `git status --short` / `git diff --stat`
 ```
@@ -103,43 +103,43 @@ Assets built successfully.
 ?? src/main/preload.test.ts
 ```
 
-**Status:** ⚠️ Abweichung festgestellt
+**Status:** ⚠️ Deviation detected
 
-Für BL-WIN-5 waren nur `src/main/usage/paths.ts` und `src/main/usage/paths.test.ts` als geänderte Dateien vorgesehen. Im aktuellen Workspace existieren jedoch zahlreiche weitere modifizierte und unversionierte Dateien. Diese gehören offensichtlich zu anderen Phasen/Build-Items (z. B. BL-WIN-3 Tray/Overlay, BL-WIN-1 Build-Infrastruktur, Dokumentation), sind aber nicht Teil von BL-WIN-5. Für die reine Phase-3-Verifikation sind sie nicht relevant, sie deuten aber darauf hin, dass der Branch/Workspace mehrere Phasen gleichzeitig trägt.
-
----
-
-## 4. Gefundene Fehler / Lücken / Abweichungen
-
-1. **Unerwartete Dateiänderungen im Workspace** — **Mittel**
-   - Neben den für BL-WIN-5 erwarteten Dateien sind viele weitere Dateien geändert bzw. unversioniert. Das erschwert die Isolierung der Phase-3-Änderungen.
-   - **Empfehlung:** Vor dem Merge/Markieren als abgeschlossen sicherstellen, dass diese Änderungen zu ihren jeweiligen Phasen gehören und separat verifiziert werden.
-
-2. **`process.platform as Platform`-Cast** — **Niedrig**
-   - `discoverPaths` verwendet `process.platform as Platform` als Default. Auf nicht gelisteten Plattformen (z. B. `freebsd`, `openbsd`) ist dies ein Type-Cast, der keinen Compile-Fehler wirft. Das Laufzeitverhalten fällt auf XDG + Legacy zurück, was konsistent mit dem Status quo vor BL-WIN-5 ist.
-   - **Empfehlung:** Für spätere Iterationen könnte der Type auf `NodeJS.Platform` erweitert oder eine explizite Fallback-Logik im Code dokumentiert werden. Für BL-WIN-5 ist das akzeptabel.
-
-3. **Semikolon-Trennung nicht im ursprünglichen Plan** — **Niedrig**
-   - Die Implementierung akzeptiert `CLAUDE_CONFIG_DIR` nun auch semikolon-getrennt. Das ist funktional sinnvoll für Windows, war aber nicht im Phase-3-Plan vorgesehen.
-   - **Empfehlung:** In der Dokumentation (`CLAUDE.md` oder `docs/adr`) ergänzen, falls nicht bereits geschehen.
-
-4. **Keine Windows-Tests für den `discoverPaths`-Default ohne Parameter** — **Niedrig**
-   - Es gibt keinen Test, der den rückwärtskompatiblen Aufruf `discoverPaths()` (ohne Parameter) auf `win32` prüft. `tracker.ts` nutzt genau diesen Aufruf.
-   - **Empfehlung:** Optional einen Integrationstest ergänzen, der sicherstellt, dass `tracker.ts` auf Windows korrekt `process.platform` weiterverwendet.
+For BL-WIN-5, only `src/main/usage/paths.ts` and `src/main/usage/paths.test.ts` were intended as changed files. The current workspace, however, contains numerous additional modified and untracked files. These obviously belong to other phases/build items (e.g. BL-WIN-3 tray/overlay, BL-WIN-1 build infrastructure, documentation) but are not part of BL-WIN-5. They are not relevant for the pure Phase 3 verification, but they indicate that the branch/workspace carries several phases at once.
 
 ---
 
-## 5. Empfohlene Fixes
+## 4. Found Errors / Gaps / Deviations
 
-- **Keine dringenden Fixes erforderlich.** BL-WIN-5 ist funktional korrekt umgesetzt.
-- **Optional:** Den Hinweis auf nicht gelistete Plattformen in `paths.ts` als Code-Kommentar ergänzen.
-- **Optional:** Dokumentation (`CLAUDE.md`) um den Semikolon-Separator für `CLAUDE_CONFIG_DIR` unter Windows erweitern.
-- **Prozess:** Die weiteren geänderten Dateien im Workspace separat verifizieren, bevor der gesamte Branch als fertig gilt.
+1. **Unexpected file changes in the workspace** — **Medium**
+   - Besides the files expected for BL-WIN-5, many additional files are modified or untracked. This makes isolating the Phase 3 changes harder.
+   - **Recommendation:** Before merging/marking as complete, ensure these changes belong to their respective phases and are verified separately.
+
+2. **`process.platform as Platform` cast** — **Low**
+   - `discoverPaths` uses `process.platform as Platform` as the default. On unlisted platforms (e.g. `freebsd`, `openbsd`) this is a type cast that raises no compile error. The runtime behavior falls back to XDG + legacy, which is consistent with the status quo before BL-WIN-5.
+   - **Recommendation:** For later iterations, the type could be widened to `NodeJS.Platform` or explicit fallback logic could be documented in the code. For BL-WIN-5 this is acceptable.
+
+3. **Semicolon separation not in the original plan** — **Low**
+   - The implementation now also accepts `CLAUDE_CONFIG_DIR` semicolon-separated. That is functionally sensible for Windows but was not foreseen in the Phase 3 plan.
+   - **Recommendation:** Add it to the documentation (`CLAUDE.md` or `docs/adr`) if not already done.
+
+4. **No Windows tests for the `discoverPaths` default without parameters** — **Low**
+   - There is no test that checks the backward-compatible call `discoverPaths()` (without parameters) on `win32`. `tracker.ts` uses exactly this call.
+   - **Recommendation:** Optionally add an integration test ensuring that `tracker.ts` correctly forwards `process.platform` on Windows.
 
 ---
 
-## 6. Gesamt-Status
+## 5. Recommended Fixes
+
+- **No urgent fixes required.** BL-WIN-5 is functionally implemented correctly.
+- **Optional:** Add the note about unlisted platforms as a code comment in `paths.ts`.
+- **Optional:** Extend the documentation (`CLAUDE.md`) with the semicolon separator for `CLAUDE_CONFIG_DIR` on Windows.
+- **Process:** Verify the other changed files in the workspace separately before the whole branch is considered done.
+
+---
+
+## 6. Overall Status
 
 **PASSED**
 
-BL-WIN-5 wurde korrekt implementiert. Alle relevanten Build-, Test- und Packaging-Schritte laufen erfolgreich durch. Die gefundenen Abweichungen (Semikolon-Trennung, `process.platform`-Cast, unerwartete Workspace-Änderungen) sind entweder funktional harmlos oder betreffen andere Phasen. Es sind keine Source-Änderungen durch den Verifikations-Agenten vorgenommen worden.
+BL-WIN-5 was implemented correctly. All relevant build, test, and packaging steps run successfully. The deviations found (semicolon separation, `process.platform` cast, unexpected workspace changes) are either functionally harmless or concern other phases. No source changes were made by the verification agent.

@@ -1,202 +1,202 @@
-# Flight-Plan Item #49 — Codex-Homes unter Windows: Union statt First-wins
+# Flight-Plan Item #49 — Codex Homes on Windows: Union Instead of First-Wins
 
-Quelle: `.flightplan/Archive/plans/parity/bereich-1-connect-usage-log-pfade.md` (Befund B1).
-Stand: Planung abgeschlossen, noch nicht implementiert.
+Source: `.flightplan/Archive/plans/parity/bereich-1-connect-usage-log-pfade.md` (finding B1).
+Status: planning complete, not yet implemented.
 
-## 1. Ziel & Akzeptanzkriterien
+## 1. Goal & Acceptance Criteria
 
-**Ziel:** Unter Windows dürfen existierende, aber session-lose Codex-Kandidaten
-(`%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex` — letzterer ist der Electron-userData-Ordner der
-Codex Desktop App) die echten CLI-Sessions unter `%USERPROFILE%\.codex` nicht mehr verdecken.
+**Goal:** On Windows, existing but session-less Codex candidates
+(`%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex` — the latter is the Electron userData folder of the
+Codex desktop app) must no longer hide the real CLI sessions under `%USERPROFILE%\.codex`.
 
-**Akzeptanzkriterien:**
+**Acceptance criteria:**
 
-- AK-1: Ein Nutzer mit installierter Codex Desktop App (also existierendem `%APPDATA%\Codex`)
-  **und** Codex CLI (Sessions in `%USERPROFILE%\.codex\sessions`) bekommt seine CLI-Sessions
-  gefunden — Connect-Codex funktioniert für diese Nutzergruppe. (Regressionstest vorhanden.)
-- AK-2: Sessions, die über mehrere existierende Kandidaten-Roots verstreut liegen, werden
-  **alle** gefunden (Union), nicht nur die des ersten existierenden Roots.
-- AK-3: Dieselbe Session (gleicher relativer Pfad `YYYY/MM/DD/rollout-*.jsonl`), über zwei
-  Roots erreichbar, wird genau einmal gelistet — der frühere Kandidat in der bisherigen
-  Reihenfolge gewinnt (deterministische Priorität).
-- AK-4: macOS/Linux-Verhalten ist byte-identisch (dort existiert nur der Kandidat `~/.codex`;
-  Union über 0 oder 1 Root ≡ bisheriges Ergebnis, inkl. Reihenfolge der Dateiliste).
-- AK-5: `CODEX_HOME`-Override unverändert: genau ein Kandidat, kein Union-Effekt.
-- AK-6: Opt-in-Gating unverändert: `UsageTracker` parst Dateiinhalte weiterhin erst nach
-  `setEnabledSources`; Discovery bleibt reines Verzeichnislisting (Union fügt maximal zwei
-  zusätzliche `readdir`-Scans hinzu, keine Dateiinhalte).
-- AK-7: `npm test`, `npm run typecheck`, `npm run lint` grün. Keine neuen Dependencies.
+- AK-1: A user with the Codex desktop app installed (i.e. with an existing `%APPDATA%\Codex`)
+  **and** the Codex CLI (sessions in `%USERPROFILE%\.codex\sessions`) gets their CLI sessions
+  found — Connect-Codex works for this user group. (Regression test included.)
+- AK-2: Sessions scattered across multiple existing candidate roots are **all** found
+  (union), not only those of the first existing root.
+- AK-3: The same session (same relative path `YYYY/MM/DD/rollout-*.jsonl`), reachable via two
+  roots, is listed exactly once — the earlier candidate in the existing order wins
+  (deterministic priority).
+- AK-4: macOS/Linux behavior is byte-identical (only the `~/.codex` candidate exists there;
+  a union over 0 or 1 root ≡ the previous result, including the order of the file list).
+- AK-5: `CODEX_HOME` override unchanged: exactly one candidate, no union effect.
+- AK-6: Opt-in gating unchanged: `UsageTracker` continues to parse file contents only after
+  `setEnabledSources`; discovery remains a pure directory listing (the union adds at most two
+  additional `readdir` scans, no file contents).
+- AK-7: `npm test`, `npm run typecheck`, `npm run lint` green. No new dependencies.
 
-## 2. Entscheidung: Union (nicht Reordering)
+## 2. Decision: Union (Not Reordering)
 
-**Entscheidung: Union aller existierenden Kandidaten**, wie in der Analyse empfohlen.
+**Decision: union of all existing candidates**, as recommended in the analysis.
 
-Begründung, ehrlich abgewogen:
+Rationale, honestly weighed:
 
-- **Reordering** (`~/.codex` an erste Stelle der win32-Kandidaten, 1 Zeile) fixt nur den
-  gemeldeten Fall „Desktop App installiert". Es lässt die umgekehrte Verdeckung bestehen:
-  Sessions unter `%LOCALAPPDATA%\Codex` würden dann von `~/.codex` verdeckt. Ob dort je
-  reale Sessions liegen, ist nicht verifiziert — Reordering wettet darauf, Union nicht.
-- **Union** fixt die ganze Fehlerklasse („irgendein existierender Kandidat verdeckt Sessions
-  eines anderen"), unabhängig davon, welcher Root Sessions enthält.
-- **Kohärenz-Argument:** Die Codebasis akzeptiert Union-Semantik bereits für Claude auf Unix
-  (`paths.ts:58-62`, Kommentar: „users who migrated may still have data in the old spot").
-  Dasselbe Migrations-/Misch-Argument gilt für Codex unter Windows exakt genauso.
-- **Aufwand ehrlich:** Union ≈ +12 Zeilen netto in `paths.ts` (Dedup-Mechanik per
-  `Map<relativ, absolut>` existiert bereits in `findCodexRolloutFiles`/`findCodexFiles`,
-  paths.ts:98-133, und wird nur eine Ebene höher wiederverwendet). Reordering wäre 1 Zeile,
-  aber semantisch schwächer. Der Mehrpreis ist klein und kapselt sich vollständig intern.
+- **Reordering** (`~/.codex` first among the win32 candidates, 1 line) only fixes the
+  reported "desktop app installed" case. It leaves the reverse hiding in place: sessions
+  under `%LOCALAPPDATA%\Codex` would then be hidden by `~/.codex`. Whether real sessions ever
+  live there is not verified — reordering bets on that, union does not.
+- **Union** fixes the entire error class ("any existing candidate hides another candidate's
+  sessions"), regardless of which root holds sessions.
+- **Coherence argument:** The codebase already accepts union semantics for Claude on Unix
+  (`paths.ts:58-62`, comment: "users who migrated may still have data in the old spot").
+  The same migration/mixing argument applies to Codex on Windows in exactly the same way.
+- **Effort, honestly:** Union ≈ +12 lines net in `paths.ts` (the dedup mechanics via
+  `Map<relative, absolute>` already exist in `findCodexRolloutFiles`/`findCodexFiles`,
+  paths.ts:98-133, and are only reused one level higher). Reordering would be 1 line,
+  but semantically weaker. The extra cost is small and fully encapsulated internally.
 
 ## 3. Design
 
-### 3.1 Konsumenten-Analyse (verifiziert per Grep über `src/`)
+### 3.1 Consumer Analysis (verified via grep over `src/`)
 
-| Symbol | Sichtbarkeit | Konsumenten |
+| Symbol | Visibility | Consumers |
 |---|---|---|
-| `resolveCodexHome` | **privat** (nicht exportiert) | nur `discoverPaths`, `paths.ts:165` |
-| `codexHomes` | privat | nur `resolveCodexHome`, `paths.ts:155` |
-| `findCodexFiles` | privat | nur `discoverPaths`, `paths.ts:166` |
-| `discoverPaths` | **exportiert** | `tracker.ts:134` (positional: env, home — Platform-Default), `paths.test.ts` (durchgehend) |
-| `parseCodexFile` / `codex-parser.ts` | exportiert | konsumiert ausschließlich **absolute Dateipfade** (`codex-parser.ts:101`), keinerlei Kopplung an `resolveCodexHome` |
+| `resolveCodexHome` | **private** (not exported) | only `discoverPaths`, `paths.ts:165` |
+| `codexHomes` | private | only `resolveCodexHome`, `paths.ts:155` |
+| `findCodexFiles` | private | only `discoverPaths`, `paths.ts:166` |
+| `discoverPaths` | **exported** | `tracker.ts:134` (positional: env, home — platform default), `paths.test.ts` (throughout) |
+| `parseCodexFile` / `codex-parser.ts` | exported | consumes only **absolute file paths** (`codex-parser.ts:101`), no coupling to `resolveCodexHome` |
 
-**Konsequenz: Die exportierte Schnittstelle (`discoverPaths`, `DiscoveredPaths`, `PathEnv`)
-bleibt unverändert.** Die Signaturänderung `string | undefined` → `string[]` betrifft nur die
-private Funktion `resolveCodexHome`. `tracker.ts` und `codex-parser.ts` werden **nicht**
-angefasst.
+**Consequence: The exported interface (`discoverPaths`, `DiscoveredPaths`, `PathEnv`)
+remains unchanged.** The signature change `string | undefined` → `string[]` affects only the
+private function `resolveCodexHome`. `tracker.ts` and `codex-parser.ts` are **not** touched.
 
-### 3.2 Geänderte/neue private Funktionen in `paths.ts`
+### 3.2 Changed/New Private Functions in `paths.ts`
 
 ```
-codexHomes(env, home, platform): string[]            // UNVERÄNDERT — Kandidatenliste,
-                                                     // Reihenfolge bleibt:
+codexHomes(env, home, platform): string[]            // UNCHANGED — candidate list,
+                                                     // order stays:
                                                      // win32: LOCALAPPDATA → APPDATA → ~/.codex
-                                                     // unix:  [~/.codex]; Override: [CODEX_HOME]
+                                                     // unix:  [~/.codex]; override: [CODEX_HOME]
 
-resolveCodexHomes(env, home, platform): string[]     // ERSETZT resolveCodexHome (Plural):
+resolveCodexHomes(env, home, platform): string[]     // REPLACES resolveCodexHome (plural):
   return codexHomes(env, home, platform)
-    .filter((d) => fs.existsSync(d));                // .filter statt .find — die ganze Änderung
+    .filter((d) => fs.existsSync(d));                // .filter instead of .find — the entire change
 
-findCodexFiles(codexHome): Map<string, string>       // RÜCKGABETYP string[] → Map<rel, abs>
-                                                     // (bisheriger Body gibt schon die
-                                                     // sessions-wins-Map her, nur [...values()]
-                                                     // entfällt)
+findCodexFiles(codexHome): Map<string, string>       // RETURN TYPE string[] → Map<rel, abs>
+                                                     // (the existing body already builds the
+                                                     // sessions-wins map, only [...values()]
+                                                     // is dropped)
 
-findAllCodexFiles(roots: readonly string[]): string[]  // NEU — Cross-Root-Union:
+findAllCodexFiles(roots: readonly string[]): string[]  // NEW — cross-root union:
   const winners = new Map<string, string>();
   for (const root of roots)
     for (const [relative, absolute] of findCodexFiles(root))
-      if (!winners.has(relative)) winners.set(relative, absolute);   // früherer Kandidat gewinnt
+      if (!winners.has(relative)) winners.set(relative, absolute);   // earlier candidate wins
   return [...winners.values()];
 ```
 
-Naming-Note (aus Verifikation, Minor): die leichte Asymmetrie `findCodexFiles → Map` vs.
-`findAllCodexFiles → string[]` ist bewusst akzeptiert — kosmetisch, keine Verhaltensfolge,
-die Implementierung folgt dem obigen Schema.
+Naming note (from verification, minor): the slight asymmetry `findCodexFiles → Map` vs.
+`findAllCodexFiles → string[]` is deliberately accepted — cosmetic, no behavioral
+consequence; the implementation follows the scheme above.
 
-`discoverPaths` (paths.ts:165-166) wird zu einer Zeile:
+`discoverPaths` (paths.ts:165-166) becomes a single line:
 
 ```ts
 const codexFiles = findAllCodexFiles(resolveCodexHomes(env, home, platform));
 ```
 
-Kommentar an `findAllCodexFiles`: Union über alle existierenden Kandidaten; bei doppeltem
-relativem Pfad gewinnt der früheste Kandidat (Kandidaten-Reihenfolge = Priorität), innerhalb
-eines Roots weiterhin `sessions/` vor `archived_sessions/`.
+Comment on `findAllCodexFiles`: union across all existing candidates; on a duplicate
+relative path the earliest candidate wins (candidate order = priority); within one root,
+`sessions/` still beats `archived_sessions/`.
 
-### 3.3 Dedup-Regeln (exakt)
+### 3.3 Dedup Rules (Exact)
 
-Dedup-Schlüssel ist der **relative Pfad** `YYYY/MM/DD/rollout-*.jsonl` (via `path.join`,
-plattformkonsistent). Priorität bei Kollision, von oben nach unten:
+The dedup key is the **relative path** `YYYY/MM/DD/rollout-*.jsonl` (via `path.join`,
+platform-consistent). Priority on collision, top to bottom:
 
-1. **Kandidaten-Reihenfolge über Root-Grenzen hinweg:** `%LOCALAPPDATA%\Codex` >
-   `%APPDATA%\Codex` > `~/.codex`. Begründung: Bewahrt die bisherige First-wins-Priorität als
-   Determinismus — der Kandidat, der früher *allein* geliefert hätte, liefert bei echter
-   Dopplung weiterhin „seine" Kopie. Praktisch ist die Kollision nahezu ausgeschlossen
-   (Desktop-App-userData enthält keine `sessions/`-Rollouts); die Regel braucht nur
-   Determinismus, nicht Wahrheit über „die richtige" Kopie.
-2. **Innerhalb eines Roots:** `sessions/` vor `archived_sessions/` (bestehende Mechanik,
-   unverändert, paths.ts:126-131). Über Root-Grenzen hinweg gilt Regel 1 — auch wenn die
-   Kopie des früheren Roots aus `archived_sessions/` stammt. Das ist bewusst so einfach
-   gehalten (ein einziger Merge-Loop) und im Kommentar zu dokumentieren.
+1. **Candidate order across root boundaries:** `%LOCALAPPDATA%\Codex` >
+   `%APPDATA%\Codex` > `~/.codex`. Rationale: preserves the previous first-wins priority as
+   determinism — the candidate that would previously have delivered *alone* keeps delivering
+   "its" copy on a true duplicate. In practice the collision is virtually impossible
+   (the desktop app's userData contains no `sessions/` rollouts); the rule only needs
+   determinism, not truth about "the right" copy.
+2. **Within one root:** `sessions/` before `archived_sessions/` (existing mechanics,
+   unchanged, paths.ts:126-131). Across root boundaries, rule 1 applies — even if the
+   earlier root's copy comes from `archived_sessions/`. This is deliberately kept that
+   simple (a single merge loop) and is documented in the comment.
 
-Nebenbedingungen:
+Side conditions:
 
-- Identische Kandidaten-Pfade (z. B. `LOCALAPPDATA` ≡ `home`-Konstrukte) sind harmlos:
-  Dedup per relativem Pfad absorbiert doppelte Roots.
-- Kein Kandidat existiert → `[]` ≡ bisher. `CODEX_HOME` gesetzt, aber nicht existent → `[]` ≡ bisher.
-- Ergebnis-Reihenfolge: Kandidaten-Reihenfolge, darin Insertion-Order der Map (sessions-
-  Traversal, dann archived-only) — bei genau einem Root **byte-identisch** zu heute (AK-4).
+- Identical candidate paths (e.g. `LOCALAPPDATA` ≡ `home` constructs) are harmless:
+  dedup by relative path absorbs duplicate roots.
+- No candidate exists → `[]` ≡ before. `CODEX_HOME` set but non-existent → `[]` ≡ before.
+- Result order: candidate order, and within it the map's insertion order (sessions
+  traversal, then archived-only) — with exactly one root **byte-identical** to today (AK-4).
 
-## 4. Änderungsliste pro Datei
+## 4. Change List per File
 
-- **`src/main/usage/paths.ts`** (einzige Produktivdatei):
-  - `resolveCodexHome` → `resolveCodexHomes`, Rückgabe `string[]`, `.find` → `.filter`
+- **`src/main/usage/paths.ts`** (only production file):
+  - `resolveCodexHome` → `resolveCodexHomes`, return `string[]`, `.find` → `.filter`
     (paths.ts:154-156).
-  - `findCodexFiles`: Rückgabetyp `string[]` → `Map<string, string>`, finales
-    `[...winners.values()]` entfällt (paths.ts:125-133).
-  - Neu: `findAllCodexFiles(roots)` mit Merge-Loop + Kommentar (Prioritätsregeln 3.3).
-  - `discoverPaths`: Zeile 165-166 durch den einen `findAllCodexFiles(resolveCodexHomes(...))`-
-    Aufruf ersetzen. Claude-Zweig (Zeile 163) **nicht anfassen** (#53-Grenze, s. §6).
-- **`src/main/usage/paths.test.ts`**: ein Test umgedreht, drei neue Tests (§5).
-  Temp-Dir-Muster (`fs.mkdtempSync(os.tmpdir())`, injiziertes env/home/platform, keine
-  homedir-Mocks) exakt beibehalten.
-- **Nicht geändert:** `tracker.ts`, `codex-parser.ts`, `main.ts`, alles andere — belegt durch
-  Konsumenten-Tabelle §3.1.
+  - `findCodexFiles`: return type `string[]` → `Map<string, string>`; the final
+    `[...winners.values()]` is dropped (paths.ts:125-133).
+  - New: `findAllCodexFiles(roots)` with merge loop + comment (priority rules 3.3).
+  - `discoverPaths`: replace lines 165-166 with the single
+    `findAllCodexFiles(resolveCodexHomes(...))` call. Claude branch (line 163) **do not
+    touch** (#53 boundary, see §6).
+- **`src/main/usage/paths.test.ts`**: one test flipped, three new tests (§5).
+  Keep the temp-dir pattern (`fs.mkdtempSync(os.tmpdir())`, injected env/home/platform, no
+  homedir mocks) exactly as is.
+- **Not changed:** `tracker.ts`, `codex-parser.ts`, `main.ts`, everything else — evidenced by
+  the consumer table §3.1.
 
-## 5. Testplan
+## 5. Test Plan
 
-### 5.1 Umzudrehender Test (bewusst, dokumentiert)
+### 5.1 Test to Flip (deliberate, documented)
 
-- `paths.test.ts:144-153` — „prefers %LOCALAPPDATA%\Codex over ~/.codex when both exist"
-  nagelt das Fehlverhalten als Spezifikation fest. **Ersetzen durch:**
-  „findet Sessions aus %LOCALAPPDATA%\Codex **und** ~/.codex (Union)" — gleiches Setup
-  (je eine `rollout-*.jsonl` mit *unterschiedlichen* Dateinamen), Erwartung: **beide** Pfade,
-  Reihenfolge LOCALAPPDATA-Datei zuerst (Kandidaten-Reihenfolge, deterministisch).
+- `paths.test.ts:144-153` — "prefers %LOCALAPPDATA%\Codex over ~/.codex when both exist"
+  pins the misbehavior as a specification. **Replace with:**
+  "finds sessions from %LOCALAPPDATA%\Codex **and** ~/.codex (union)" — same setup
+  (one `rollout-*.jsonl` each with *different* file names), expectation: **both** paths,
+  LOCALAPPDATA file first (candidate order, deterministic).
 
-### 5.2 Neue Tests (alle in `describe('discoverPaths — Codex on Windows')`)
+### 5.2 New Tests (all in `describe('discoverPaths — Codex on Windows')`)
 
-1. **AK-1-Regression:** „existierendes %APPDATA%\Codex ohne Sessions verdeckt ~/.codex-
-   Sessions nicht" — `%APPDATA%\Codex` als Verzeichnis anlegen (plus einer Nicht-Session-
-   Datei, z. B. `config.json`, um den Desktop-App-Fall zu imitieren), Session unter
-   `~/.codex/sessions/...` → genau diese eine Datei wird gefunden.
-2. **AK-3-Dedup:** „gleicher relativer Pfad in zwei Roots → früherer Kandidat gewinnt" —
-   identischen `YYYY/MM/DD/rollout-dup.jsonl` unter `%LOCALAPPDATA%\Codex\sessions` und
-   `~/.codex\sessions` anlegen (unterschiedlicher Inhalt) → genau 1 Ergebnis, und zwar der
-   LOCALAPPDATA-Pfad.
-3. **AK-2/AK-3-Union mit archived:** „sessions in Root A schlägt archived_sessions in Root B
-   für dieselbe Datei" — identischer relativer Pfad, Kopie in `%LOCALAPPDATA%\Codex\sessions`
-   und in `~/.codex\archived_sessions` → genau 1 Ergebnis, der LOCALAPPDATA-Pfad
-   (Kandidaten-Reihenfolge schlägt archived über Root-Grenzen hinweg, §3.3 Regel 2).
+1. **AK-1 regression:** "existing %APPDATA%\Codex without sessions does not hide ~/.codex
+   sessions" — create `%APPDATA%\Codex` as a directory (plus a non-session file,
+   e.g. `config.json`, to mimic the desktop app case), session under
+   `~/.codex/sessions/...` → exactly that one file is found.
+2. **AK-3 dedup:** "same relative path in two roots → earlier candidate wins" —
+   create identical `YYYY/MM/DD/rollout-dup.jsonl` under `%LOCALAPPDATA%\Codex\sessions` and
+   `~/.codex\sessions` (different content) → exactly 1 result, namely the
+   LOCALAPPDATA path.
+3. **AK-2/AK-3 union with archived:** "sessions in root A beats archived_sessions in root B
+   for the same file" — identical relative path, copy in `%LOCALAPPDATA%\Codex\sessions`
+   and in `~/.codex\archived_sessions` → exactly 1 result, the LOCALAPPDATA path
+   (candidate order beats archived across root boundaries, §3.3 rule 2).
 
-### 5.3 Unverändert bestehen bleibende Tests (Kontrollliste)
+### 5.3 Tests Remaining Unchanged (checklist)
 
-- `paths.test.ts:155-162` („falls back to %APPDATA%\Codex when LOCALAPPDATA is missing"):
-  Semantik heute = Union mit nur einem liefernden Root → grün, Name bleibt tolerierbar.
-- `paths.test.ts:164-170` („falls back to ~/.codex when no AppData paths exist"): grün.
-- `paths.test.ts:172-181` (CODEX_HOME-Vorrang): grün (AK-5).
-- Gesamter Unix-Codex-Block `paths.test.ts:106-141` inkl. sessions-wins-Dedup: grün (AK-4).
-- `tracker.test.ts` (inkl. plattformneutralem Spy-Test „does not read log file contents
-  until the user opts in", tracker.test.ts:118-133 — kein win32-Setup): grün (AK-6).
+- `paths.test.ts:155-162` ("falls back to %APPDATA%\Codex when LOCALAPPDATA is missing"):
+  semantics today = union with only one contributing root → green, name remains tolerable.
+- `paths.test.ts:164-170` ("falls back to ~/.codex when no AppData paths exist"): green.
+- `paths.test.ts:172-181` (CODEX_HOME precedence): green (AK-5).
+- Entire Unix Codex block `paths.test.ts:106-141` incl. sessions-wins dedup: green (AK-4).
+- `tracker.test.ts` (incl. the platform-neutral spy test "does not read log file contents
+  until the user opts in", tracker.test.ts:118-133 — no win32 setup): green (AK-6).
 
-### 5.4 Verifikation
+### 5.4 Verification
 
-- `npm test` (vitest run), `npm run typecheck`, `npm run lint` — alle lokal grün.
-- CI-Matrix (`ubuntu-latest` + `windows-latest`) läuft die win32-Simulations-Tests zusätzlich
-  mit echten Win32-Pfaden.
+- `npm test` (vitest run), `npm run typecheck`, `npm run lint` — all green locally.
+- The CI matrix (`ubuntu-latest` + `windows-latest`) additionally runs the win32 simulation
+  tests with real Win32 paths.
 
-## 6. Risiken / Offenes
+## 6. Risks / Open Items
 
-- **#53-Grenze (Claude-XDG-Union, gleiche Datei):** Item #53 wird `claudeConfigDirs`
-  (paths.ts:54-56) und Test `paths.test.ts:76-81` anfassen — disjunkte Funktionen, disjunkte
-  Tests. Einzige Berührungspunkte: die benachbarte Zeile in `discoverPaths` (163 vs. 165) und
-  dieselbe Testdatei. Dieser Plan ändert bewusst **nichts** am Claude-Zweig; der spätere
-  #53-Loop soll auf dem #49-Stand aufsetzen (Rebase), Konfliktrisiko maximal trivial.
-- **macOS-Invarianz:** Union über genau einen Kandidaten (`~/.codex`) bzw. null Kandidaten
-  ist per Konstruktion ergebnis- und reihenfolgenidentisch (§3.3); abgesichert durch die
-  unverändert grünen Unix-Tests (§5.3). Kein plattformspezifischer Sonderpfad nötig.
-- **Kollisions-Priorität ist Konvention, kein Wissen:** Welche Kopie bei echter Cross-Root-
-  Dopplung „richtiger" ist, ist unbekannt; Kandidaten-Reihenfolge liefert nur Determinismus.
-  Akzeptiert, weil der Fall praktisch nicht auftritt (Desktop-App-userData hat keine
-  `sessions/`). Im Code-Kommentar festgehalten.
-- **Performance:** Bis zu zwei zusätzliche `readdir`-Bäume pro Refresh, nur wenn die Roots
-  existieren; vernachlässigbar gegenüber dem Datei-Parsing, kein Gating-Bruch (nur Listings).
+- **#53 boundary (Claude XDG union, same file):** Item #53 will touch `claudeConfigDirs`
+  (paths.ts:54-56) and test `paths.test.ts:76-81` — disjoint functions, disjoint
+  tests. The only touchpoints: the adjacent line in `discoverPaths` (163 vs. 165) and
+  the same test file. This plan deliberately changes **nothing** in the Claude branch; the
+  later #53 loop should build on the #49 state (rebase); conflict risk at most trivial.
+- **macOS invariance:** A union over exactly one candidate (`~/.codex`) or zero candidates
+  is by construction result- and order-identical (§3.3); covered by the unchanged green
+  Unix tests (§5.3). No platform-specific special path needed.
+- **Collision priority is convention, not knowledge:** Which copy is "more correct" on a
+  true cross-root duplicate is unknown; candidate order only provides determinism.
+  Accepted because the case practically never occurs (desktop app userData has no
+  `sessions/`). Recorded in the code comment.
+- **Performance:** Up to two additional `readdir` trees per refresh, only when the roots
+  exist; negligible compared to file parsing; no gating breach (listings only).

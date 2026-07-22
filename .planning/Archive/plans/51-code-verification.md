@@ -1,80 +1,80 @@
-# Item #51 — Finale Code-Verifikation: Settings-Fensterhöhe
+# Item #51 — Final code verification: Settings window height
 
-Datum: 2026-07-17 · Prüfer: Verifikations-Sub-Agent (read-only)
-Geprüft: `git diff` (settings-window.ts, settings-window.test.ts, settings.html, cdp-screenshot.mjs),
+Date: 2026-07-17 · Reviewer: Verification sub-agent (read-only)
+Reviewed: `git diff` (settings-window.ts, settings-window.test.ts, settings.html, cdp-screenshot.mjs),
 `src/main/mrr/settings-window.ts`, `src/main/mrr/settings-window.test.ts`, `scripts/cdp-screenshot.mjs`,
 `src/main/main.ts:199-335`, `src/main/mrr/settings.html`, `docs/design-reviews/BL-51-settings.png`,
 `.flightplan/Reference/windows-native-flight-plan.md` Item 51, `package.json`/`package-lock.json`.
-Selbst ausgeführt: `npx vitest run`, `npm run typecheck`, Prozess-Check (`tasklist`).
+Self-run: `npx vitest run`, `npm run typecheck`, process check (`tasklist`).
 
-## Urteil: FREIGABE
+## Verdict: APPROVED
 
-Kein Blocker, kein Minor-Befund im #51-Code. Alle 8 Prüfpunkte bestanden. Behauptungen des
-Umsetzers (435 passed / 6 skipped, typecheck grün, Screenshot ohne Scrollbar, keine
-App-Prozesse) sind allesamt eigenständig reproduziert/verifiziert.
+No blocker, no minor finding in the #51 code. All 8 check points passed. The implementer's
+claims (435 passed / 6 skipped, typecheck green, screenshot without scrollbar, no
+app processes) were all independently reproduced/verified.
 
-## Befunde
+## Findings
 
-Keine blocker/minor-Befunde. Drei Nits (kein Handlungsbedarf):
+No blocker/minor findings. Three nits (no action needed):
 
-- [nit] `docs/design-reviews/BL-51-verdict.md` fehlt — Plan §4.4 stuft es selbst als
-  „empfohlen, aber optional" ein; die Messwerte stehen vollständig in Plan §7.
-- [nit] Screenshot zeigt `#status` leer (Initialzustand) — der Bereich liegt als
-  Freiraum unterhalb des Pet-Fieldsets im Viewport; der gefüllte Zustand ist durch die
-  Worst-Case-Messung (`#status: "connected"`, docScrollH 705 ≤ innerH 740) abgedeckt.
-- [nit] Commit-Hygiene: `settings.html` („on this Mac" → „on this computer") ist Item
-  #50 und sollte nicht im selben Commit wie die #51-Dateien landen.
+- [nit] `docs/design-reviews/BL-51-verdict.md` is missing — Plan §4.4 itself classifies it as
+  „recommended, but optional"; the measurements are fully in Plan §7.
+- [nit] Screenshot shows `#status` empty (initial state) — the area is free space below the
+  Pet fieldset in the viewport; the filled state is covered by the worst-case measurement
+  (`#status: "connected"`, docScrollH 705 ≤ innerH 740).
+- [nit] Commit hygiene: `settings.html` („on this Mac" → „on this computer") is Item
+  #50 and should not be in the same commit as the #51 files.
 
-## Checkliste 1–8
+## Checklist 1–8
 
-1. **Diff-Scope — OK.** `settings-window.ts` (Import `screen`, Konstanten
+1. **Diff scope — OK.** `settings-window.ts` (import `screen`, constants
    `SETTINGS_WINDOW_CONTENT_HEIGHT = 713` / `TITLE_BAR_ALLOWANCE = 40`, `height: Math.min(...)`,
-   `useContentSize: true`, Kommentare), `settings-window.test.ts` (electron/hardening-Mocks +
-   Pin-Test) und `cdp-screenshot.mjs` (`--target`/`--measure`, `outfile '-'` = Messlauf)
-   enthalten ausschließlich #51-Änderungen. `settings.html`-Diff ist exakt die #50-Einzeiler-
-   Änderung (`settings.html:63`) — keine Fremdänderung, gehört nur nicht zu diesem Item.
-2. **Kappungslogik — OK.** `settings-window.ts:267-270`:
-   `min(713, screen.getPrimaryDisplay().workAreaSize.height - 40)`. Aufrufkette geprüft:
-   `openSettingsWindow` wird nur aus `openGrowthSettings()` (`main.ts:272-273`) aufgerufen,
-   die innerhalb `app.whenReady().then(...)` (`main.ts:199`) definiert und erst via Tray
-   (`main.ts:329-330`) oder Flag (`main.ts:335`) nach app-ready ausgeführt wird — kein
-   Aufruf vor app-ready möglich, kein Absturzrisiko. `screen` im Main-Prozess ohnehin
-   etabliert (`getPrimaryWorkAreaInfo`). Kommentare (`settings-window.ts:45-55, 264-266`)
-   fachlich korrekt: useContentSize → height = Content; workAreaSize ist logisch (DIP);
-   40 px ≈ Titelleiste ~31 px + Puffer; Kappung ⇒ Content scrollt funktional, kein Datenverlust.
-3. **Pin-Test — OK.** Echte Konstruktor-Assertion: `BrowserWindow: vi.fn().mockImplementation(
-   function () { return fakeWin; })` (`settings-window.test.ts:32-34`) mit vollständigem
-   Fake-Win (`loadFile` resolving, `on`, `focus`, `isDestroyed`, `webContents`) — kein leerer
-   Mock; Assertion `toHaveBeenCalledWith(expect.objectContaining({ width: 420, height: 713,
-   useContentSize: true, resizable: false }))` (Zeile 317-319) prüft die realen Optionen.
-   Kein Mock-Leak: `vi.mock` ist datei-scoped (vitest-Isolation pro File); Modul-State
-   (`settingsWindow`, `handlersRegistered`) wird von keinem anderen Test der Datei gelesen
-   (alle Handler-Tests nutzen `createSettingsHandlers` mit eigenem Predicate). Läuft stabil
-   in der Gesamtsuite (Punkt 6).
-4. **cdp-screenshot.mjs — OK.** Rückwärtskompatibel: alter Aufruf `<port> <outfile>
-   [delayMs]` ohne Flags → `targetMatch = null` ⇒ erstes page-Target (altes Verhalten),
-   `measure = false` ⇒ kein evaluate, Screenshot-Pfad unverändert. Worst-Case-Fill speichert
-   `textContent` aller 5 Elemente und stellt sie im selben evaluate synchron wieder her
-   (`cdp-screenshot.mjs:68-78`) — nachfolgender Screenshot unbeeinflusst. Sicherheit:
-   evaluate-Ausdruck ist ein fester String ohne Interpolation; `--target` wird nur für
-   Substring-Matching verwendet, nie evaluiert. Keine neuen Dependencies.
+   `useContentSize: true`, comments), `settings-window.test.ts` (electron/hardening mocks +
+   pin test) and `cdp-screenshot.mjs` (`--target`/`--measure`, `outfile '-'` = measurement run)
+   contain only #51 changes. `settings.html`-diff is exactly the #50 one-line
+   change (`settings.html:63`) — no foreign change, it just belongs to a different item.
+2. **Capping logic — OK.** `settings-window.ts:267-270`:
+   `min(713, screen.getPrimaryDisplay().workAreaSize.height - 40)`. Call chain checked:
+   `openSettingsWindow` is only called from `openGrowthSettings()` (`main.ts:272-273`),
+   which is defined inside `app.whenReady().then(...)` (`main.ts:199`) and is only executed
+   after app-ready via tray (`main.ts:329-330`) or flag (`main.ts:335`) — no call before
+   app-ready possible, no crash risk. `screen` in the main process is already established
+   (`getPrimaryWorkAreaInfo`). Comments (`settings-window.ts:45-55, 264-266`) are technically
+   correct: useContentSize → height = content; workAreaSize is logical (DIP);
+   40 px ≈ title bar ~31 px + buffer; capping ⇒ content scrolls functionally, no data loss.
+3. **Pin test — OK.** Real constructor assertion: `BrowserWindow: vi.fn().mockImplementation(
+   function () { return fakeWin; })` (`settings-window.test.ts:32-34`) with a complete
+   fake window (`loadFile` resolving, `on`, `focus`, `isDestroyed`, `webContents`) — no empty
+   mock; assertion `toHaveBeenCalledWith(expect.objectContaining({ width: 420, height: 713,
+   useContentSize: true, resizable: false }))` (lines 317-319) checks the real options.
+   No mock leak: `vi.mock` is file-scoped (vitest isolation per file); module state
+   (`settingsWindow`, `handlersRegistered`) is not read by any other test in the file (all
+   handler tests use `createSettingsHandlers` with their own predicate). Runs stably in the
+   full suite (point 6).
+4. **cdp-screenshot.mjs — OK.** Backwards compatible: old call `<port> <outfile>
+   [delayMs]` without flags → `targetMatch = null` ⇒ first page target (old behavior),
+   `measure = false` ⇒ no evaluate, screenshot path unchanged. Worst-case fill saves
+   `textContent` of all 5 elements and restores it synchronously in the same evaluate
+   (`cdp-screenshot.mjs:68-78`) — following screenshot is unaffected. Security:
+   evaluate expression is a fixed string without interpolation; `--target` is only used for
+   substring matching, never evaluated. No new dependencies.
 5. **Screenshot — OK.** `docs/design-reviews/BL-51-settings.png` (510×887 px ≈ 426×740 CSS
-   @120 % DPI — konsistent mit der dokumentierten Nachher-Messung innerW 426 / innerH 740)
-   zeigt alle 5 Fieldsets (Connect mit beiden Buttons + Status-Spans, Stripe, RevenueCat,
-   Growth source, Pet inkl. vollständig sichtbarem „Reset beaver (XP & hatch)"-Button),
-   keine vertikale/horizontale Scrollbar, kein abgeschnittener Content. Statusbereich
-   (`#status`, `settings.html:125`) liegt im Viewport (leer im Initialzustand, s. Nit).
-6. **Selbst ausgeführt — OK.** `npx vitest run`: **43 Files, 435 passed, 6 skipped**
-   (exakt die Behauptung; 434 Baseline + 1 Pin-Test). `npm run typecheck` (tsc --noEmit,
-   main + renderer + gen-sprites): **grün, keine Fehler**.
-7. **Prozess-Hygiene — OK.** `tasklist` nach `electron.exe` und `Beaver Buddy.exe`:
-   keine laufenden Prozesse — keine Zombies des Umsetzers.
-8. **Manifeste — OK.** `git diff --stat -- package.json package-lock.json` leer; beide
-   Dateien unverändert (auch nicht in `git status --porcelain` gelistet).
+   @120 % DPI — consistent with the documented after-measurement innerW 426 / innerH 740)
+   shows all 5 fieldsets (Connect with both buttons + status spans, Stripe, RevenueCat,
+   Growth source, Pet including fully visible „Reset beaver (XP & hatch)" button),
+   no vertical/horizontal scrollbar, no cut-off content. Status area (`#status`, `settings.html:125`)
+   is in the viewport (empty in the initial state, see nit).
+6. **Self-run — OK.** `npx vitest run`: **43 files, 435 passed, 6 skipped**
+   (exactly the claim; 434 baseline + 1 pin test). `npm run typecheck` (tsc --noEmit,
+   main + renderer + gen-sprites): **green, no errors**.
+7. **Process hygiene — OK.** `tasklist` for `electron.exe` and `Beaver Buddy.exe`:
+   no running processes — no zombies from the implementer.
+8. **Manifests — OK.** `git diff --stat -- package.json package-lock.json` empty; both
+   files unchanged (also not listed in `git status --porcelain`).
 
-## Zusatz (außerhalb der Checkliste, geprüft)
+## Addendum (outside the checklist, reviewed)
 
-Flight-Plan Item 51 (`.flightplan/Reference/windows-native-flight-plan.md:267-271`) ist korrekt
-aktualisiert: Status „Umgesetzt (Runde 2, 2026-07-17) — Verifikation ausstehend" +
-`Umsetzung:`-Zeile mit Dateien, Messwerten und Testzahlen — Verifikations-Befund B3 aus
-dem Plan-Verifikationsbericht ist eingearbeitet.
+Flight-plan Item 51 (`.flightplan/Reference/windows-native-flight-plan.md:267-271`) is correctly
+updated: Status „Implemented (Round 2, 2026-07-17) — verification pending" +
+`Implementation:` line with files, measurements, and test counts — verification finding B3 from
+the plan verification report is incorporated.

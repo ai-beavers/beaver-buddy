@@ -1,12 +1,12 @@
-# Code-Verifikation #50 — Connect-Hint „on this Mac" → „on this computer"
+# Code Verification #50 — Connect Hint "on this Mac" → "on this computer"
 
-Datum: 2026-07-17 · Prüfer: Verifikations-Sub-Agent (explore)
+Date: 2026-07-17 · Reviewer: verification sub-agent (explore)
 
-**Urteil: FREIGABE**
+**Verdict: APPROVED**
 
-1. **Diff-Umfang:** `git diff -- src/main/mrr/settings.html` zeigt ausschließlich Zeile 63: „on this Mac" → „on this computer". Keine weiteren Änderungen. ✅
-2. **Textvorkommen:** Grep über `src/**/*.html` + `dist/main/**/*.html`: kein „on this Mac" mehr; „on this computer" in `src/main/mrr/settings.html:63` und `dist/main/mrr/settings.html:63` vorhanden. ✅
-3. **Git-Status:** nur `M src/main/mrr/settings.html` — keine anderen Dateien im Diff. ✅
-4. **Vitest:** `npx vitest run` → 43 Files, **434 passed | 6 skipped (440)** — exakt Baseline. ✅
+1. **Diff scope:** `git diff -- src/main/mrr/settings.html` shows only line 63: "on this Mac" → "on this computer". No other changes. ✅
+2. **Text occurrences:** Grep over `src/**/*.html` + `dist/main/**/*.html`: no "on this Mac" left; "on this computer" present in `src/main/mrr/settings.html:63` and `dist/main/mrr/settings.html:63`. ✅
+3. **Git status:** only `M src/main/mrr/settings.html` — no other files in the diff. ✅
+4. **Vitest:** `npx vitest run` → 43 files, **434 passed | 6 skipped (440)** — exactly the baseline. ✅
 
-Fix ist minimal, vollständig, alle Tests grün. Keine Korrektur nötig.
+The fix is minimal, complete, all tests green. No correction needed.

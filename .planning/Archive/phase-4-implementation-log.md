@@ -1,6 +1,6 @@
 # Phase 4 Implementation Log — Beaver Buddy Windows Port
 
-**Build-Items:** BL-WIN-8 (Renderer HiDPI / Scaling), BL-WIN-10 (Dokumentation & Design-Gate)  
+**Build-Items:** BL-WIN-8 (Renderer HiDPI / Scaling), BL-WIN-10 (Documentation & Design-Gate)  
 **Date:** 2026-07-15  
 **Status:** Completed
 
@@ -62,7 +62,7 @@
 
 ---
 
-## 2. BL-WIN-10: Dokumentation & Design-Gate
+## 2. BL-WIN-10: Documentation & Design-Gate
 
 ### 2.1 Changes
 
@@ -93,7 +93,7 @@
   - Marked Phase 4, BL-WIN-8 and BL-WIN-10 as completed.
   - Added HiDPI/Scaling architecture section (3.7).
   - Added detailed Phase 4 results.
-  - Added "Finales Master-Icon / Design-Pass" to Phase 5 / deferred tasks.
+  - Added "Final Master Icon / Design Pass" to Phase 5 / deferred tasks.
 
 ### 2.2 Decisions
 

@@ -1,56 +1,56 @@
-# Phase 1: Foundation — Implementationslog
+# Phase 1: Foundation — Implementation Log
 
-**Datum:** 2026-07-15
-**Build-Items:** BL-WIN-1, BL-WIN-2, BL-WIN-9
-**Lokale Umgebung:** Windows 10.0.26200, Node v22.19.0, npm 11.14.1
-**CI-Ziel:** Node 24.x, `ubuntu-latest` + `windows-latest`
-
----
-
-## 1. Geänderte Dateien
-
-| Datei | Build-Item | Änderung |
-|-------|------------|----------|
-| `package.json` | BL-WIN-1, BL-WIN-2 | `build`-Script plattformunabhängig gemacht, `description` aktualisiert, `author` hinzugefügt |
-| `scripts/build-assets.js` | BL-WIN-1 | Neues Node-Skript zur plattformunabhängigen Asset-Kopie |
-| `electron-builder.yml` | BL-WIN-2 | `win:`-Target (nsis + portable), Icon, NSIS-Installer/Uninstaller-Icon |
-| `assets/icon.ico` | BL-WIN-2 | Neues Windows-Icon aus `assets/sprites/beaver-baby.png` generiert |
-| `assets/tray-icon.png` | BL-WIN-2 | Neues farbiges 32×32-Tray-Icon aus demselben Sprite |
-| `.github/workflows/ci.yml` | BL-WIN-9 | Matrix `ubuntu-latest` + `windows-latest`, Build- und Packaging-Steps, Artifact-Upload |
-| `.flightplan/Archive/phase-1-plan.md` | Dokumentation | Node-Version-Hinweis, Icon-Skalierung präzisiert, `publisherName`-Hinweis, BL-WIN-9-Abhängigkeit korrigiert |
-| `.flightplan/Archive/WINDOWS_PORT_PLAN.md` | Dokumentation | BL-WIN-9-Abhängigkeit von BL-WIN-5 entfernt |
+**Date:** 2026-07-15
+**Build Items:** BL-WIN-1, BL-WIN-2, BL-WIN-9
+**Local Environment:** Windows 10.0.26200, Node v22.19.0, npm 11.14.1
+**CI Target:** Node 24.x, `ubuntu-latest` + `windows-latest`
 
 ---
 
-## 2. BL-WIN-1: Build-Scripts plattformunabhängig
+## 1. Files Changed
 
-### 2.1 Analyse `src/renderer/tsconfig.json`
+| File | Build Item | Change |
+|------|------------|--------|
+| `package.json` | BL-WIN-1, BL-WIN-2 | `build` script made platform-independent, `description` updated, `author` added |
+| `scripts/build-assets.js` | BL-WIN-1 | New Node script for platform-independent asset copying |
+| `electron-builder.yml` | BL-WIN-2 | `win:` target (nsis + portable), icon, NSIS installer/uninstaller icon |
+| `assets/icon.ico` | BL-WIN-2 | New Windows icon generated from `assets/sprites/beaver-baby.png` |
+| `assets/tray-icon.png` | BL-WIN-2 | New colored 32×32 tray icon from the same sprite |
+| `.github/workflows/ci.yml` | BL-WIN-9 | Matrix `ubuntu-latest` + `windows-latest`, build and packaging steps, artifact upload |
+| `.flightplan/Archive/phase-1-plan.md` | Documentation | Node version note, icon scaling clarified, `publisherName` note, BL-WIN-9 dependency corrected |
+| `.flightplan/Archive/WINDOWS_PORT_PLAN.md` | Documentation | BL-WIN-9 dependency on BL-WIN-5 removed |
 
-`src/renderer/tsconfig.json` definiert korrekt:
+---
+
+## 2. BL-WIN-1: Platform-Independent Build Scripts
+
+### 2.1 Analysis of `src/renderer/tsconfig.json`
+
+`src/renderer/tsconfig.json` correctly defines:
 
 ```json
 "outDir": "../../dist/renderer"
 ```
 
-`tsconfig.json` (Root) definiert:
+`tsconfig.json` (root) defines:
 
 ```json
 "rootDir": "src",
 "outDir": "dist"
 ```
 
-Damit schreibt `tsc` nach `dist/main/` und `tsc -p src/renderer/tsconfig.json` nach `dist/renderer/`. `scripts/build-assets.js` kopiert anschließend die statischen Assets in diese Ordner.
+So `tsc` writes to `dist/main/` and `tsc -p src/renderer/tsconfig.json` writes to `dist/renderer/`. `scripts/build-assets.js` then copies the static assets into these folders.
 
 ### 2.2 `scripts/build-assets.js`
 
-Neues Skript mit `node:fs`/`node:path`:
+New script with `node:fs`/`node:path`:
 
-- Löscht `dist/renderer/assets/sprites` idempotent via `fs.rmSync(..., { recursive: true, force: true })`.
-- Kopiert `src/renderer/index.html` → `dist/renderer/index.html`.
-- Kopiert `src/main/mrr/settings.html` → `dist/main/mrr/settings.html`.
-- Kopiert `assets/sprites` rekursiv → `dist/renderer/assets/sprites`.
+- Deletes `dist/renderer/assets/sprites` idempotently via `fs.rmSync(..., { recursive: true, force: true })`.
+- Copies `src/renderer/index.html` → `dist/renderer/index.html`.
+- Copies `src/main/mrr/settings.html` → `dist/main/mrr/settings.html`.
+- Copies `assets/sprites` recursively → `dist/renderer/assets/sprites`.
 
-### 2.3 `package.json`-Änderungen
+### 2.3 `package.json` Changes
 
 ```diff
 -  "description": "Pixel-art desktop beaver overlay for macOS",
@@ -61,13 +61,13 @@ Neues Skript mit `node:fs`/`node:path`:
 +    "build": "tsc && tsc -p src/renderer/tsconfig.json && node scripts/build-assets.js",
 ```
 
-### 2.4 Verifikation
+### 2.4 Verification
 
 ```cmd
 npm run build
 ```
 
-Ergebnis:
+Result:
 
 ```
 > beaver-buddy@0.1.0 build
@@ -76,7 +76,7 @@ Ergebnis:
 Assets built successfully.
 ```
 
-Erzeugte Dateien:
+Files produced:
 
 - `dist/renderer/index.html`
 - `dist/main/mrr/settings.html`
@@ -89,14 +89,14 @@ Erzeugte Dateien:
 
 ---
 
-## 3. BL-WIN-2: Windows-Target + Icon-Assets
+## 3. BL-WIN-2: Windows Target + Icon Assets
 
-### 3.1 Icon-Generierung
+### 3.1 Icon Generation
 
-**Quelle:** `assets/sprites/beaver-baby.png` (192×192-Sheet, erstes 96×96-Idle-Tile).  
-**Tool:** Python 3.13.14 + Pillow 12.1.1 (lokal verfügbar, keine neue Projektabhängigkeit).
+**Source:** `assets/sprites/beaver-baby.png` (192×192 sheet, first 96×96 idle tile).  
+**Tool:** Python 3.13.14 + Pillow 12.1.1 (available locally, no new project dependency).
 
-Befehl (inline, nicht im Repo gespeichert):
+Command (inline, not stored in the repo):
 
 ```python
 python - <<'PY'
@@ -127,16 +127,16 @@ scaled.resize((32, 32), Image.NEAREST).save(dst_tray, format='PNG')
 PY
 ```
 
-**Design-Entscheidungen:**
+**Design decisions:**
 
-- 96×96-Idle-Tile wird nearest-neighbor auf 192×192 skaliert (exakt 2×).
-- 192×192-Bild wird in 256×256-Canvas mit transparentem Rand zentriert.
-- ICO enthält die Auflösungen 16, 32, 48, 128, 256 px.
-- Kleinere Auflösungen (16, 32, 48) werden aus der 192×192-Quelle mit integerem Faktor generiert, um die Pixel-Art scharf zu halten.
-- 128×256 werden aus dem gepaddeten 256×256-Bild abgeleitet (128 = 2×-Downsample).
-- `tray-icon.png` ist 32×32, generiert aus 192×192 mit nearest-neighbor (6:1).
+- The 96×96 idle tile is scaled to 192×192 with nearest-neighbor (exactly 2×).
+- The 192×192 image is centered on a 256×256 canvas with a transparent border.
+- The ICO contains the resolutions 16, 32, 48, 128, 256 px.
+- Smaller resolutions (16, 32, 48) are generated from the 192×192 source with an integer factor to keep the pixel art sharp.
+- 128×256 are derived from the padded 256×256 image (128 = 2× downsample).
+- `tray-icon.png` is 32×32, generated from 192×192 with nearest-neighbor (6:1).
 
-Verifikation:
+Verification:
 
 ```cmd
 ls -la assets/icon.ico assets/tray-icon.png
@@ -179,15 +179,15 @@ nsis:
   uninstallerIcon: assets/icon.ico
 ```
 
-**Hinweis:** `publisherName: AI Beavers` unter `win:` wurde von `electron-builder` 26.15.3 mit einem Schema-Fehler abgelehnt. Stattdessen wurde `"author": "AI Beavers"` in `package.json` gesetzt.
+**Note:** `publisherName: AI Beavers` under `win:` was rejected by `electron-builder` 26.15.3 with a schema error. Instead, `"author": "AI Beavers"` was set in `package.json`.
 
-### 3.3 Verifikation Packaging
+### 3.3 Packaging Verification
 
 ```cmd
 npx electron-builder --win --publish never
 ```
 
-Ergebnis (gekürzt):
+Result (truncated):
 
 ```
 • electron-builder  version=26.15.3 os=10.0.26200
@@ -197,7 +197,7 @@ Ergebnis (gekürzt):
 • building        target=portable file=release\Beaver Buddy 0.1.0.exe archs=x64
 ```
 
-Erzeugte Dateien:
+Files produced:
 
 ```cmd
 ls -la release/*.exe
@@ -208,21 +208,21 @@ ls -la release/*.exe
 -rwxr-xr-x 1 rodgi 197609 164987079 Jul 15 19:45 release/Beaver Buddy Setup 0.1.0.exe
 ```
 
-Beide Dateien sind vorhanden: ein NSIS-Installer und eine portable `.exe`.
+Both files are present: an NSIS installer and a portable `.exe`.
 
 ---
 
-## 4. BL-WIN-9: CI um `windows-latest` erweitern
+## 4. BL-WIN-9: Extend CI with `windows-latest`
 
-### 4.1 Vorab-Test unter Windows
+### 4.1 Preliminary Test on Windows
 
-Vor der CI-Erweiterung wurde `npm test` lokal auf Windows ausgeführt:
+Before the CI extension, `npm test` was run locally on Windows:
 
 ```cmd
 npm test
 ```
 
-Ergebnis:
+Result:
 
 ```
  Test Files  32 passed (32)
@@ -230,11 +230,11 @@ Ergebnis:
    Duration  4.51s
 ```
 
-Alle Tests bestehen auf Windows (Node 22.x). Keine Test-Änderungen nötig.
+All tests pass on Windows (Node 22.x). No test changes needed.
 
 ### 4.2 `.github/workflows/ci.yml`
 
-Matrix erweitert:
+Matrix extended:
 
 ```yaml
 jobs:
@@ -246,7 +246,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
 ```
 
-Neue Steps:
+New steps:
 
 ```yaml
       - name: Build
@@ -264,29 +264,29 @@ Neue Steps:
           path: release/*.exe
 ```
 
-### 4.3 Abhängigkeitskorrektur
+### 4.3 Dependency Correction
 
-Im Hauptplan `.flightplan/Archive/WINDOWS_PORT_PLAN.md` wurde die Abhängigkeit von BL-WIN-9 auf BL-WIN-5 entfernt:
+In the main plan `.flightplan/Archive/WINDOWS_PORT_PLAN.md`, the dependency of BL-WIN-9 on BL-WIN-5 was removed:
 
 ```diff
-- **Abhängigkeiten:** BL-WIN-1, BL-WIN-2, BL-WIN-5.
-+ **Abhängigkeiten:** BL-WIN-1, BL-WIN-2.
+- **Dependencies:** BL-WIN-1, BL-WIN-2, BL-WIN-5.
++ **Dependencies:** BL-WIN-1, BL-WIN-2.
 ```
 
 ---
 
-## 5. Node-Version
+## 5. Node Version
 
-Lokale Umgebung: Node v22.19.0  
-Projekt-Vorgabe: `engines.node: "24.x"`
+Local environment: Node v22.19.0  
+Project requirement: `engines.node: "24.x"`
 
-`npm ci` wurde lokal ausgeführt:
+`npm ci` was run locally:
 
 ```cmd
 npm ci
 ```
 
-Ergebnis:
+Result:
 
 ```
 npm warn EBADENGINE Unsupported engine {
@@ -299,24 +299,24 @@ added 390 packages, and audited 391 packages in 14s
 found 0 vulnerabilities
 ```
 
-`npm ci` warnt, bricht aber nicht ab. Daher wurde `engines.node` **nicht** vorübergehend gelockert. CI läuft weiterhin explizit mit Node 24.x.
+`npm ci` warns but does not abort. Therefore `engines.node` was **not** temporarily relaxed. CI continues to run explicitly with Node 24.x.
 
 ---
 
-## 6. Zusammenfassung der Befehle und Ergebnisse
+## 6. Summary of Commands and Results
 
-| Befehl | Ergebnis |
-|--------|----------|
-| `npm ci` | ✅ Erfolgreich (Warnung wegen Node 22.x vs. 24.x, kein Fehler) |
-| `npm run build` | ✅ Erfolgreich, alle Assets vorhanden |
-| `npm test` | ✅ 32/32 Test-Dateien, 292 passed, 6 skipped |
-| `npx electron-builder --win --publish never` | ✅ Erfolgreich, `release/*.exe` erzeugt |
+| Command | Result |
+|---------|--------|
+| `npm ci` | ✅ Successful (warning about Node 22.x vs. 24.x, no error) |
+| `npm run build` | ✅ Successful, all assets present |
+| `npm test` | ✅ 32/32 test files, 292 passed, 6 skipped |
+| `npx electron-builder --win --publish never` | ✅ Successful, `release/*.exe` produced |
 
 ---
 
-## 7. Offene Punkte / Blocker
+## 7. Open Items / Blockers
 
-- Keine Blocker für Phase 1.
-- Visueller Smoke-Test des Icons im Installer/Explorer/Task-Manager ist noch ausstehend (manueller Test).
-- `electron-builder --mac --publish never` konnte lokal nicht verifiziert werden, da die Umgebung Windows ist. Der macOS-Build sollte unverändert funktionsfähig bleiben; gegebenenfalls auf macOS-CI oder -Hardware prüfen.
-- Node-Version der lokalen Entwicklungsumgebung sollte außerhalb dieser Phase auf 24.x angehoben werden.
+- No blockers for Phase 1.
+- A visual smoke test of the icon in the installer/Explorer/Task Manager is still pending (manual test).
+- `electron-builder --mac --publish never` could not be verified locally because the environment is Windows. The macOS build should remain functional unchanged; check on macOS CI or hardware if needed.
+- The Node version of the local development environment should be raised to 24.x outside this phase.

@@ -1,62 +1,62 @@
 # Beaver Buddy — Phase 2: Core Windows Experience
 
-**Status:** Plan / Nicht begonnen  
-**Build-Items:** BL-WIN-3, BL-WIN-4  
-**Ziel:** Overlay und Tray verhalten sich auf Windows nativ; der Biber bleibt immer sichtbar und wird nie von der Taskleiste verdeckt.
+**Status:** Plan / Not started  
+**Build items:** BL-WIN-3, BL-WIN-4  
+**Goal:** Overlay and tray behave natively on Windows; the beaver always stays visible and is never obscured by the taskbar.
 
 ---
 
-## 1. Zusammenfassung der Phase
+## 1. Phase summary
 
-Phase 1 hat Build, Packaging und CI für Windows stabilisiert. Phase 2 konzentriert sich auf die beiden sichtbaren Haupt-Blocker:
+Phase 1 stabilized build, packaging, and CI for Windows. Phase 2 focuses on the two visible main blockers:
 
-1. **BL-WIN-3 Overlay-Adapter für Windows**  
-   Das Overlay-Fenster darf auf Windows nicht hinter die Taskleiste rutschen. Dafür müssen `setAlwaysOnTop`-Level, Fenstergröße/-position und die Roaming-Bounds plattformspezifisch behandelt werden. Die verfügbare Arbeitsfläche (`screen.getPrimaryDisplay().workArea`) ersetzt die rohe Bildschirmauflösung als Bezugsgröße für Bewegung, Kletterverhalten und Hatch-Positionierung.
+1. **BL-WIN-3 Overlay adapter for Windows**  
+   The overlay window must not slide behind the taskbar on Windows. This requires platform-specific handling of the `setAlwaysOnTop` level, window size/position, and roaming bounds. The available work area (`screen.getPrimaryDisplay().workArea`) replaces the raw screen resolution as the reference size for movement, climbing behavior, and hatch positioning.
 
-2. **BL-WIN-4 Tray-Adapter für Windows**  
-   Unter Windows muss das farbige `assets/tray-icon.png` geladen werden. `setTemplateImage` ist nur auf macOS erlaubt. Das Menü selbst bleibt unverändert.
+2. **BL-WIN-4 Tray adapter for Windows**  
+   On Windows the colored `assets/tray-icon.png` must be loaded. `setTemplateImage` is only allowed on macOS. The menu itself remains unchanged.
 
-Beide Items sind kleine, isolierte Adapter-Änderungen. Sie führen keine neuen Dependencies ein, ändern keine Renderer-Animationslogik und lassen die bestehenden Unit-Tests unberührt.
-
----
-
-## 2. Abhängigkeiten
-
-| Build-Item | Benötigt von | Begründung |
-|------------|--------------|------------|
-| BL-WIN-3   | —            | Kann unabhängig umgesetzt werden. |
-| BL-WIN-4   | BL-WIN-2     | Das farbige `assets/tray-icon.png` wurde in Phase 1 (BL-WIN-2) erzeugt. |
-| Phase 2    | Phase 1      | Build/Packaging/CI müssen bereits auf Windows laufen. |
-
-**Reihenfolge innerhalb Phase 2:**
-1. BL-WIN-3 umsetzen.
-2. BL-WIN-4 umsetzen (kurz, da Asset vorhanden).
-3. Gesamt-Build + Tests laufen lassen.
-4. Manuelle Smoke-Tests auf Windows durchführen.
+Both items are small, isolated adapter changes. They introduce no new dependencies, change no renderer animation logic, and leave the existing unit tests untouched.
 
 ---
 
-## 3. BL-WIN-3: Overlay-Adapter für Windows
+## 2. Dependencies
 
-### 3.1 Problemstellung
+| Build item | Needed by | Rationale |
+|------------|-----------|-----------|
+| BL-WIN-3   | —         | Can be implemented independently. |
+| BL-WIN-4   | BL-WIN-2  | The colored `assets/tray-icon.png` was created in Phase 1 (BL-WIN-2). |
+| Phase 2    | Phase 1   | Build/packaging/CI must already run on Windows. |
 
-In `src/main/main.ts` steht aktuell:
+**Order within Phase 2:**
+1. Implement BL-WIN-3.
+2. Implement BL-WIN-4 (quick, since the asset exists).
+3. Run the full build + tests.
+4. Perform manual smoke tests on Windows.
+
+---
+
+## 3. BL-WIN-3: Overlay adapter for Windows
+
+### 3.1 Problem statement
+
+`src/main/main.ts` currently contains:
 
 ```ts
 win.setAlwaysOnTop(true, 'floating');
 ```
 
-Auf macOS hält `'floating'` das Fenster korrekt über normalen Apps. Auf Windows landet ein Fenster mit diesem Level aber **unter der Taskleiste**, wenn es an den unteren Rand positioniert wird. Zusätzlich orientieren sich Roaming-Bounds momentan an der Fenstergröße, was zufällig der `workArea` entspricht, solange sich die Taskleiste nicht ändert. Es gibt aber keine Reaktion auf Taskleisten-Änderungen (Position, Auto-Hide, Größe) und keine explizite Sicherstellung, dass der Biber immer innerhalb der `workArea` bleibt.
+On macOS `'floating'` correctly keeps the window above normal apps. On Windows, however, a window at this level ends up **below the taskbar** when positioned at the bottom edge. In addition, the roaming bounds are currently based on the window size, which coincidentally matches the `workArea` as long as the taskbar does not change. But there is no reaction to taskbar changes (position, auto-hide, size) and no explicit guarantee that the beaver always stays inside the `workArea`.
 
-### 3.2 Lösungsansatz
+### 3.2 Approach
 
-Kleiner plattformspezifischer Adapter, der die folgenden drei Aufgaben übernimmt:
+A small platform-specific adapter that takes over the following three tasks:
 
-1. `setAlwaysOnTop`-Level je nach Plattform wählen.
-2. Verfügbare Arbeitsfläche (`workArea`) liefern und Änderungen beobachten.
-3. Overlay-Fenster bei Änderungen sanft neu ausrichten.
+1. Choose the `setAlwaysOnTop` level per platform.
+2. Provide the available work area (`workArea`) and observe changes.
+3. Smoothly realign the overlay window on changes.
 
-### 3.3 Neue Datei: `src/main/overlay-adapter.ts`
+### 3.3 New file: `src/main/overlay-adapter.ts`
 
 ```ts
 import { BrowserWindow, screen, type Display } from 'electron';
@@ -97,10 +97,10 @@ export function configureAlwaysOnTop(win: BrowserWindow): void {
   if (process.platform === 'darwin') {
     win.setAlwaysOnTop(true, 'floating');
   } else {
-    // 'normal' reicht auf Windows, um über normalen Fenstern zu bleiben,
-    // ohne in die Screensaver-Ebene zu greifen.
-    // 'pop-up-menu' ist der Fallback, falls 'normal' unter bestimmten
-    // Taskleisten-Konstellationen versagt.
+    // 'normal' is sufficient on Windows to stay above normal windows
+    // without reaching into the screensaver level.
+    // 'pop-up-menu' is the fallback in case 'normal' fails under
+    // certain taskbar configurations.
     win.setAlwaysOnTop(true, 'normal');
   }
 }
@@ -111,7 +111,7 @@ export function fitWindowToWorkArea(win: BrowserWindow, info: WorkAreaInfo): voi
     y: info.y,
     width: info.width,
     height: info.height,
-  }, true); // true = animate, sanfte Verschiebung bei Änderungen
+  }, true); // true = animate, smooth shift on changes
 }
 
 export function onWorkAreaChanged(callback: (info: WorkAreaInfo) => void): () => void {
@@ -127,36 +127,36 @@ export function onWorkAreaChanged(callback: (info: WorkAreaInfo) => void): () =>
 }
 ```
 
-**Begründung für `normal` vs. `pop-up-menu`:**  
-Der Hauptplan nennt beide Optionen. Wir starten mit `'normal'`, weil es dem macOS-Verhalten am nächsten kommt (über normalen Fenstern, aber nicht über allem). Falls Tests zeigen, dass die Taskleiste den Biber bei Auto-Hide trotzdem verdeckt, wird auf `'pop-up-menu'` umgestellt. Diese Entscheidung wird im Code kommentiert und in der Akzeptanz dokumentiert.
+**Rationale for `normal` vs. `pop-up-menu`:**  
+The main plan names both options. We start with `'normal'` because it is closest to the macOS behavior (above normal windows, but not above everything). If tests show that the taskbar still obscures the beaver with auto-hide, we switch to `'pop-up-menu'`. This decision is documented in a code comment and in the acceptance criteria.
 
-### 3.4 Änderungen in `src/main/main.ts`
+### 3.4 Changes in `src/main/main.ts`
 
-#### Schritt 1: Adapter importieren
+#### Step 1: Import the adapter
 
 ```ts
 import { configureAlwaysOnTop, fitWindowToWorkArea, getPrimaryWorkAreaInfo, onWorkAreaChanged } from './overlay-adapter';
 ```
 
-#### Schritt 2: `createWindow()` anpassen
+#### Step 2: Adjust `createWindow()`
 
-Ersetzen:
+Replace:
 
 ```ts
 win.setAlwaysOnTop(true, 'floating');
 ```
 
-durch:
+with:
 
 ```ts
 configureAlwaysOnTop(win);
 ```
 
-Der Rest der Fensterkonstruktion bleibt unverändert (`skipTaskbar: true`, `focusable: false`, `transparent: true`, `frame: false`, etc.).
+The rest of the window construction remains unchanged (`skipTaskbar: true`, `focusable: false`, `transparent: true`, `frame: false`, etc.).
 
-#### Schritt 3: WorkArea-Änderungen beobachten
+#### Step 3: Observe work-area changes
 
-Nach `mainWindow = createWindow();` in `app.whenReady()`:
+After `mainWindow = createWindow();` in `app.whenReady()`:
 
 ```ts
 mainWindow = createWindow();
@@ -168,7 +168,7 @@ const unsubscribeWorkArea = onWorkAreaChanged((next) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   workAreaInfo = next;
   fitWindowToWorkArea(mainWindow, next);
-  // Renderer über neue verfügbare Fläche informieren
+  // Inform the renderer about the new available area
   mainWindow.webContents.send(BOUNDS_CHANGED_CHANNEL, {
     width: next.width,
     height: next.height,
@@ -180,34 +180,34 @@ mainWindow.on('closed', () => {
 });
 ```
 
-> **Hinweis:** `fitWindowToWorkArea` mit `animate: true` sorgt dafür, dass der Biber bei einer Taskleisten-Vergrößerung sanft in die neue Fläche zurückwandert, statt abgeschnitten zu werden.
+> **Note:** `fitWindowToWorkArea` with `animate: true` ensures the beaver smoothly walks back into the new area when the taskbar grows, instead of being cut off.
 
-### 3.5 Änderungen in `src/renderer/renderer.ts`
+### 3.5 Changes in `src/renderer/renderer.ts`
 
-Der Renderer nutzt aktuell `window.innerWidth`/`window.innerHeight` als Roaming-Bounds. Das ist weiterhin korrekt, solange das Hauptfenster exakt auf `workArea` skaliert. Bei Änderungen der `workArea` muss aber die Canvas-Größe neu gesetzt und der Roaming-Zustand an die neuen Bounds angeglichen werden.
+The renderer currently uses `window.innerWidth`/`window.innerHeight` as the roaming bounds. That remains correct as long as the main window scales exactly to the `workArea`. When the `workArea` changes, however, the canvas size must be reset and the roaming state aligned to the new bounds.
 
-#### Schritt 1: IPC-Handler in `src/main/preload.ts` erweitern
+#### Step 1: Extend the IPC handler in `src/main/preload.ts`
 
-Neuer Kanal in `src/main/ipc-channels.ts`:
+New channel in `src/main/ipc-channels.ts`:
 
 ```ts
 export const BOUNDS_CHANGED_CHANNEL = 'state:bounds';
 ```
 
-Neuer Eintrag in `src/main/preload.ts` (inkl. Inline-Literal, da preload keine Sibling-Module importieren kann):
+New entry in `src/main/preload.ts` (including inline literal, since preload cannot import sibling modules):
 
 ```ts
 const BOUNDS_CHANGED_CHANNEL = 'state:bounds'; // must match src/main/ipc-channels.ts
 
 contextBridge.exposeInMainWorld('beaverBuddy', {
-  // ... bestehende Handler
+  // ... existing handlers
   onBoundsChanged: (callback: (bounds: { width: number; height: number }) => void): void => {
     ipcRenderer.on(BOUNDS_CHANGED_CHANNEL, (_event, bounds) => callback(bounds));
   },
 });
 ```
 
-#### Schritt 2: Renderer-Handler ergänzen
+#### Step 2: Add the renderer handler
 
 In `src/renderer/renderer.ts`:
 
@@ -221,17 +221,17 @@ function resizeCanvas(): void {
 window.addEventListener('resize', resizeCanvas);
 
 window.beaverBuddy.onBoundsChanged((next) => {
-  // Fenstergröße wurde vom Main-Prozess angepasst; innerWidth/innerHeight
-  // sollten bereits next entsprechen, aber wir setzen Canvas explizit.
+  // The window size was adjusted by the main process; innerWidth/innerHeight
+  // should already match next, but we set the canvas explicitly.
   resizeCanvas();
-  // Sicherstellen, dass der Biber innerhalb der neuen Fläche bleibt.
+  // Ensure the beaver stays within the new area.
   roamState = clampRoamStateToBounds(roamState, bounds());
 });
 ```
 
-#### Schritt 3: Hilfsfunktion `clampRoamStateToBounds`
+#### Step 3: Helper function `clampRoamStateToBounds`
 
-In `src/renderer/renderer.ts` oder `src/renderer/roam.ts`:
+In `src/renderer/renderer.ts` or `src/renderer/roam.ts`:
 
 ```ts
 function clampRoamStateToBounds(state: RoamState, b: Bounds): RoamState {
@@ -247,27 +247,27 @@ function clampRoamStateToBounds(state: RoamState, b: Bounds): RoamState {
 }
 ```
 
-**Alternative:** Falls `roam.ts` diese Logik aufnehmen soll (reiner State), kann `clampRoamStateToBounds` in `roam.ts` als Export leben und in `renderer.ts` importiert werden. Das vermeidet Duplikation mit `maxX`/`groundY`.
+**Alternative:** If `roam.ts` should hold this logic (pure state), `clampRoamStateToBounds` can live as an export in `roam.ts` and be imported into `renderer.ts`. This avoids duplication with `maxX`/`groundY`.
 
 ### 3.6 Tests
 
-`src/main/overlay-adapter.ts` ist isoliert von Electron-UI-APIs testbar:
+`src/main/overlay-adapter.ts` is testable in isolation from Electron UI APIs:
 
-- `detectTaskbarEdge` für alle vier Kanten + Auto-Hide (simuliert durch unterschiedliche bounds/workArea).
-- `configureAlwaysOnTop` ist rein pass-through; ein Unit-Test mit Mock-`BrowserWindow` prüft, dass auf `win32` `'normal'` und auf `darwin` `'floating'` verwendet wird.
-- `onWorkAreaChanged` registriert/deregistriert die drei `screen`-Events korrekt.
+- `detectTaskbarEdge` for all four edges + auto-hide (simulated by different bounds/workArea).
+- `configureAlwaysOnTop` is pure pass-through; a unit test with a mock `BrowserWindow` verifies that `'normal'` is used on `win32` and `'floating'` on `darwin`.
+- `onWorkAreaChanged` registers/deregisters the three `screen` events correctly.
 
-**Bestehende Tests bleiben grün:**
+**Existing tests stay green:**
 
-- `roam.test.ts` ändert sich nicht.
-- `tray.test.ts` ändert sich nicht.
-- Keine neuen Dependencies.
+- `roam.test.ts` does not change.
+- `tray.test.ts` does not change.
+- No new dependencies.
 
 ---
 
-## 4. BL-WIN-4: Tray-Adapter für Windows
+## 4. BL-WIN-4: Tray adapter for Windows
 
-### 4.1 Problemstellung
+### 4.1 Problem statement
 
 In `src/main/tray.ts`:
 
@@ -277,17 +277,17 @@ const icon = nativeImage.createFromPath(iconPath);
 icon.setTemplateImage(true);
 ```
 
-- `tray-iconTemplate.png` ist für macOS gedacht und wird dort als Template-Image gerendert.
-- `setTemplateImage(true)` hat auf Windows keine Wirkung bzw. kann zu einem unsichtbaren/falschen Icon führen.
-- In Phase 1 wurde `assets/tray-icon.png` (farbig) erzeugt.
+- `tray-iconTemplate.png` is meant for macOS and is rendered there as a template image.
+- `setTemplateImage(true)` has no effect on Windows and can lead to an invisible/wrong icon.
+- In Phase 1, `assets/tray-icon.png` (colored) was created.
 
-### 4.2 Lösungsansatz
+### 4.2 Approach
 
-Plattformspezifische Icon-Auswahl und Template-Image-Flag.
+Platform-specific icon selection and template-image flag.
 
-### 4.3 Änderungen in `src/main/tray.ts`
+### 4.3 Changes in `src/main/tray.ts`
 
-Ersetzen der hartkodierten Zeilen durch:
+Replace the hardcoded lines with:
 
 ```ts
 const iconFileName = process.platform === 'darwin' ? 'tray-iconTemplate.png' : 'tray-icon.png';
@@ -298,7 +298,7 @@ if (process.platform === 'darwin') {
 }
 ```
 
-Alternativ kann eine kleine Hilfsfunktion `loadTrayIcon()` die Logik kapseln:
+Alternatively, a small helper function `loadTrayIcon()` can encapsulate the logic:
 
 ```ts
 function loadTrayIcon(): NativeImage {
@@ -313,56 +313,56 @@ function loadTrayIcon(): NativeImage {
 
 ### 4.4 Tests
 
-`tray.test.ts` testet ausschließlich `buildMenuTemplate` und `formatPetLabel`. Die Icon-Ladung ist nicht gecovert, daher bleiben die Tests grün.
+`tray.test.ts` tests only `buildMenuTemplate` and `formatPetLabel`. Icon loading is not covered, so the tests stay green.
 
-Optional kann ein neuer Test für `loadTrayIcon` hinzugefügt werden, der auf `process.platform` mockt und prüft, ob der richtige Dateiname gewählt und `setTemplateImage` nur auf `darwin` aufgerufen wird. Das ist aber nicht zwingend erforderlich.
+Optionally, a new test for `loadTrayIcon` can be added that mocks `process.platform` and checks whether the correct filename is chosen and `setTemplateImage` is only called on `darwin`. This is not strictly required, however.
 
 ---
 
-## 5. Akzeptanzkriterien für die gesamte Phase
+## 5. Acceptance criteria for the whole phase
 
 ### BL-WIN-3
 
-- [ ] Auf Windows startet das Overlay-Fenster mit `setAlwaysOnTop(true, 'normal')` (oder `'pop-up-menu'`, falls validiert).
-- [ ] Auf macOS bleibt `setAlwaysOnTop(true, 'floating')` erhalten.
-- [ ] Das Fenster wird exakt auf `screen.getPrimaryDisplay().workArea` ausgerichtet.
-- [ ] Bei Änderung der Taskleisten-Position, -Größe oder des Auto-Hide-Zustands wird `workArea` neu berechnet und das Fenster sanft angepasst.
-- [ ] Der Biber bleibt immer innerhalb der verfügbaren Arbeitsfläche; er verschwindet nicht hinter der Taskleiste.
-- [ ] `skipTaskbar: true`, `focusable: false`, `transparent: true` bleiben erhalten.
-- [ ] Klick-Through funktioniert weiterhin (`setIgnoreMouseEvents(true)`).
-- [ ] Kein Fokus-Diebstahl durch das Overlay.
+- [ ] On Windows the overlay window starts with `setAlwaysOnTop(true, 'normal')` (or `'pop-up-menu'` if validated).
+- [ ] On macOS `setAlwaysOnTop(true, 'floating')` is retained.
+- [ ] The window is aligned exactly to `screen.getPrimaryDisplay().workArea`.
+- [ ] When the taskbar position, size, or auto-hide state changes, the `workArea` is recalculated and the window smoothly adjusted.
+- [ ] The beaver always stays within the available work area; it does not disappear behind the taskbar.
+- [ ] `skipTaskbar: true`, `focusable: false`, `transparent: true` are retained.
+- [ ] Click-through keeps working (`setIgnoreMouseEvents(true)`).
+- [ ] No focus stealing by the overlay.
 
 ### BL-WIN-4
 
-- [ ] Unter Windows wird `assets/tray-icon.png` als farbiges Tray-Icon angezeigt.
-- [ ] Unter macOS bleibt `assets/tray-iconTemplate.png` mit `setTemplateImage(true)` unverändert.
-- [ ] Das Tray-Kontextmenü öffnet sich und alle Einträge funktionieren.
+- [ ] On Windows `assets/tray-icon.png` is shown as the colored tray icon.
+- [ ] On macOS `assets/tray-iconTemplate.png` with `setTemplateImage(true)` remains unchanged.
+- [ ] The tray context menu opens and all entries work.
 
-### Gesamtphase
+### Whole phase
 
-- [ ] `npm run build` läuft auf Windows und macOS durch.
-- [ ] `npm run typecheck`, `npm run lint`, `npm test` sind grün.
-- [ ] `npx electron-builder --win --publish never` erzeugt weiterhin funktionierende Installer.
-- [ ] Manuelle Smoke-Tests auf Windows bestätigen: Biber sichtbar, Tray-Menü funktioniert, Taskleisten-Änderungen werden überlebt.
-
----
-
-## 6. Risiken und Mitigationen
-
-| Risiko | Auswirkung | Wahrscheinlichkeit | Mitigation |
-|--------|------------|--------------------|------------|
-| `'normal'` reicht nicht, um über Auto-Hide-Taskleiste zu bleiben | Biber wird kurzzeitig verdeckt | Mittel | Fallback auf `'pop-up-menu'` dokumentieren und in Akzeptanztest prüfen. |
-| `screen`-Events feuern nicht bei jeder Taskleisten-Änderung | Biber bleibt außerhalb der neuen workArea | Niedrig | Zusätzlich `resize`-Event auf `BrowserWindow` oder periodische Prüfung in Betracht ziehen (nur falls empirisch nötig). |
-| `fitWindowToWorkArea` mit Animation erzeugt kurzen visuellen Sprung | Biber „ruckelt" bei Taskleisten-Änderung | Niedrig | Animation kann auf `false` gesetzt werden, falls störend. |
-| Renderer empfängt `state:bounds` vor `did-finish-load` | Message geht verloren | Niedrig | Initialer Bounds-Request erst nach `did-finish-load` senden, oder Renderer ignoriert frühe Events. |
-| Farbiges Tray-Icon auf Windows ist bei dunklem Taskleisten-Hintergrund schlecht sichtbar | Schlechte UX | Mittel | In Phase 4 (BL-WIN-10/HiDPI) Design-Gate für kontrastreiches Icon einplanen. |
-| `nativeImage.createFromPath` bei fehlendem `tray-icon.png` wirft nicht sofort, aber das Icon ist leer | Leeres Tray-Icon | Niedrig | Build-Script/CI prüft Existenz der Asset-Dateien; manueller Smoke-Test. |
+- [ ] `npm run build` completes on Windows and macOS.
+- [ ] `npm run typecheck`, `npm run lint`, `npm test` are green.
+- [ ] `npx electron-builder --win --publish never` continues to produce working installers.
+- [ ] Manual smoke tests on Windows confirm: beaver visible, tray menu works, taskbar changes are survived.
 
 ---
 
-## 7. Test- und Verifikationsschritte
+## 6. Risks and mitigations
 
-### 7.1 Automatisierte Tests (lokal + CI)
+| Risk | Impact | Likelihood | Mitigation |
+|------|--------|------------|------------|
+| `'normal'` is not enough to stay above the auto-hide taskbar | Beaver is briefly obscured | Medium | Document the fallback to `'pop-up-menu'` and check it in the acceptance test. |
+| `screen` events do not fire for every taskbar change | Beaver stays outside the new workArea | Low | Consider an additional `resize` event on `BrowserWindow` or a periodic check (only if empirically needed). |
+| `fitWindowToWorkArea` with animation causes a brief visual jump | Beaver "stutters" on taskbar change | Low | Animation can be set to `false` if disruptive. |
+| Renderer receives `state:bounds` before `did-finish-load` | Message is lost | Low | Send the initial bounds request only after `did-finish-load`, or have the renderer ignore early events. |
+| Colored tray icon on Windows is hard to see on a dark taskbar background | Poor UX | Medium | Plan a design gate for a high-contrast icon in Phase 4 (BL-WIN-10/HiDPI). |
+| `nativeImage.createFromPath` with a missing `tray-icon.png` does not throw immediately, but the icon is empty | Empty tray icon | Low | Build script/CI checks the existence of the asset files; manual smoke test. |
+
+---
+
+## 7. Test and verification steps
+
+### 7.1 Automated tests (local + CI)
 
 ```bash
 npm run typecheck
@@ -372,77 +372,77 @@ npm run build
 npx electron-builder --win --publish never
 ```
 
-Erwartetes Ergebnis:
+Expected result:
 
-- TypeScript ohne Fehler.
-- ESLint ohne Fehler.
-- Alle bestehenden Tests grün.
-- Build-Ausgabe in `dist/` und `release/` vorhanden.
+- TypeScript without errors.
+- ESLint without errors.
+- All existing tests green.
+- Build output present in `dist/` and `release/`.
 
-### 7.2 Neue Unit-Tests
+### 7.2 New unit tests
 
 - `src/main/overlay-adapter.test.ts`:
-  - `detectTaskbarEdge` für top/bottom/left/right/none.
-  - `configureAlwaysOnTop` wählt korrekten Level für `win32` und `darwin`.
-  - `onWorkAreaChanged` subscribed/unsubscribed die drei Events.
+  - `detectTaskbarEdge` for top/bottom/left/right/none.
+  - `configureAlwaysOnTop` chooses the correct level for `win32` and `darwin`.
+  - `onWorkAreaChanged` subscribes/unsubscribes the three events.
 
-- (Optional) `src/main/tray.test.ts` erweitern:
-  - Mock für `process.platform` und Prüfung des gewählten Icon-Namens.
+- (Optional) extend `src/main/tray.test.ts`:
+  - Mock for `process.platform` and check the chosen icon name.
 
-### 7.3 Manuelle Smoke-Tests auf Windows
+### 7.3 Manual smoke tests on Windows
 
-1. **App starten:**
+1. **Start the app:**
    ```bash
    npm start
    ```
-2. **Sichtbarkeit prüfen:** Biber läuft am unteren Rand, ist über der Taskleiste sichtbar.
-3. **Taskleiste verschieben:** Rechtsklick Taskleiste → Taskleisteneinstellungen → Position ändern (oben/links/rechts). Biber bleibt sichtbar und innerhalb der workArea.
-4. **Auto-Hide aktivieren:** Taskleiste automatisch ausblenden. Biber bleibt sichtbar, auch wenn die Taskleiste eingeblendet wird.
-5. **Vollbild-App:** Editor/Browser im Vollbildmodus. Biber sollte weiterhin sichtbar sein (kein Fokus-Diebstahl, aber Overlay bleibt oben).
-6. **Klick-Through:** Mausklicks auf den Biber gehen an die darunter liegende Anwendung durch.
-7. **Task-Manager:** Kein Eintrag in der Windows-Taskleiste (`skipTaskbar: true`).
-8. **Tray:** Farbiges Icon sichtbar, Rechtsklick öffnet Menü, Pause/Resume/Quit funktionieren.
+2. **Check visibility:** The beaver walks along the bottom edge and is visible above the taskbar.
+3. **Move the taskbar:** Right-click taskbar → taskbar settings → change position (top/left/right). The beaver stays visible and within the workArea.
+4. **Enable auto-hide:** Automatically hide the taskbar. The beaver stays visible, even when the taskbar slides in.
+5. **Fullscreen app:** Editor/browser in fullscreen mode. The beaver should remain visible (no focus stealing, but the overlay stays on top).
+6. **Click-through:** Mouse clicks on the beaver pass through to the application below.
+7. **Task Manager:** No entry in the Windows taskbar (`skipTaskbar: true`).
+8. **Tray:** Colored icon visible, right-click opens the menu, Pause/Resume/Quit work.
 
-### 7.4 Manuelle Regression auf macOS
+### 7.4 Manual regression on macOS
 
-1. App starten.
-2. Biber bleibt über der Dock-Menüleiste.
-3. Tray-Icon ist ein Template-Image und passt sich dem Dunkel-/Hellmodus an.
-4. Menü funktioniert wie bisher.
+1. Start the app.
+2. The beaver stays above the dock menu bar.
+3. The tray icon is a template image and adapts to dark/light mode.
+4. The menu works as before.
 
 ---
 
-## 8. Dateien, die angefasst werden
+## 8. Files to be touched
 
-| Datei | Änderung | Build-Item |
-|-------|----------|------------|
-| `src/main/overlay-adapter.ts` | Neu: Plattform-Adapter für AlwaysOnTop, WorkArea, Taskleisten-Kante | BL-WIN-3 |
-| `src/main/main.ts` | Import Adapter, `configureAlwaysOnTop` statt `'floating'`, WorkArea-Change-Handler | BL-WIN-3 |
-| `src/main/ipc-channels.ts` | Neuer Kanal `state:bounds` | BL-WIN-3 |
+| File | Change | Build item |
+|------|--------|------------|
+| `src/main/overlay-adapter.ts` | New: platform adapter for AlwaysOnTop, work area, taskbar edge | BL-WIN-3 |
+| `src/main/main.ts` | Import adapter, `configureAlwaysOnTop` instead of `'floating'`, work-area change handler | BL-WIN-3 |
+| `src/main/ipc-channels.ts` | New channel `state:bounds` | BL-WIN-3 |
 | `src/main/preload.ts` | `onBoundsChanged` expose | BL-WIN-3 |
-| `src/renderer/renderer.ts` | Bounds-Change-Handler, Canvas-Resize, Clamp-RoamState | BL-WIN-3 |
-| `src/main/overlay-adapter.test.ts` | Neue Tests | BL-WIN-3 |
-| `src/main/tray.ts` | Plattformspezifische Icon-Auswahl + Template-Image nur auf macOS | BL-WIN-4 |
-| `src/main/tray.test.ts` | Optional: Test für Icon-Ladung | BL-WIN-4 |
+| `src/renderer/renderer.ts` | Bounds-change handler, canvas resize, clamp RoamState | BL-WIN-3 |
+| `src/main/overlay-adapter.test.ts` | New tests | BL-WIN-3 |
+| `src/main/tray.ts` | Platform-specific icon selection + template image only on macOS | BL-WIN-4 |
+| `src/main/tray.test.ts` | Optional: test for icon loading | BL-WIN-4 |
 
-**Nicht angefasst werden:**
+**Not to be touched:**
 
-- `src/renderer/roam.ts` (reiner State, keine plattformspezifische Logik).
-- `src/main/usage/paths.ts` (Thema von Phase 3 / BL-WIN-5).
-- `src/main/mrr/keychain.ts` (verschoben auf BL-WIN-6).
-- `package.json`, `electron-builder.yml` (Phase 1 abgeschlossen).
-
----
-
-## 9. Offene Punkte / Follow-up
-
-- **Z-Order-Fallback:** Falls `'normal'` unter Windows nicht ausreicht, muss `'pop-up-menu'` getestet und ggf. dokumentiert werden.
-- **Multi-Monitor:** Aktuell nur `screen.getPrimaryDisplay()`. Spätere Phase könnte den Biber bei Display-Wechseln auf den neuen primären Monitor migrieren.
-- **HiDPI/Scaling:** Bleibt in Phase 4 (BL-WIN-8).
-- **Tray-Icon-Design:** Farbiges Icon funktioniert vorerst; Design-Gate in Phase 4.
+- `src/renderer/roam.ts` (pure state, no platform-specific logic).
+- `src/main/usage/paths.ts` (topic of Phase 3 / BL-WIN-5).
+- `src/main/mrr/keychain.ts` (deferred to BL-WIN-6).
+- `package.json`, `electron-builder.yml` (Phase 1 completed).
 
 ---
 
-## 10. Zusammenfassung für das Team
+## 9. Open points / follow-up
 
-Phase 2 ist ein schlanker, risikoarmer Schritt: Zwei plattformspezifische Adapter korrigieren das sichtbarste Windows-Verhalten (Overlay-Z-Order + Tray-Icon). Die Änderungen beschränken sich auf wenige Dateien im Main-Prozess, erfordern keine neuen Dependencies und lassen Renderer-Logik sowie Tests weitgehend unberührt. Nach der Umsetzung sollte der Biber auf Windows immer sichtbar bleiben und das farbige Tray-Icon korrekt angezeigt werden.
+- **Z-order fallback:** If `'normal'` is not sufficient on Windows, `'pop-up-menu'` must be tested and documented if applicable.
+- **Multi-monitor:** Currently only `screen.getPrimaryDisplay()`. A later phase could migrate the beaver to the new primary monitor on display switches.
+- **HiDPI/scaling:** Remains in Phase 4 (BL-WIN-8).
+- **Tray icon design:** Colored icon works for now; design gate in Phase 4.
+
+---
+
+## 10. Summary for the team
+
+Phase 2 is a lean, low-risk step: two platform-specific adapters fix the most visible Windows behavior (overlay Z-order + tray icon). The changes are confined to a few files in the main process, require no new dependencies, and leave the renderer logic and tests largely untouched. After implementation, the beaver should always stay visible on Windows and the colored tray icon should be displayed correctly.

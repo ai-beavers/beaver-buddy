@@ -1,10 +1,10 @@
-# Kritisches Review: Phase-5-Plan (`phase-5-plan.md`)
+# Critical Review: Phase 5 Plan (`phase-5-plan.md`)
 
-**Review-Agent:** Kimi Code CLI  
-**Datum:** 2026-07-15  
-**Geprüfter Plan:** `.flightplan/Archive/phase-5-plan.md`  
-**Basis:** `.flightplan/Archive/WINDOWS_PORT_PLAN.md`, Stand 2026-07-15  
-**Validierte Quelldateien:**
+**Review agent:** Kimi Code CLI  
+**Date:** 2026-07-15  
+**Reviewed plan:** `.flightplan/Archive/phase-5-plan.md`  
+**Basis:** `.flightplan/Archive/WINDOWS_PORT_PLAN.md`, as of 2026-07-15  
+**Validated source files:**
 - `src/main/mrr/keychain.ts`
 - `src/main/mrr/keychain.test.ts`
 - `src/main/mrr/mrr-config.ts`
@@ -14,60 +14,60 @@
 
 ---
 
-## 1. Zusammenfassung des geprüften Plans
+## 1. Summary of the reviewed plan
 
-Der Phase-5-Plan dokumentiert korrekt, dass es sich um eine **Dokumentations- und Recherchephase** ohne Source-Änderungen handelt. Die drei zurückgestellten Build-Items (BL-WIN-6 Secret-Store, BL-WIN-7 atomares Schreiben, Codex-Tracking) werden mit ihren externen Blockern (Administrator-Entscheidung, Recherche) erfasst, und die App wird als auf Windows voll funktionsfähig beschrieben.
+The Phase 5 plan correctly documents that this is a **documentation and research phase** without source changes. The three deferred build items (BL-WIN-6 secret store, BL-WIN-7 atomic writes, Codex tracking) are captured with their external blockers (administrator decision, research), and the app is described as fully functional on Windows.
 
-Die Struktur ist verständlich: pro Item Status, Begründung, Optionen, nächste Schritte und Akzeptanzkriterien. Die Risiken und die empfohlene Reihenfolge sind grundsätzlich nachvollziehbar.
+The structure is understandable: per item status, rationale, options, next steps, and acceptance criteria. The risks and the recommended order are fundamentally sound.
 
-**Kernproblem:** Der Plan enthält mehrere **technische Ungenauigkeiten und Lücken**, die einen Implementierungs-Agenten in die Irre führen oder zu unzulänglichen Lösungen führen können. Besonders bei BL-WIN-6 und BL-WIN-7 sind die vorgeschlagenen Ansätze teils unpräzise, teils technisch problematisch.
+**Core problem:** The plan contains several **technical inaccuracies and gaps** that can mislead an implementation agent or lead to inadequate solutions. Especially for BL-WIN-6 and BL-WIN-7, the proposed approaches are partly imprecise, partly technically problematic.
 
 ---
 
-## 2. Gefundene Probleme / Lücken / Fehler
+## 2. Found problems / gaps / errors
 
-### BL-WIN-6: Windows Secret-Store / MRR-Mode
+### BL-WIN-6: Windows secret store / MRR mode
 
-#### 2.1 `cmdkey.exe` als Leselösung ist praktisch unbrauchbar *(Schwere: Hoch)*
+#### 2.1 `cmdkey.exe` as a read solution is practically unusable *(Severity: High)*
 
-Der Plan nennt unter Option A (`src/main/mrr/keychain.ts` / `keychain-win32.ts`) drei Varianten für den Windows Credential Manager:
+Under Option A (`src/main/mrr/keychain.ts` / `keychain-win32.ts`), the plan lists three variants for Windows Credential Manager:
 
-- PowerShell `CredentialManager`-Modul
-- `cmdkey.exe` zum Schreiben, „Lesen allerdings eingeschränkt"
-- Kleiner Native-Addon mit `CredWriteW` / `CredReadW` / `CredDeleteW`
+- PowerShell `CredentialManager` module
+- `cmdkey.exe` for writing, "reading however limited"
+- Small native addon with `CredWriteW` / `CredReadW` / `CredDeleteW`
 
-**Kritik:** „Eingeschränkt" trifft es nicht. `cmdkey.exe` kann **keine** generischen Credentials lesen, die über die Win32-Credential-API geschrieben wurden. Es verwaltet ausschließlich Anmeldeinformationen für Netzwerkressourcen (z. B. Remote-Desktops, UNC-Pfade). Eine Leseoperation via `cmdkey /list` zeigt nur diese Netzwerk-Credentials an, nicht die generischen Credentials, die ein Credential-Manager-Adapter bräuchte. Die Planung suggeriert fälschlich, `cmdkey.exe` sei eine halbwegs brauchbare Option.
+**Criticism:** "Limited" does not capture it. `cmdkey.exe` can read **no** generic credentials written via the Win32 Credential API. It exclusively manages logon information for network resources (e.g. Remote Desktops, UNC paths). A read operation via `cmdkey /list` only shows these network credentials, not the generic credentials a Credential Manager adapter would need. The plan falsely suggests that `cmdkey.exe` is a halfway usable option.
 
-**Empfohlene Korrektur:** `cmdkey.exe` entweder ganz streichen oder als „nicht für generische Credentials geeignet" kennzeichnen. Für Option A bleiben nur:
+**Recommended correction:** Either remove `cmdkey.exe` entirely or mark it as "not suitable for generic credentials". For Option A, only the following remain:
 
-- PowerShell-CredentialManager-Modul (fragil, nicht standardmäßig installiert)
-- Native Addon mit `CredWriteW` / `CredReadW` / `CredDeleteW`
+- PowerShell CredentialManager module (fragile, not installed by default)
+- Native addon with `CredWriteW` / `CredReadW` / `CredDeleteW`
 
-#### 2.2 PowerShell-CredentialManager-Modul ist keine seriöse Default-Lösung *(Schwere: Hoch)*
+#### 2.2 PowerShell CredentialManager module is not a serious default solution *(Severity: High)*
 
-Der Plan nennt das PowerShell-Modul `CredentialManager` als erste Unteroption. Das Modul ist **nicht standardmäßig in Windows installiert**; es muss aus dem PSGallery nachinstalliert werden. Das würde bedeuten, dass die App auf einem frischen Windows-System nicht funktioniert, bis der Nutzer oder ein Installer ein PowerShell-Modul installiert. Für einen MRR-Mode, der für Endnutzer funktionieren soll, ist das inakzeptabel.
+The plan lists the PowerShell module `CredentialManager` as the first sub-option. The module is **not installed in Windows by default**; it must be installed from the PSGallery. That would mean the app does not work on a fresh Windows system until the user or an installer installs a PowerShell module. For an MRR mode that is supposed to work for end users, that is unacceptable.
 
-**Empfohlene Korrektur:** Das PowerShell-Modul als „nur für lokale Entwickler-POCs geeignet, nicht für Shipping" markieren.
+**Recommended correction:** Mark the PowerShell module as "suitable only for local developer POCs, not for shipping".
 
-#### 2.3 Native Addon widerspricht `CLAUDE.md`-Dependency-Richtlinie *(Schwere: Mittel-Hoch)*
+#### 2.3 Native addon contradicts the `CLAUDE.md` dependency policy *(Severity: Medium-High)*
 
-Der Plan erwähnt zwar, dass ein Native-Addon ggf. gegen `CLAUDE.md`-Restriktionen verstößt, behandelt es aber dennoch als ernsthafte Option. Ein `node-gyp`-basiertes Addon würde:
+The plan does mention that a native addon may violate `CLAUDE.md` restrictions, but still treats it as a serious option. A `node-gyp`-based addon would:
 
-- Build-Komplexität auf Windows, macOS und Linux erhöhen (auch wenn nur Windows Ziel ist, muss es in der CI überall bauen oder vorkompilierte Binaries verteilt werden)
-- Lizenz- und Sicherheitsreview erfordern
-- Electron-Version-Upgrades erschweren (ABI-Abhängigkeit)
+- Increase build complexity on Windows, macOS, and Linux (even if Windows is the only target, it must build everywhere in CI or prebuilt binaries must be distributed)
+- Require a license and security review
+- Complicate Electron version upgrades (ABI dependency)
 
-**Empfohlene Korrektur:** Option A als „nur mit Administrator-Entscheidung und explizitem ADR zu neuen Native-Dependencies" kennzeichnen.
+**Recommended correction:** Mark Option A as "only with an administrator decision and an explicit ADR for new native dependencies".
 
-#### 2.4 `electron.safeStorage` erfordert Ready-State-Berücksichtigung *(Schwere: Mittel)*
+#### 2.4 `electron.safeStorage` requires ready-state consideration *(Severity: Medium)*
 
-Option B (`electron.safeStorage`) wird als einfacher Fallback dargestellt. Unterschlagen wird, dass `safeStorage` in Electron **erst nach `app.whenReady()`** verwendet werden sollte. Wenn MRR-Credentials sehr früh geladen werden (z. B. beim App-Start vor Window-Creation), kann `safeStorage` noch nicht bereit sein.
+Option B (`electron.safeStorage`) is presented as a simple fallback. What is omitted is that `safeStorage` in Electron should **only be used after `app.whenReady()`**. If MRR credentials are loaded very early (e.g. at app start before window creation), `safeStorage` may not be ready yet.
 
-**Empfohlene Korrektur:** Hinweis auf Initialisierungszeitpunkt und ggf. Lazy-Loading der Credentials ergänzen.
+**Recommended correction:** Add a note on the initialization timing and possibly lazy loading of the credentials.
 
-#### 2.5 Aktueller Codeexport ist funktionsbasiert, nicht interfacebasiert *(Schwere: Mittel)*
+#### 2.5 Current code export is function-based, not interface-based *(Severity: Medium)*
 
-Der Plan spricht von einem „Adapter-Pattern" mit `keychain.ts` als Interface + Factory und `keychain-darwin.ts` / `keychain-win32.ts`. Die aktuelle Datei `src/main/mrr/keychain.ts` exportiert jedoch direkt:
+The plan speaks of an "adapter pattern" with `keychain.ts` as interface + factory and `keychain-darwin.ts` / `keychain-win32.ts`. However, the current file `src/main/mrr/keychain.ts` directly exports:
 
 ```ts
 export async function setKeychainSecret(...)
@@ -76,70 +76,70 @@ export async function deleteKeychainSecret(...)
 export function isValidKeychainService(...)
 ```
 
-Es gibt **kein Interface**, keine Factory und keine Injektion. Der Refactor-Aufwand ist daher größer als der Plan suggeriert. Alle Aufrufer (z. B. `src/main/mrr/mrr-config.ts`, ggf. `mrr-engine.ts`) müssen angepasst werden.
+There is **no interface**, no factory, and no injection. The refactor effort is therefore larger than the plan suggests. All callers (e.g. `src/main/mrr/mrr-config.ts`, possibly `mrr-engine.ts`) must be adjusted.
 
-**Empfohlene Korrektur:** Explizit notieren, dass `keychain.ts` zunächst in ein Interface + Implementierungen aufgeteilt werden muss, und die Aufrufer auf DI oder Factory umgestellt werden.
+**Recommended correction:** Explicitly note that `keychain.ts` must first be split into an interface + implementations, and the callers switched to DI or a factory.
 
-#### 2.6 `--keychain-service` QA-Flag ist im Plan unzureichend erfasst *(Schwere: Mittel)*
+#### 2.6 `--keychain-service` QA flag is insufficiently covered in the plan *(Severity: Medium)*
 
-Das Flag wird in `src/main/main.ts:91-99` geparst und in `src/main/mrr/mrr-config.ts:19` als `DEFAULT_KEYCHAIN_SERVICE = 'beaver-buddy'` definiert. Der Plan erwähnt das Flag mehrfach, aber nicht:
+The flag is parsed in `src/main/main.ts:91-99` and defined as `DEFAULT_KEYCHAIN_SERVICE = 'beaver-buddy'` in `src/main/mrr/mrr-config.ts:19`. The plan mentions the flag several times, but not:
 
-- wo es aktuell implementiert ist
-- dass es nicht nur ein „QA-Flag" ist, sondern der Service-Name-Override für die gesamte Keychain-Implementierung
-- dass `isValidKeychainService` aus `src/main/mrr/keychain.ts:27` auf Windows weiterhin verwendet werden muss, um Injection in Service-Namen zu verhindern
+- where it is currently implemented
+- that it is not just a "QA flag" but the service-name override for the entire keychain implementation
+- that `isValidKeychainService` from `src/main/mrr/keychain.ts:27` must continue to be used on Windows to prevent injection into service names
 
-**Empfohlene Korrektur:** Code-Bezüge zu `main.ts:91-99` und `mrr-config.ts:17-25` ergänzen.
+**Recommended correction:** Add code references to `main.ts:91-99` and `mrr-config.ts:17-25`.
 
-#### 2.7 Keine klare Entscheidungsempfehlung *(Schwere: Mittel)*
+#### 2.7 No clear decision recommendation *(Severity: Medium)*
 
-Der Plan präsentiert Option A als „primärer Prüfkandidat" und Option B als „dokumentierter Fallback", ohne klar zu sagen: **Unter den gegebenen Restriktionen (`CLAUDE.md`, keine neuen Dependencies) ist Option B wahrscheinlich die einzige realistische Shipping-Lösung.**
+The plan presents Option A as the "primary candidate for review" and Option B as a "documented fallback", without clearly stating: **Under the given restrictions (`CLAUDE.md`, no new dependencies), Option B is probably the only realistic shipping solution.**
 
-**Empfohlene Korrektur:** Empfehlung schärfen: Option B als präferierte Standardlösung, Option A nur bei expliziter Admin-Entscheidung für Credential Manager inklusive Native-Addon.
-
----
-
-### BL-WIN-7: Atomares Schreiben Windows-nativ
-
-#### 3.1 Option A (`setTimeout`-Backoff in synchroner Funktion) ist technisch unmöglich *(Schwere: Kritisch)*
-
-Unter Option A schlägt der Plan vor:
-
-> „In `atomicWriteFile` wird `fs.renameSync` in einer Schleife mit kurzem `setTimeout`-Backoff wiederholt"
-
-`src/main/atomic-file.ts:12` definiert `atomicWriteFile` als **synchrone** Funktion. `setTimeout` ist asynchron; innerhalb einer synchronen Funktion kann damit kein Retry realisiert werden. Der Plan beschreibt hier einen nicht funktionierenden Ansatz.
-
-**Empfohlene Korrektur:** Entweder
-- `atomicWriteFile` asynchron machen (`async` + `fs.promises` + `setTimeout`), oder
-- synchronen Retry ohne Verzögerung (busy-wait mit `Atomics.wait`/`sleep`-Variante) als bewussten Kompromiss dokumentieren, oder
-- Retry mit `Atomics.wait` aus `node:buffer` / `node:timers` prüfen.
-
-#### 3.2 Fehlerklassifikation fehlt *(Schwere: Mittel)*
-
-Der aktuelle Code in `src/main/atomic-file.ts:18` wirft einfach den `renameSync`-Fehler weiter. Der Plan fragt zwar, welche Fehler abgefangen werden sollen (`EPERM`, `EACCES`, `EBUSY`), gibt aber keine klare Antwort.
-
-**Empfohlene Korrektur:** Explizit festlegen, dass `EPERM` und `EBUSY` retriable sind, `EACCES` dagegen ein dauerhaftes Berechtigungsproblem darstellt und nicht retriert werden sollte (oder nur sehr kurz).
-
-#### 3.3 Temporärdatei liegt bereits korrekt im Zielverzeichnis *(Schwere: Niedrig-Mittel)*
-
-Option D erwähnt:
-
-> „Temporäre Datei wird außerhalb des Zielverzeichnisses erstellt (auf gleichem Volume), um Fragmentierung zu vermeiden."
-
-Das ist irreführend: `atomic-file.ts:15` erzeugt die Temp-Datei bereits im **gleichen Verzeichnis** wie die Zieldatei (`${filePath}.tmp-...`). Das ist korrekt, denn `rename` ist nur auf demselben Filesystem atomar, und `userData` liegt auf einem Volume. „Fragmentierung" ist hier kein relevantes Problem; die wichtige Eigenschaft ist Same-Volume-Rename.
-
-**Empfohlene Korrektur:** Option D überarbeiten: Temp-Datei im Zielverzeichnis beibehalten, aber Retry-Logik und robusteres Cleanup ergänzen.
-
-#### 3.4 Keine Abbruchkriterien für die Recherche *(Schwere: Mittel)*
-
-Der Plan sagt „Recherche nach besserem Pattern", ohne zu definieren, wann die Recherche als erfolglos gilt und Option A/D als Default gewählt wird.
-
-**Empfohlene Korrektur:** Zeitbox (z. B. 4 Stunden) und Abbruchkriterien ergänzen.
+**Recommended correction:** Sharpen the recommendation: Option B as the preferred default solution, Option A only with an explicit admin decision for Credential Manager including a native addon.
 
 ---
 
-### Codex-Tracking: Windows-Log-Pfade
+### BL-WIN-7: Windows-native atomic writes
 
-#### 4.1 `Platform`-Typcast in `discoverPaths` ist latent fehlerhaft *(Schwere: Mittel)*
+#### 3.1 Option A (`setTimeout` backoff in a synchronous function) is technically impossible *(Severity: Critical)*
+
+Under Option A, the plan proposes:
+
+> "In `atomicWriteFile`, `fs.renameSync` is repeated in a loop with a short `setTimeout` backoff"
+
+`src/main/atomic-file.ts:12` defines `atomicWriteFile` as a **synchronous** function. `setTimeout` is asynchronous; no retry can be realized with it inside a synchronous function. The plan describes a non-working approach here.
+
+**Recommended correction:** Either
+- make `atomicWriteFile` asynchronous (`async` + `fs.promises` + `setTimeout`), or
+- document a synchronous retry without delay (busy-wait with `Atomics.wait`/`sleep` variant) as a conscious compromise, or
+- investigate a retry with `Atomics.wait` from `node:buffer` / `node:timers`.
+
+#### 3.2 Error classification is missing *(Severity: Medium)*
+
+The current code in `src/main/atomic-file.ts:18` simply rethrows the `renameSync` error. The plan does ask which errors should be caught (`EPERM`, `EACCES`, `EBUSY`), but gives no clear answer.
+
+**Recommended correction:** Explicitly specify that `EPERM` and `EBUSY` are retriable, while `EACCES` represents a permanent permission problem and should not be retried (or only very briefly).
+
+#### 3.3 Temporary file already correctly resides in the target directory *(Severity: Low-Medium)*
+
+Option D mentions:
+
+> "The temporary file is created outside the target directory (on the same volume) to avoid fragmentation."
+
+This is misleading: `atomic-file.ts:15` already creates the temp file in the **same directory** as the target file (`${filePath}.tmp-...`). That is correct, because `rename` is only atomic on the same filesystem, and `userData` resides on one volume. "Fragmentation" is not a relevant problem here; the important property is same-volume rename.
+
+**Recommended correction:** Rework Option D: keep the temp file in the target directory, but add retry logic and more robust cleanup.
+
+#### 3.4 No abort criteria for the research *(Severity: Medium)*
+
+The plan says "research into a better pattern" without defining when the research counts as unsuccessful and Option A/D is chosen as the default.
+
+**Recommended correction:** Add a timebox (e.g. 4 hours) and abort criteria.
+
+---
+
+### Codex tracking: Windows log paths
+
+#### 4.1 `Platform` type cast in `discoverPaths` is latently incorrect *(Severity: Medium)*
 
 `src/main/usage/paths.ts:129`:
 
@@ -147,117 +147,117 @@ Der Plan sagt „Recherche nach besserem Pattern", ohne zu definieren, wann die 
 platform: Platform = process.platform as Platform,
 ```
 
-Der Typ `Platform` ist auf `'win32' | 'darwin' | 'linux'` beschränkt. Auf `freebsd`, `openbsd` etc. ist der Cast falsch. Der Hauptplan erwähnt das zwar in den verbleibenden Hinweisen, der Phase-5-Plan nicht.
+The `Platform` type is restricted to `'win32' | 'darwin' | 'linux'`. On `freebsd`, `openbsd`, etc., the cast is wrong. The main plan does mention this in the remaining notes; the Phase 5 plan does not.
 
-**Empfohlene Korrektur:** Hinweis ergänzen, dass `discoverPaths` nur mit den drei definierten `Platform`-Werten aufgerufen werden sollte, oder ein Fallback auf `linux` für unbekannte Plattformen in Betracht ziehen.
+**Recommended correction:** Add a note that `discoverPaths` should only be called with the three defined `Platform` values, or consider a fallback to `linux` for unknown platforms.
 
-#### 4.2 Unklar, ob Codex überhaupt offiziell Windows unterstützt *(Schwere: Mittel)*
+#### 4.2 Unclear whether Codex officially supports Windows at all *(Severity: Medium)*
 
-Der Plan geht davon aus, dass Codex auf Windows läuft und nur der Pfad unklar ist. Es wird nicht erwähnt, dass die Codex-CLI von OpenAI möglicherweise **noch keine stabile Windows-Unterstützung** hat oder ihr Windows-Verhalten sich schnell ändert.
+The plan assumes that Codex runs on Windows and only the path is unclear. It does not mention that OpenAI's Codex CLI may **not yet have stable Windows support** or that its Windows behavior changes quickly.
 
-**Empfohlene Korrektur:** Als Risiko ergänzen: „Codex-Windows-Support selbst ist möglicherweise experimentell; Pfad kann sich zwischen Versionen ändern."
+**Recommended correction:** Add as a risk: "Codex Windows support itself may be experimental; the path can change between versions."
 
-#### 4.3 Option B fehlt klare Pfadpriorisierung *(Schwere: Niedrig-Mittel)*
+#### 4.3 Option B lacks clear path prioritization *(Severity: Low-Medium)*
 
-Die Option B listet mehrere Kandidatenpfade auf (`~/.codex`, `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`), ohne zu sagen, welcher zuerst geprüft werden soll.
+Option B lists several candidate paths (`~/.codex`, `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`) without saying which should be checked first.
 
-**Empfohlene Korrektur:** Reihenfolge festlegen, z. B.:
-1. `CODEX_HOME` (Override)
-2. `%LOCALAPPDATA%\Codex` (modernster Windows-AppData-Pfad)
+**Recommended correction:** Define an order, e.g.:
+1. `CODEX_HOME` (override)
+2. `%LOCALAPPDATA%\Codex` (most modern Windows AppData path)
 3. `%APPDATA%\Codex`
-4. `~/.codex` (Legacy / WSL-ähnliche Umgebungen)
+4. `~/.codex` (legacy / WSL-like environments)
 
 ---
 
-### Querschnittliche Lücken
+### Cross-cutting gaps
 
-#### 5.1 Fehlende Bezüge zu bestehenden Testdateien *(Schwere: Mittel)*
+#### 5.1 Missing references to existing test files *(Severity: Medium)*
 
-Der Plan nennt keine bestehenden Tests, die bei der Umsetzung angepasst werden müssen:
+The plan names no existing tests that must be adjusted during implementation:
 
-- `src/main/mrr/keychain.test.ts` (muss bei Adapter-Refactor komplett umgebaut werden)
-- `src/main/usage/paths.test.ts` (muss um Windows-Codex-Szenarien erweitert werden)
-- `src/main/atomic-file.ts` hat **keine eigene Testdatei** (Glob `src/main/*atomic*.test.ts` liefert nichts)
+- `src/main/mrr/keychain.test.ts` (must be completely rebuilt in an adapter refactor)
+- `src/main/usage/paths.test.ts` (must be extended with Windows Codex scenarios)
+- `src/main/atomic-file.ts` has **no dedicated test file** (Glob `src/main/*atomic*.test.ts` returns nothing)
 
-**Empfohlene Korrektur:** Testaufwand explizit erwähnen, insbesondere dass für BL-WIN-7 neue Tests geschrieben werden müssen.
+**Recommended correction:** Explicitly mention the test effort, in particular that new tests must be written for BL-WIN-7.
 
-#### 5.2 `redact.ts` wird nicht erwähnt *(Schwere: Niedrig-Mittel)*
+#### 5.2 `redact.ts` is not mentioned *(Severity: Low-Medium)*
 
-`src/main/mrr/keychain.ts:17` importiert `logRedacted` aus `./redact`. Eine Windows-Implementierung muss dieselbe Redaktion verwenden. Der Plan erwähnt diesen wichtigen Security-Aspekt nicht.
+`src/main/mrr/keychain.ts:17` imports `logRedacted` from `./redact`. A Windows implementation must use the same redaction. The plan does not mention this important security aspect.
 
-**Empfohlene Korrektur:** Hinweis ergänzen, dass `keychain-win32.ts` ebenfalls `logRedacted` nutzen muss.
+**Recommended correction:** Add a note that `keychain-win32.ts` must also use `logRedacted`.
 
-#### 5.3 Finales Master-Icon / Design-Pass fehlt im Phase-5-Plan *(Schwere: Niedrig)*
+#### 5.3 Final master icon / design pass missing from the Phase 5 plan *(Severity: Low)*
 
-Der Hauptplan (`WINDOWS_PORT_PLAN.md:511-513` und „Verschobene Aufgaben" Abschnitt 8) listet das **finale Master-Icon / Design-Pass** als zurückgestellten Punkt. Der Phase-5-Plan erwähnt dieses Item nicht.
+The main plan (`WINDOWS_PORT_PLAN.md:511-513` and the "Deferred tasks" section 8) lists the **final master icon / design pass** as a deferred item. The Phase 5 plan does not mention this item.
 
-**Empfohlene Korrektur:** Entweder ins Inhaltsverzeichnis aufnehmen oder explizit als „nicht Teil von Phase 5" begründen.
+**Recommended correction:** Either include it in the table of contents or explicitly justify it as "not part of Phase 5".
 
-#### 5.4 Keine klare „Definition of Done" für die Planungsphase *(Schwere: Niedrig-Mittel)*
+#### 5.4 No clear "Definition of Done" for the planning phase *(Severity: Low-Medium)*
 
-Der Plan endet mit „Sobald die externen Klärungen vorliegen, sollten die Items umgesetzt werden". Es fehlt ein klares Kriterium, wann dieser Plan selbst als abgeschlossen gilt (z. B.: „Alle drei Entscheidungsfragen beantwortet oder Eskalationspfad definiert").
+The plan ends with "Once the external clarifications are available, the items should be implemented". A clear criterion is missing for when this plan itself counts as complete (e.g.: "All three decision questions answered or an escalation path defined").
 
 ---
 
-## 3. Konkrete Verbesserungsvorschläge
+## 3. Concrete improvement suggestions
 
-| # | Thema | Vorschlag | Bezug |
+| # | Topic | Suggestion | Reference |
 |---|-------|-----------|-------|
-| 1 | BL-WIN-6 Option A | `cmdkey.exe` als nicht für generische Credentials geeignet kennzeichnen oder entfernen. | `phase-5-plan.md:3.3 Option A` |
-| 2 | BL-WIN-6 Option A | PowerShell `CredentialManager`-Modul als „nur für lokale POCs, nicht für Shipping" markieren. | `phase-5-plan.md:3.3 Option A` |
-| 3 | BL-WIN-6 Option A | Native-Addon explizit als „nur mit Admin-Entscheidung + ADR für neue Native-Dependency" kennzeichnen. | `phase-5-plan.md:3.3 Option A`, `CLAUDE.md` |
-| 4 | BL-WIN-6 Option B | Hinweis ergänzen: `electron.safeStorage` erst nach `app.whenReady()` nutzbar; ggf. Lazy-Loading. | `phase-5-plan.md:3.3 Option B` |
-| 5 | BL-WIN-6 Architektur | Notieren, dass `src/main/mrr/keychain.ts` aktuell funktionsbasiert ist und in Interface + Factory + zwei Implementierungen refactored werden muss. | `src/main/mrr/keychain.ts`, `src/main/mrr/mrr-config.ts` |
-| 6 | BL-WIN-6 QA-Flag | Code-Bezüge zu `--keychain-service` ergänzen (`src/main/main.ts:91-99`, `src/main/mrr/mrr-config.ts:17-25`). | `src/main/main.ts:91-99` |
-| 7 | BL-WIN-6 Empfehlung | Empfehlung schärfen: Option B als Default, Option A nur bei Admin-Entscheidung. | `phase-5-plan.md:3.3` |
-| 8 | BL-WIN-7 Option A | `setTimeout`-Retry in synchroner Funktion korrigieren: entweder Funktion asynchron machen oder alternativen synchronen Retry dokumentieren. | `src/main/atomic-file.ts:12`, `phase-5-plan.md:3.3 Option A` |
-| 9 | BL-WIN-7 Fehlerklassen | Klar festlegen: `EPERM`/`EBUSY` retriable, `EACCES` nicht retriable (oder nur kurz). | `phase-5-plan.md:3.2` |
-| 10 | BL-WIN-7 Option D | Irreführenden Hinweis zur Temp-Datei außerhalb des Zielverzeichnisses korrigieren. | `phase-5-plan.md:3.3 Option D` |
-| 11 | BL-WIN-7 Recherche | Zeitbox und Abbruchkriterien für Recherche definieren. | `phase-5-plan.md:3.4` |
-| 12 | Codex-Tracking | Latenten `Platform`-Cast in `discoverPaths` erwähnen. | `src/main/usage/paths.ts:129` |
-| 13 | Codex-Tracking | Risiko ergänzen: Codex-Windows-Support selbst kann instabil sein. | `phase-5-plan.md:4` |
-| 14 | Codex-Tracking | Klare Priorisierung der Kandidatenpfade in Option B festlegen. | `phase-5-plan.md:4.3 Option B` |
-| 15 | Tests | Bestehende Testdateien (`keychain.test.ts`, `paths.test.ts`) und fehlende `atomic-file.test.ts` erwähnen. | `src/main/mrr/keychain.test.ts`, `src/main/usage/paths.test.ts` |
-| 16 | Security | Hinweis ergänzen, dass `keychain-win32.ts` `logRedacted` aus `src/main/mrr/redact.ts` wiederverwenden muss. | `src/main/mrr/redact.ts` |
-| 17 | Vollständigkeit | Master-Icon / Design-Pass entweder aufnehmen oder ausgrenzen. | `WINDOWS_PORT_PLAN.md:511-513` |
-| 18 | DoD | Klare „Definition of Done" für diese Planungsphase ergänzen. | `phase-5-plan.md:8` |
+| 1 | BL-WIN-6 Option A | Mark `cmdkey.exe` as unsuitable for generic credentials or remove it. | `phase-5-plan.md:3.3 Option A` |
+| 2 | BL-WIN-6 Option A | Mark the PowerShell `CredentialManager` module as "only for local POCs, not for shipping". | `phase-5-plan.md:3.3 Option A` |
+| 3 | BL-WIN-6 Option A | Explicitly mark the native addon as "only with an admin decision + ADR for a new native dependency". | `phase-5-plan.md:3.3 Option A`, `CLAUDE.md` |
+| 4 | BL-WIN-6 Option B | Add a note: `electron.safeStorage` only usable after `app.whenReady()`; possibly lazy loading. | `phase-5-plan.md:3.3 Option B` |
+| 5 | BL-WIN-6 architecture | Note that `src/main/mrr/keychain.ts` is currently function-based and must be refactored into interface + factory + two implementations. | `src/main/mrr/keychain.ts`, `src/main/mrr/mrr-config.ts` |
+| 6 | BL-WIN-6 QA flag | Add code references for `--keychain-service` (`src/main/main.ts:91-99`, `src/main/mrr/mrr-config.ts:17-25`). | `src/main/main.ts:91-99` |
+| 7 | BL-WIN-6 recommendation | Sharpen the recommendation: Option B as default, Option A only with an admin decision. | `phase-5-plan.md:3.3` |
+| 8 | BL-WIN-7 Option A | Correct the `setTimeout` retry in a synchronous function: either make the function asynchronous or document an alternative synchronous retry. | `src/main/atomic-file.ts:12`, `phase-5-plan.md:3.3 Option A` |
+| 9 | BL-WIN-7 error classes | Clearly specify: `EPERM`/`EBUSY` retriable, `EACCES` not retriable (or only briefly). | `phase-5-plan.md:3.2` |
+| 10 | BL-WIN-7 Option D | Correct the misleading note about the temp file being outside the target directory. | `phase-5-plan.md:3.3 Option D` |
+| 11 | BL-WIN-7 research | Define a timebox and abort criteria for the research. | `phase-5-plan.md:3.4` |
+| 12 | Codex tracking | Mention the latent `Platform` cast in `discoverPaths`. | `src/main/usage/paths.ts:129` |
+| 13 | Codex tracking | Add a risk: Codex Windows support itself may be unstable. | `phase-5-plan.md:4` |
+| 14 | Codex tracking | Define a clear prioritization of the candidate paths in Option B. | `phase-5-plan.md:4.3 Option B` |
+| 15 | Tests | Mention existing test files (`keychain.test.ts`, `paths.test.ts`) and the missing `atomic-file.test.ts`. | `src/main/mrr/keychain.test.ts`, `src/main/usage/paths.test.ts` |
+| 16 | Security | Add a note that `keychain-win32.ts` must reuse `logRedacted` from `src/main/mrr/redact.ts`. | `src/main/mrr/redact.ts` |
+| 17 | Completeness | Either include the master icon / design pass or explicitly exclude it. | `WINDOWS_PORT_PLAN.md:511-513` |
+| 18 | DoD | Add a clear "Definition of Done" for this planning phase. | `phase-5-plan.md:8` |
 
 ---
 
-## 4. GO / NO-GO Empfehlung
+## 4. GO / NO-GO recommendation
 
-**Empfehlung: GO mit MAJOR REVISIONS (bedingtes GO für Dokumentation/Forschung)**
+**Recommendation: GO with MAJOR REVISIONS (conditional GO for documentation/research)**
 
-Der Plan darf als Planungsdokument genutzt werden, **muss aber vor Weitergabe an einen Implementierungs-Agenten überarbeitet werden**. Die gravierendsten Fehler (`setTimeout` in synchroner Funktion, `cmdkey.exe` als Leselösung) müssen korrigiert werden, bevor der Plan als Handlungsanweisung dient.
+The plan may be used as a planning document, **but must be revised before being handed to an implementation agent**. The most serious errors (`setTimeout` in a synchronous function, `cmdkey.exe` as a read solution) must be corrected before the plan serves as an instruction.
 
-Das grundsätzliche Konzept (drei zurückgestellte Items, externe Blocker, Recherchephase) ist korrekt und vollständig genug, um das weitere Vorgehen zu steuern.
+The basic concept (three deferred items, external blockers, research phase) is correct and complete enough to steer the further course of action.
 
 ---
 
-## 5. Wichtige Hinweise für den Implementierungs-Agenten
+## 5. Important notes for the implementation agent
 
-Falls der Plan nach Korrektur als Basis für die Umsetzung dient:
+If the plan, after correction, serves as the basis for implementation:
 
 ### BL-WIN-6
-- **Bevorzuge Option B (`electron.safeStorage` + verschlüsselte JSON in `userData`)**, es sei denn, der Administrator entscheidet ausdrücklich für Windows Credential Manager mit Native-Addon.
-- Refactore `src/main/mrr/keychain.ts` in ein Interface + Factory; extrahiere die bestehende `security`-CLI-Logik nach `keychain-darwin.ts`.
-- Stelle sicher, dass `isValidKeychainService` weiterhin exportiert wird und von `src/main/main.ts:91-99` genutzt wird.
-- Verwende in `keychain-win32.ts` zwingend `logRedacted` aus `src/main/mrr/redact.ts`, damit Secrets niemals im Log landen.
-- Aktiviere den MRR-Mode auf Windows erst, nachdem ein vollständiger Write/Read/Delete-Zyklus getestet ist.
+- **Prefer Option B (`electron.safeStorage` + encrypted JSON in `userData`)**, unless the administrator explicitly decides in favor of Windows Credential Manager with a native addon.
+- Refactor `src/main/mrr/keychain.ts` into an interface + factory; extract the existing `security` CLI logic into `keychain-darwin.ts`.
+- Ensure that `isValidKeychainService` continues to be exported and used by `src/main/main.ts:91-99`.
+- In `keychain-win32.ts`, mandatory use of `logRedacted` from `src/main/mrr/redact.ts` so that secrets never end up in the log.
+- Enable MRR mode on Windows only after a full write/read/delete cycle has been tested.
 
 ### BL-WIN-7
-- **Mache `atomicWriteFile` asynchron** (`async function atomicWriteFile(...)`), wenn du Retry mit Backoff implementieren möchtest. Verwende `fs.promises.writeFile` + `fs.promises.rename` + `setTimeout`.
-- Falls Synchronität zwingend erforderlich ist, dokumentiere den Grund und implementiere einen synchronen Retry (z. B. mit `Atomics.wait` oder einem synchronen Sleep), nicht `setTimeout`.
-- Klassifiziere Fehler klar: `EPERM` und `EBUSY` retriable, `EACCES` nur mit sehr kurzer Retry-Grenze.
-- Behält die Temp-Datei im Zielverzeichnis bei (`${filePath}.tmp-...`), um Same-Volume-Rename zu garantieren.
-- Schreibe eine neue Testdatei `src/main/atomic-file.test.ts`; es gibt aktuell keine.
+- **Make `atomicWriteFile` asynchronous** (`async function atomicWriteFile(...)`) if you want to implement retry with backoff. Use `fs.promises.writeFile` + `fs.promises.rename` + `setTimeout`.
+- If synchronicity is strictly required, document the reason and implement a synchronous retry (e.g. with `Atomics.wait` or a synchronous sleep), not `setTimeout`.
+- Classify errors clearly: `EPERM` and `EBUSY` retriable, `EACCES` only with a very short retry limit.
+- Keep the temp file in the target directory (`${filePath}.tmp-...`) to guarantee same-volume rename.
+- Write a new test file `src/main/atomic-file.test.ts`; none exists currently.
 
-### Codex-Tracking
-- Prüfe zuerst empirisch auf Windows, ob Codex überhaupt läuft und welche Verzeichnisse angelegt werden.
-- Implementiere die Pfadsuche in dieser Priorität: `CODEX_HOME` > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` > `~/.codex`.
-- Erweitere `src/main/usage/paths.test.ts` um Windows-Codex-Szenarien.
-- Behandle unbekannte `process.platform`-Werte defensiv (z. B. Fallback auf `linux`-Verhalten), anstatt blind `as Platform` zu casten.
+### Codex tracking
+- First empirically check on Windows whether Codex runs at all and which directories are created.
+- Implement the path search in this priority: `CODEX_HOME` > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` > `~/.codex`.
+- Extend `src/main/usage/paths.test.ts` with Windows Codex scenarios.
+- Handle unknown `process.platform` values defensively (e.g. fallback to `linux` behavior) instead of blindly casting `as Platform`.
 
-### Allgemein
-- Keine neuen Dependencies ohne explizite Begründung und ADR (vgl. `CLAUDE.md`).
-- Halte den Plan nach jeder Entscheidung / Recherche aktuell; er soll ein „lebendes Dokument" bleiben.
+### General
+- No new dependencies without an explicit justification and ADR (cf. `CLAUDE.md`).
+- Keep the plan up to date after every decision / research finding; it should remain a "living document".

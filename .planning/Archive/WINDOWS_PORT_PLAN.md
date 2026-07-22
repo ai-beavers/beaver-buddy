@@ -1,130 +1,129 @@
-# Beaver Buddy — Cross-Platform / Windows-Implementation Plan
+# Beaver Buddy — Cross-Platform / Windows Implementation Plan
 
-**Status:** Phase 1, 2, 3 und 4 abgeschlossen. Phase 5 teilweise abgeschlossen — BL-WIN-7 und Codex-Tracking sind umgesetzt; BL-WIN-6 (Windows Secret-Store / MRR-Mode) bleibt bis zur Admin-Entscheidung zurückgestellt.  
-**Ziel:** Beaver Buddy als cross-platform Electron-App für macOS und Windows
-aufbauen; aktueller Fokus liegt auf der **Windows-Implementation**.  
-**Scope-Entscheidung:** Siehe ADR 002 (`docs/adr/002-cross-platform-scope.md`).  
-**Ausgangsbasis:** Electron-App mit macOS-spezifischen Annahmen (Node 24.x,
+**Status:** Phases 1, 2, 3, and 4 completed. Phase 5 partially completed — BL-WIN-7 and Codex tracking are implemented; BL-WIN-6 (Windows secret store / MRR mode) remains deferred pending the admin decision.  
+**Goal:** Build Beaver Buddy as a cross-platform Electron app for macOS and Windows;
+the current focus is the **Windows implementation**.  
+**Scope decision:** See ADR 002 (`docs/adr/002-cross-platform-scope.md`).  
+**Starting point:** Electron app with macOS-specific assumptions (Node 24.x,
 Electron 43.1.0, TypeScript strict).
 
 ---
 
-## Gesamtstatus
+## Overall Status
 
-| Phase | Status | Build-Items |
+| Phase | Status | Build Items |
 |-------|--------|-------------|
-| **Phase 1: Foundation** | ✅ Abgeschlossen | BL-WIN-1, BL-WIN-2, BL-WIN-9 |
-| **Phase 2: Core Windows Experience** | ✅ Abgeschlossen | BL-WIN-3, BL-WIN-4 |
-| **Phase 3: Windows Integrations** | ✅ Abgeschlossen | BL-WIN-5 |
-| **Phase 4: Polish & Release-Readiness** | ✅ Abgeschlossen | BL-WIN-8, BL-WIN-10 |
-| **Phase 5: Deferred / Follow-up** | ✅ Teilweise abgeschlossen | BL-WIN-7 ✅, Codex-Tracking ✅, BL-WIN-6 ⏸️ zurückgestellt |
-| **Post-Phase-5 Bugfix: Single-Instance-Schutz** | ✅ Abgeschlossen | Doppelte App-Instanzen werden verhindert (`app.requestSingleInstanceLock`). |
+| **Phase 1: Foundation** | ✅ Completed | BL-WIN-1, BL-WIN-2, BL-WIN-9 |
+| **Phase 2: Core Windows Experience** | ✅ Completed | BL-WIN-3, BL-WIN-4 |
+| **Phase 3: Windows Integrations** | ✅ Completed | BL-WIN-5 |
+| **Phase 4: Polish & Release Readiness** | ✅ Completed | BL-WIN-8, BL-WIN-10 |
+| **Phase 5: Deferred / Follow-up** | ✅ Partially completed | BL-WIN-7 ✅, Codex tracking ✅, BL-WIN-6 ⏸️ deferred |
+| **Post-Phase-5 Bugfix: Single-Instance Protection** | ✅ Completed | Duplicate app instances are prevented (`app.requestSingleInstanceLock`). |
 
 ---
 
-## 1. Zusammenfassung / Executive Summary
+## 1. Summary / Executive Summary
 
-Die Codebasis ist überwiegend plattformneutral. Die harten Blocker für die
-Windows-Implementation sitzen in vier Bereichen:
+The codebase is mostly platform-neutral. The hard blockers for the
+Windows implementation sit in four areas:
 
-1. **Build & Packaging:** `npm run build` verwendet Unix-Shell-Kommandos;
-   `electron-builder.yml` hat kein `win:`-Target.
-2. **Overlay-Fenster:** `setAlwaysOnTop(true, 'floating')` platziert das Fenster
-   auf Windows **unter die Taskleiste**; der Biber würde am unteren Rand
-   verschwinden.
-3. **Tray:** `setTemplateImage(true)` und das Template-PNG sind macOS-only.
-4. **Secrets:** `security`-CLI für den macOS-Keychain hat kein Windows-Pendant.
-5. **Usage-Logs:** Der Legacy-Pfad `~/.claude` funktioniert auf Windows bereits
-   (`%USERPROFILE%\.claude`). Der XDG-Pfad `~/.config/claude` ist auf Windows
-   nicht dokumentiert und muss geprüft/ersetzt werden.
-6. **HiDPI/Scaling:** Der Canvas-Renderer arbeitet in logischen Pixeln; auf
-   Windows mit 125 %/150 %/200 % Skalierung muss das Canvas physikalisch um den
-   DPR skaliert werden, damit die Pixel-Art scharf bleibt.
+1. **Build & Packaging:** `npm run build` uses Unix shell commands;
+   `electron-builder.yml` has no `win:` target.
+2. **Overlay window:** `setAlwaysOnTop(true, 'floating')` places the window
+   on Windows **below the taskbar**; the beaver would disappear at the
+   bottom edge.
+3. **Tray:** `setTemplateImage(true)` and the template PNG are macOS-only.
+4. **Secrets:** the `security` CLI for the macOS Keychain has no Windows equivalent.
+5. **Usage logs:** the legacy path `~/.claude` already works on Windows
+   (`%USERPROFILE%\.claude`). The XDG path `~/.config/claude` is not
+   documented on Windows and must be reviewed/replaced.
+6. **HiDPI/scaling:** the canvas renderer works in logical pixels; on
+   Windows with 125%/150%/200% scaling, the canvas must be scaled physically
+   by the DPR so the pixel art stays sharp.
 
-Renderer, Sprite-Animation und State-Logik sind weitgehend portabel. Die
-größten Unsicherheiten sind die Windows-Z-Order des Overlays und die Wahl eines
-robusten Windows-Secret-Stores.
-
----
-
-## 2. Gefundene plattformspezifische Stellen
-
-| # | Datei:Zeile | Problem | Schwere |
-|---|-------------|---------|---------|
-| 1 | `package.json:12` | Build-Script nutzt `cp`, `rm -rf`, `mkdir -p` (Unix-only). | Blocker |
-| 2 | `electron-builder.yml:9-12` | Nur `mac:`-Target konfiguriert, kein `win:`. | Blocker |
-| 3 | `src/main/main.ts:118` | `setAlwaysOnTop(true, 'floating')` — auf Windows unter der Taskleiste. | Blocker |
-| 4 | `src/main/tray.ts:82-84` | `setTemplateImage(true)` und `tray-iconTemplate.png` sind macOS-only. | Blocker |
-| 5 | `src/main/mrr/keychain.ts:54-85` | Nutzt macOS-`security`-CLI zum Lesen/Schreiben/Löschen von Secrets. | Blocker |
-| 6 | `src/main/usage/paths.ts:40` | XDG-Pfad `~/.config/claude` ist auf Windows nicht dokumentiert. | Mittel |
-| 7 | `src/main/atomic-file.ts:18` | `fs.renameSync` kann auf Windows bei transienten Locks (`EPERM`) fehlschlagen. | Mittel |
-| 8 | `.github/workflows/ci.yml:17` | CI läuft nur auf `ubuntu-latest`. | Mittel |
-| 9 | `src/renderer/renderer.ts:81-82` | Canvas arbeitet in logischen Pixeln; auf Windows-HiDPI möglicherweise unscharf. | Niedrig-Mittel |
-| 10 | `assets/tray-iconTemplate.png` | Kein Windows-Icon-Asset (`.ico`/farbiges PNG). | Mittel |
+Renderer, sprite animation, and state logic are largely portable. The
+biggest uncertainties are the Windows z-order of the overlay and the choice
+of a robust Windows secret store.
 
 ---
 
-## 3. Architekturentscheidungen
+## 2. Platform-Specific Spots Found
 
-### 3.1 Plattform-Adapter statt `if (platform)`-Spaghetti
+| # | File:Line | Problem | Severity |
+|---|-----------|---------|----------|
+| 1 | `package.json:12` | Build script uses `cp`, `rm -rf`, `mkdir -p` (Unix-only). | Blocker |
+| 2 | `electron-builder.yml:9-12` | Only `mac:` target configured, no `win:`. | Blocker |
+| 3 | `src/main/main.ts:118` | `setAlwaysOnTop(true, 'floating')` — below the taskbar on Windows. | Blocker |
+| 4 | `src/main/tray.ts:82-84` | `setTemplateImage(true)` and `tray-iconTemplate.png` are macOS-only. | Blocker |
+| 5 | `src/main/mrr/keychain.ts:54-85` | Uses the macOS `security` CLI to read/write/delete secrets. | Blocker |
+| 6 | `src/main/usage/paths.ts:40` | XDG path `~/.config/claude` is not documented on Windows. | Medium |
+| 7 | `src/main/atomic-file.ts:18` | `fs.renameSync` can fail on Windows with transient locks (`EPERM`). | Medium |
+| 8 | `.github/workflows/ci.yml:17` | CI runs only on `ubuntu-latest`. | Medium |
+| 9 | `src/renderer/renderer.ts:81-82` | Canvas works in logical pixels; possibly blurry on Windows HiDPI. | Low-Medium |
+| 10 | `assets/tray-iconTemplate.png` | No Windows icon asset (`.ico`/colored PNG). | Medium |
 
-Für Keychain, Usage-Paths und ggf. Overlay/Tray werden kleine Adapter-Module
-eingeführt:
+---
+
+## 3. Architecture Decisions
+
+### 3.1 Platform Adapters Instead of `if (platform)` Spaghetti
+
+Small adapter modules are introduced for Keychain, usage paths, and
+possibly overlay/tray:
 
 ```text
-src/main/mrr/keychain.ts          → Interface + Factory
-src/main/mrr/keychain-darwin.ts   → bestehende security-CLI-Logik
+src/main/mrr/keychain.ts          → interface + factory
+src/main/mrr/keychain-darwin.ts   → existing security-CLI logic
 src/main/mrr/keychain-win32.ts    → Windows secure storage
-src/main/usage/paths.ts           → plattformabhängige Defaults beibehalten/erweitern
+src/main/usage/paths.ts           → keep/extend platform-dependent defaults
 ```
 
-Vorteil: Testbarkeit, klare Trennung, spätere Erweiterbarkeit.
+Advantage: testability, clear separation, future extensibility.
 
-### 3.2 Secret-Storage auf Windows
+### 3.2 Secret Storage on Windows
 
-Optionen:
+Options:
 
-| Option | Umsetzung | Vor- / Nachteile |
-|--------|-----------|------------------|
-| A. Windows Credential Manager | PowerShell `CredentialManager`-Modul oder `cmdkey.exe` + ggf. kleiner Native-Addon | Nativer Store, CLI-Abhängigkeit, komplexere Tests, Lesen von Secrets eingeschränkt. |
-| B. `electron.safeStorage` + verschlüsselte JSON im `userData` | DPAPI-verschlüsselt, keine externe CLI | Einfach, keine neue Dependency, verstößt historisch gegen CLAUDE.md („secrets never in app-support dir“) — erfordert ADR/Scope-Update. |
-| C. `keytar`-ähnliche Dependency | Würde native Bindings erfordern; CLAUDE.md erschwert neue Dependencies. | Vermeiden. |
+| Option | Implementation | Pros / Cons |
+|--------|----------------|-------------|
+| A. Windows Credential Manager | PowerShell `CredentialManager` module or `cmdkey.exe` + possibly a small native addon | Native store, CLI dependency, more complex tests, restricted reading of secrets. |
+| B. `electron.safeStorage` + encrypted JSON in `userData` | DPAPI-encrypted, no external CLI | Simple, no new dependency, historically violates CLAUDE.md ("secrets never in app-support dir") — requires ADR/scope update. |
+| C. `keytar`-like dependency | Would require native bindings; CLAUDE.md makes new dependencies difficult. | Avoid. |
 
-**Empfehlung:** Option A (Windows Credential Manager) als primärer Weg prüfen;
-Option B (`safeStorage`) als dokumentierter Fallback, falls Option A zu
-instabil oder zu aufwändig ist.
+**Recommendation:** evaluate Option A (Windows Credential Manager) as the
+primary path; Option B (`safeStorage`) as a documented fallback if Option A
+proves too unstable or too costly.
 
-### 3.3 Overlay-Verhalten auf Windows
+### 3.3 Overlay Behavior on Windows
 
-**Entscheidung:** Der Biber darf niemals hinter der Windows-Taskleiste
-verschwinden. Er muss immer sauber sichtbar sein und am unteren Bildschirmrand
-laufen, ohne verdeckt zu werden — auch bei Auto-Hide-Taskleiste und bei
-Taskleisten an beliebiger Position (unten, oben, links, rechts).
+**Decision:** The beaver must never disappear behind the Windows taskbar.
+It must always remain cleanly visible and walk along the bottom screen edge
+without being covered — even with an auto-hide taskbar and with taskbars
+at any position (bottom, top, left, right).
 
-Umsetzung:
+Implementation:
 
-- Auf macOS: `setAlwaysOnTop(true, 'floating')` beibehalten.
-- Auf Windows: `setAlwaysOnTop(true, 'normal')` oder `'pop-up-menu'` verwenden,
-  um das Overlay über normalen Fenstern zu halten, ohne Screensaver-Ebene zu
-  erreichen.
-- Die Roaming-Bounds und Hatch-Position orientieren sich nicht an der
-  Bildschirmauflösung, sondern an der tatsächlich verfügbaren Arbeitsfläche
-  **abzüglich Taskleiste**.
-- Taskleisten-Detektion:
-  - Primär: `screen.getPrimaryDisplay().workArea` vs. `bounds` vergleichen.
-  - Sekundär (falls `workArea` bei Auto-Hide ungenau ist): Windows-AppBar/
-    Taskleisten-API nutzen, um die reservierte Taskleisten-Region zu ermitteln.
-- Bei Änderungen der Taskleisten-Sichtbarkeit/Position wird die workArea neu
-  berechnet und der Biber sanft in die verfügbare Fläche zurückgeführt (kein
-  Sprung, sondern neues Roaming-Ziel oberhalb der Taskleiste).
-- `skipTaskbar: true`, `focusable: false`, `transparent: true` beibehalten.
-- Akzeptanztest: Klick-Through, kein Fokus-Diebstahl, kein Taskleisten-Eintrag,
-  Biber bleibt immer über/sichtbar neben der Taskleiste, Überleben von
-  Vollbild-Anwendungen.
+- On macOS: keep `setAlwaysOnTop(true, 'floating')`.
+- On Windows: use `setAlwaysOnTop(true, 'normal')` or `'pop-up-menu'` to
+  keep the overlay above normal windows without reaching the screensaver
+  level.
+- The roaming bounds and hatch position are based not on the screen
+  resolution but on the actually available work area **minus the taskbar**.
+- Taskbar detection:
+  - Primary: compare `screen.getPrimaryDisplay().workArea` vs. `bounds`.
+  - Secondary (if `workArea` is inaccurate with auto-hide): use the Windows
+    AppBar/taskbar API to determine the reserved taskbar region.
+- When taskbar visibility/position changes, the workArea is recalculated
+  and the beaver is gently guided back into the available area (no jump,
+  but a new roaming target above the taskbar).
+- Keep `skipTaskbar: true`, `focusable: false`, `transparent: true`.
+- Acceptance test: click-through, no focus stealing, no taskbar entry,
+  beaver always stays above/visible next to the taskbar, survives
+  full-screen applications.
 
-### 3.4 Build-Script
+### 3.4 Build Script
 
-Ein neues Node-Skript `scripts/build-assets.js` ersetzt die Unix-Kette:
+A new Node script `scripts/build-assets.js` replaces the Unix chain:
 
 ```js
 fs.rmSync('dist/renderer/assets/sprites', { recursive: true, force: true });
@@ -134,7 +133,7 @@ fs.cpSync('src/renderer/index.html', 'dist/renderer/index.html');
 fs.cpSync('src/main/mrr/settings.html', 'dist/main/mrr/settings.html');
 ```
 
-`package.json` Build-Script verkürzt sich auf:
+The `package.json` build script shortens to:
 
 ```json
 "build": "tsc && tsc -p src/renderer/tsconfig.json && node scripts/build-assets.js"
@@ -142,7 +141,7 @@ fs.cpSync('src/main/mrr/settings.html', 'dist/main/mrr/settings.html');
 
 ### 3.5 Packaging & Icons
 
-`electron-builder.yml` erweitern:
+Extend `electron-builder.yml`:
 
 ```yaml
 win:
@@ -153,468 +152,463 @@ win:
   publisherName: AI Beavers
 ```
 
-**Icons (vorläufig):**
+**Icons (provisional):**
 
-- Es gibt noch kein finales Master-Icon.
-- Vorerst wird `assets/icon.ico` und ein farbiges `assets/tray-icon.png` aus den
-  bestehenden Sprite-Assets (z. B. `assets/sprites/beaver-baby.png` oder
-  `assets/sprites/lodge.png`) generiert.
-- Tray-Icon = gleiches Beaver-Icon in Farbe (Entscheidung Punkt 5).
-- Später muss ein Design-Gate ein echtes, hochauflösendes Master-Icon liefern
-  und die generierten Icons ersetzen.
+- There is no final master icon yet.
+- For now, `assets/icon.ico` and a colored `assets/tray-icon.png` are
+  generated from the existing sprite assets (e.g.
+  `assets/sprites/beaver-baby.png` or `assets/sprites/lodge.png`).
+- Tray icon = same beaver icon in color (decision point 5).
+- Later, a design gate must deliver a real, high-resolution master icon and
+  replace the generated icons.
 
-**Code-Signing:**
+**Code signing:**
 
-- Vorerst Out-of-Scope (Entscheidung Punkt 6).
-- Der NSIS/Portable-Installer wird unsigniert erzeugt; Windows Defender
-  SmartScreen-Warnung wird akzeptiert.
-- Echtes Code-Signing kann später als eigenes Build-Item nachgereicht werden.
+- Out of scope for now (decision point 6).
+- The NSIS/portable installer is produced unsigned; the Windows Defender
+  SmartScreen warning is accepted.
+- Real code signing can be submitted later as its own build item.
 
-### 3.6 Usage-Log-Pfade
+### 3.6 Usage Log Paths
 
-- Legacy-Pfad `~/.claude` bleibt erhalten und funktioniert auf Windows
-  automatisch (`%USERPROFILE%\.claude`).
-- XDG-Pfad `~/.config/claude` wird auf Windows nicht geprüft, da nicht
-  dokumentiert.
-- `CLAUDE_CONFIG_DIR` bleibt als Override mit höchster Priorität.
-- **Codex-Tracking auf Windows ist vorerst zurückgestellt** (siehe
-  „Verschobene Aufgaben“).
+- The legacy path `~/.claude` remains and works on Windows automatically
+  (`%USERPROFILE%\.claude`).
+- The XDG path `~/.config/claude` is not checked on Windows, since it is
+  not documented.
+- `CLAUDE_CONFIG_DIR` remains the highest-priority override.
+- **Codex tracking on Windows is deferred for now** (see "Deferred Tasks").
 
-### 3.7 HiDPI/Scaling auf Windows
+### 3.7 HiDPI/Scaling on Windows
 
-**Entscheidung:** Der Renderer skaliert das Canvas physikalisch um den
-`devicePixelRatio` (DPR), während alle Spielwelt-Koordinaten (Roaming, Hatch,
-Bubble, Dirty Rects) in logischen Pixeln bleiben.
+**Decision:** The renderer scales the canvas physically by the
+`devicePixelRatio` (DPR), while all game-world coordinates (roaming, hatch,
+bubble, dirty rects) stay in logical pixels.
 
-Umsetzung:
+Implementation:
 
-- `canvas.width`/`canvas.height` = `logicalBounds * DPR` (gerundet).
-- `canvas.style.width`/`canvas.style.height` = logische Bounds.
-- `ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` statt kumulativer `scale()`.
-- `ctx.imageSmoothingEnabled = false` bleibt aktiv.
-- `bounds()` gibt logische Bounds zurück; kein Code interpretiert
-  `canvas.width/height` als logische Größe.
-- `ctx.clearRect(0, 0, bounds().width, bounds().height)` löscht den gesamten
-  physikalischen Canvas durch die transformierte logische Größe.
-- DPR-Änderungen werden zusätzlich zu `onBoundsChanged` über einen
-  `window.resize`-Listener erfasst, der `window.devicePixelRatio` mit dem
-  zuletzt bekannten Wert vergleicht.
+- `canvas.width`/`canvas.height` = `logicalBounds * DPR` (rounded).
+- `canvas.style.width`/`canvas.style.height` = logical bounds.
+- `ctx.setTransform(dpr, 0, 0, dpr, 0, 0)` instead of cumulative `scale()`.
+- `ctx.imageSmoothingEnabled = false` stays active.
+- `bounds()` returns logical bounds; no code interprets
+  `canvas.width/height` as a logical size.
+- `ctx.clearRect(0, 0, bounds().width, bounds().height)` clears the entire
+  physical canvas through the transformed logical size.
+- DPR changes are detected in addition to `onBoundsChanged` via a
+  `window.resize` listener that compares `window.devicePixelRatio` with the
+  last known value.
 
 ---
 
-## 4. Build-Items (Reihenfolge)
+## 4. Build Items (Order)
 
-### BL-WIN-1: Build-Scripts plattformunabhängig ✅
-- **Scope:** `package.json`, neues `scripts/build-assets.js`.
-- **Akzeptanz:** `npm run build` läuft unter Windows cmd/PowerShell, macOS und Linux identisch.
-- **Abhängigkeiten:** Keine.
-- **Status:** Abgeschlossen. `package.json:build` ruft nun `node scripts/build-assets.js` auf; alle Assets werden plattformunabhängig via `node:fs`/`node:path` kopiert.
+### BL-WIN-1: Platform-Independent Build Scripts ✅
+- **Scope:** `package.json`, new `scripts/build-assets.js`.
+- **Acceptance:** `npm run build` runs identically on Windows cmd/PowerShell, macOS, and Linux.
+- **Dependencies:** None.
+- **Status:** Completed. `package.json:build` now calls `node scripts/build-assets.js`; all assets are copied platform-independently via `node:fs`/`node:path`.
 
-### BL-WIN-2: electron-builder Windows-Konfiguration ✅
-- **Scope:** `electron-builder.yml`, Windows-Icon-Assets.
-- **Akzeptanz:** `electron-builder --win` erzeugt `.exe`/`.nsis`-Installer; App zeigt Icon im Installer/Explorer.
-- **Abhängigkeiten:** BL-WIN-1.
-- **Status:** Abgeschlossen. `win:`-Target mit `nsis` + `portable`, `assets/icon.ico` und `assets/tray-icon.png` hinzugefügt. `author` in `package.json` auf "AI Beavers" gesetzt (Herausgeber für Windows-Installer).
+### BL-WIN-2: electron-builder Windows Configuration ✅
+- **Scope:** `electron-builder.yml`, Windows icon assets.
+- **Acceptance:** `electron-builder --win` produces `.exe`/`.nsis` installers; app shows icon in the installer/Explorer.
+- **Dependencies:** BL-WIN-1.
+- **Status:** Completed. Added `win:` target with `nsis` + `portable`, `assets/icon.ico`, and `assets/tray-icon.png`. Set `author` in `package.json` to "AI Beavers" (publisher for the Windows installer).
 
-### BL-WIN-3: Overlay-Windows-Adapter ✅
+### BL-WIN-3: Overlay Windows Adapter ✅
 - **Scope:** `src/main/overlay-adapter.ts`, `src/main/main.ts`, `src/main/ipc-channels.ts`,
   `src/main/preload.ts`, `src/renderer/renderer.ts`, `src/renderer/roam.ts`.
-- **Akzeptanz:**
-  - Plattformabhängiger `setAlwaysOnTop`-Aufruf.
-  - Taskleiste wird erkannt und die verfügbare Arbeitsfläche wird an die
-    Taskleisten-Region angepasst.
-  - Biber bleibt bei sichtbarer Taskleiste am unteren Rand sichtbar und wird nicht
-    von der Taskleiste verdeckt.
-  - Smoke-Test bestätigt Klick-Through und keinen Fokus-Diebstahl.
-- **Abhängigkeiten:** Keine.
-- **Status:** Abgeschlossen. `configureAlwaysOnTop` wählt auf macOS `floating`, auf
-  Windows/Linux `normal`. `fitWindowToWorkArea` richtet das Fenster auf die Work-Area
-  des primären Displays aus; Änderungen werden dedupliziert und über `state:bounds`
-  an den Renderer gesendet.
+- **Acceptance:**
+  - Platform-dependent `setAlwaysOnTop` call.
+  - The taskbar is detected and the available work area is adjusted to the
+    taskbar region.
+  - The beaver stays visible at the bottom edge when the taskbar is visible and
+    is not covered by the taskbar.
+  - Smoke test confirms click-through and no focus stealing.
+- **Dependencies:** None.
+- **Status:** Completed. `configureAlwaysOnTop` selects `floating` on macOS and
+  `normal` on Windows/Linux. `fitWindowToWorkArea` aligns the window with the
+  work area of the primary display; changes are deduplicated and sent to the
+  renderer via `state:bounds`.
 
-### BL-WIN-4: Tray-Windows-Adapter ✅
-- **Scope:** `src/main/tray.ts`, Windows-Tray-Asset.
-- **Akzeptanz:** Unter Windows wird farbiges `.ico`/PNG geladen; unter macOS bleibt Template-Image-Verhalten erhalten; Tray-Menü funktioniert.
-- **Abhängigkeiten:** BL-WIN-2 (für Asset).
-- **Status:** Abgeschlossen. `loadTrayIcon` lädt auf Windows/Linux `assets/tray-icon.png`
-  und ruft `setTemplateImage` nur auf macOS auf.
+### BL-WIN-4: Tray Windows Adapter ✅
+- **Scope:** `src/main/tray.ts`, Windows tray asset.
+- **Acceptance:** On Windows a colored `.ico`/PNG is loaded; on macOS the template-image behavior is preserved; tray menu works.
+- **Dependencies:** BL-WIN-2 (for the asset).
+- **Status:** Completed. `loadTrayIcon` loads `assets/tray-icon.png` on Windows/Linux
+  and calls `setTemplateImage` only on macOS.
 
-### BL-WIN-5: Claude-Usage-Log-Path-Windows-Adapter ✅
+### BL-WIN-5: Claude Usage Log Path Windows Adapter ✅
 - **Scope:** `src/main/usage/paths.ts`, `paths.test.ts`.
-- **Akzeptanz:** `discoverPaths()` funktioniert auf Windows für Claude Code
-  (`%USERPROFILE%\.claude`, ggf. `CLAUDE_CONFIG_DIR`); XDG-Pfad wird auf Windows
-  ignoriert; Codex-Pfade bleiben unverändert (vorerst zurückgestellt, siehe
-  „Verschobene Aufgaben“).
-- **Abhängigkeiten:** Keine.
-- **Status:** Abgeschlossen. `discoverPaths` erhält einen optionalen `platform`-Parameter;
-  auf `win32` wird nur `~/.claude` geprüft, auf `darwin`/`linux` bleibt XDG + Legacy erhalten.
-  `CLAUDE_CONFIG_DIR` bleibt Override mit höchster Priorität und akzeptiert zusätzlich
-  zum Komma auch Semikolon als Trennzeichen.
+- **Acceptance:** `discoverPaths()` works on Windows for Claude Code
+  (`%USERPROFILE%\.claude`, possibly `CLAUDE_CONFIG_DIR`); the XDG path is
+  ignored on Windows; Codex paths remain unchanged (deferred for now, see
+  "Deferred Tasks").
+- **Dependencies:** None.
+- **Status:** Completed. `discoverPaths` gains an optional `platform` parameter;
+  on `win32` only `~/.claude` is checked; on `darwin`/`linux` XDG + legacy are preserved.
+  `CLAUDE_CONFIG_DIR` remains the highest-priority override and additionally
+  accepts semicolons as separators alongside commas.
 
-### BL-WIN-6: Keychain-Windows-Adapter ⏸️ ZURÜCKGESTELLT
-- **Status:** Zurückgestellt / Offen — Admin-Entscheidung ausstehend.
-- **Begründung:** Muss mit dem Projekt-Administrator besprochen und detailliert
-  geplant werden (Credential Manager vs. `safeStorage` vs. andere Lösung).
-- **Scope:** `src/main/mrr/keychain.ts` → Adapter, `keychain-darwin.ts`,
-  `keychain-win32.ts`, Tests.
-- **Akzeptanz:** Interface-basierte Implementierung; Windows-Variante
-  speichert/liest/löscht Secrets robust; `--keychain-service` QA-Flag bleibt
-  erhalten.
-- **Abhängigkeiten:** Entscheidung durch Projekt-Administrator.
-- **Auswirkung:** Der MRR-Mode (Stripe/RevenueCat) ist auf Windows vorerst nicht
-  verfügbar. Die App ist ohne Credentials voll funktionsfähig (Overlay, Tray,
-  Animationen, Token-Tracking).
+### BL-WIN-6: Keychain Windows Adapter ⏸️ DEFERRED
+- **Status:** Deferred / open — admin decision pending.
+- **Rationale:** Must be discussed and planned in detail with the project
+  administrator (Credential Manager vs. `safeStorage` vs. another solution).
+- **Scope:** `src/main/mrr/keychain.ts` → adapter, `keychain-darwin.ts`,
+  `keychain-win32.ts`, tests.
+- **Acceptance:** Interface-based implementation; the Windows variant
+  stores/reads/deletes secrets robustly; the `--keychain-service` QA flag is
+  preserved.
+- **Dependencies:** Decision by the project administrator.
+- **Impact:** MRR mode (Stripe/RevenueCat) is not available on Windows for now.
+  The app is fully functional without credentials (overlay, tray, animations,
+  token tracking).
 
-### BL-WIN-7: Atomares Schreiben auf Windows ✅
-- **Status:** Abgeschlossen.
-- **Begründung:** `fs.renameSync` kann auf Windows bei transienten Locks (`EPERM`)
-  fehlschlagen. Eine asynchrone Retry-Logik mit kurzem Backoff bietet eine
-  pragmatische, dependency-freie Lösung.
-- **Scope:** `src/main/atomic-file.ts` und alle synchronen Aufrufer (`saveOnboardingState`,
+### BL-WIN-7: Atomic Writes on Windows ✅
+- **Status:** Completed.
+- **Rationale:** `fs.renameSync` can fail on Windows with transient locks
+  (`EPERM`). An asynchronous retry logic with a short backoff offers a
+  pragmatic, dependency-free solution.
+- **Scope:** `src/main/atomic-file.ts` and all synchronous callers (`saveOnboardingState`,
   `saveState`, `saveSettingsState`, `XpEngine`).
-- **Akzeptanz:** State-Dateien werden auf Windows robust persistiert; Lösung ist
-  dokumentiert und getestet.
-- **Ergebnis:** `atomicWriteFile` ist jetzt `async`, verwendet `fs.promises.writeFile` +
-  `fs.promises.rename`, wiederholt den Rename bis zu 4-mal mit Delays `[0, 10, 50, 100]` ms
-  bei `EPERM`/`EBUSY`, und bereinigt die Temp-Datei im `finally`. Alle Aufrufer und Tests
-  wurden auf `async` umgestellt; `src/main/atomic-file.test.ts` wurde neu erstellt.
+- **Acceptance:** State files are persisted robustly on Windows; the solution is
+  documented and tested.
+- **Result:** `atomicWriteFile` is now `async`, uses `fs.promises.writeFile` +
+  `fs.promises.rename`, retries the rename up to 4 times with delays of
+  `[0, 10, 50, 100]` ms on `EPERM`/`EBUSY`, and cleans up the temp file in
+  `finally`. All callers and tests were converted to `async`;
+  `src/main/atomic-file.test.ts` was newly created.
 
 ### BL-WIN-8: Renderer HiDPI / Scaling ✅
 - **Scope:** `src/renderer/renderer.ts`, `src/renderer/canvas-dpr.ts`,
   `src/renderer/canvas-dpr.test.ts`, `src/renderer/renderer.test.ts`.
-- **Akzeptanz:** Overlay bleibt auf 125 %/150 %/200 % Windows-Skalierung scharf;
-  Pixel-Art bleibt nearest-neighbor; logische Bounds für Roaming/Hatch/Bubble
-  bleiben erhalten; DPR-Änderungen ohne Fenster-Resize werden erkannt.
-- **Abhängigkeiten:** BL-WIN-3.
-- **Status:** Abgeschlossen. `applyDpr` kapselt die DPR-Mathematik in einer
-  testbaren Hilfsdatei; `bounds()` gibt logische Pixel zurück; `clearRect`
-  verwendet logische Bounds; ein `window.resize`-Listener erfasst reine
-  DPR-Änderungen. 200 % Skalierung ist integer-scharf; 125 %/150 % zeigen
-  keine Bilinear-Unschärfe, können aber ein leicht ungleichmäßiges Pixel-Raster
-  aufweisen.
+- **Acceptance:** The overlay stays sharp at 125%/150%/200% Windows scaling;
+  pixel art remains nearest-neighbor; logical bounds for roaming/hatch/bubble
+  are preserved; DPR changes without a window resize are detected.
+- **Dependencies:** BL-WIN-3.
+- **Status:** Completed. `applyDpr` encapsulates the DPR math in a testable
+  helper file; `bounds()` returns logical pixels; `clearRect` uses logical
+  bounds; a `window.resize` listener captures pure DPR changes. 200% scaling
+  is integer-sharp; 125%/150% show no bilinear blur but may exhibit a
+  slightly uneven pixel grid.
 
-### BL-WIN-9: CI-Windows-Runner ✅
+### BL-WIN-9: CI Windows Runner ✅
 - **Scope:** `.github/workflows/ci.yml`.
-- **Akzeptanz:** CI-Matrix enthält `windows-latest`; `typecheck`, `lint`, `test`, `npm run build` und `electron-builder --win --publish never` sind grün.
-- **Abhängigkeiten:** BL-WIN-1, BL-WIN-2.
-- **Status:** Abgeschlossen. Matrix läuft auf `ubuntu-latest` und `windows-latest` mit `fail-fast: false`; Windows-Artifakte werden als GitHub Actions Artifacts hochgeladen.
+- **Acceptance:** CI matrix includes `windows-latest`; `typecheck`, `lint`, `test`, `npm run build`, and `electron-builder --win --publish never` are green.
+- **Dependencies:** BL-WIN-1, BL-WIN-2.
+- **Status:** Completed. The matrix runs on `ubuntu-latest` and `windows-latest` with `fail-fast: false`; Windows artifacts are uploaded as GitHub Actions artifacts.
 
-### BL-WIN-10: Dokumentation & Design-Gate ✅
+### BL-WIN-10: Documentation & Design Gate ✅
 - **Scope:** `README.md`, `PRD.md`, `CLAUDE.md`,
   `docs/design-reviews/phase-4-windows/verdict.md`.
-- **Akzeptanz:** README/PRD/CLAUDE spiegeln macOS + Windows wider; Design-Gate für
-  Windows-Icons und HiDPI abgeschlossen; Screenshots/Verdict liegen vor.
-- **Abhängigkeiten:** BL-WIN-2, BL-WIN-4, BL-WIN-8.
-- **Status:** Abgeschlossen. Dokumentation um HiDPI-Hinweise, Troubleshooting
-  und Design-Gate-Kriterien ergänzt. Verdict bewertet die vorläufigen
-  Sprite-generierten Icons als „CONDITIONAL PASS“; ein professionelles
-  Master-Icon bleibt als bekanntes Follow-up offen.
+- **Acceptance:** README/PRD/CLAUDE reflect macOS + Windows; design gate for
+  Windows icons and HiDPI completed; screenshots/verdict available.
+- **Dependencies:** BL-WIN-2, BL-WIN-4, BL-WIN-8.
+- **Status:** Completed. Documentation supplemented with HiDPI notes,
+  troubleshooting, and design-gate criteria. The verdict rates the provisional
+  sprite-generated icons as "CONDITIONAL PASS"; a professional master icon
+  remains open as a known follow-up.
 
 ---
 
-## 5. Risiken & offene Fragen
+## 5. Risks & Open Questions
 
-| Risiko | Auswirkung | Mitigation |
-|--------|------------|------------|
-| Overlay-Z-Order auf Windows | Biber hinter Taskleiste oder über Vollbild-Apps. | Smoke-Tests mit verschiedenen Levels (`pop-up-menu`, `screen-saver`). |
-| Windows Secret-Store noch nicht entschieden. | MRR-Mode auf Windows vorerst nicht nutzbar. | Mit Projekt-Administrator abstimmen; bis dahin MRR-Mode auf Windows deaktiviert lassen. |
-| Codex-Usage-Tracking auf Windows zurückgestellt. | Token-Burn-Tracker auf Windows berücksichtigt vorerst nur Claude Code. | Recherche/Testinstallation; späteres Build-Item. |
-| HiDPI-Scaling bei 125 %/150 % zeigt ungleichmäßiges Pixel-Raster. | Visuelle Qualität leidet leicht bei nicht-integer-DPR. | Akzeptiert: kein bilinearer Blur, 200 % ist integer-scharf. |
-| Neue Dependencies verstoßen gegen CLAUDE.md. | Review-Blocker. | Keine neuen Dependencies für Build/Keychain; nur falls absolut nötig, mit Lizenz + Begründung. |
-| Atomares Schreiben auf Windows noch nicht final gelöst. | State-Dateien können kurzzeitig nicht geschrieben werden. | Recherche nach Windows-nativer Lösung (BL-WIN-7). |
-| Node-Version-Mismatch (Projekt will 24.x, lokale Umgebung hat 22.x). | Build-Warnungen, potenzielle Inkompatibilitäten. | Für Windows-CI Node 24.x vorsehen; Entwicklungsumgebung anpassen. |
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| Overlay z-order on Windows | Beaver behind the taskbar or above full-screen apps. | Smoke tests with different levels (`pop-up-menu`, `screen-saver`). |
+| Windows secret store not yet decided. | MRR mode not usable on Windows for now. | Align with the project administrator; keep MRR mode disabled on Windows until then. |
+| Codex usage tracking on Windows deferred. | Token-burn tracker on Windows only covers Claude Code for now. | Research/test installation; later build item. |
+| HiDPI scaling at 125%/150% shows an uneven pixel grid. | Visual quality suffers slightly at non-integer DPR. | Accepted: no bilinear blur, 200% is integer-sharp. |
+| New dependencies violate CLAUDE.md. | Review blocker. | No new dependencies for build/keychain; only if absolutely necessary, with license + rationale. |
+| Atomic writes on Windows not yet finally solved. | State files may temporarily fail to be written. | Research a Windows-native solution (BL-WIN-7). |
+| Node version mismatch (project wants 24.x, local environment has 22.x). | Build warnings, potential incompatibilities. | Provide Node 24.x for Windows CI; adjust the development environment. |
 
 ---
 
-## 6. Empfohlene Vorgehensweise
+## 6. Recommended Approach
 
-1. **Sofort:** Recherche der Windows-Log-Pfade für Codex (blockiert BL-WIN-5).
-2. **Erste Umsetzung:** BL-WIN-1 + BL-WIN-2 + BL-WIN-9 (Build, Packaging, CI),
-   damit Windows-Entwicklung und -Packaging überhaupt möglich sind.
-3. **Danach:** BL-WIN-3 + BL-WIN-4 (Overlay/Tray), dann BL-WIN-5 (Paths).
+1. **Immediately:** Research the Windows log paths for Codex (blocks BL-WIN-5).
+2. **First implementation:** BL-WIN-1 + BL-WIN-2 + BL-WIN-9 (build, packaging, CI),
+   so that Windows development and packaging are possible at all.
+3. **Then:** BL-WIN-3 + BL-WIN-4 (overlay/tray), then BL-WIN-5 (paths).
 4. **Polish:** BL-WIN-8 + BL-WIN-10.
-5. **Später (nach Recherche):** BL-WIN-7 (Atomares Schreiben).
-6. **Später (nach Administrator-Abstimmung):** BL-WIN-6 (Keychain/Secrets) und
-   MRR-Mode-Aktivierung auf Windows.
+5. **Later (after research):** BL-WIN-7 (atomic writes).
+6. **Later (after administrator alignment):** BL-WIN-6 (keychain/secrets) and
+   MRR mode activation on Windows.
 
 ---
 
-## 7. Milestones & Phasen
+## 7. Milestones & Phases
 
-| Phase | Milestone | Build-Items | Ziel |
+| Phase | Milestone | Build Items | Goal |
 |-------|-----------|-------------|------|
-| **Phase 1** | **Foundation** | BL-WIN-1, BL-WIN-2, BL-WIN-9 | App lässt sich auf Windows bauen, packen und in der CI testen. |
-| **Phase 2** | **Core Windows Experience** | BL-WIN-3, BL-WIN-4 | Overlay und Tray funktionieren nativ auf Windows; Biber bleibt immer sichtbar, auch bei Taskleiste. |
-| **Phase 3** | **Windows Integrations** | BL-WIN-5 | Claude-Code-Usage-Tracking funktioniert auf Windows. |
-| **Phase 4** | **Polish & Release-Readiness** | BL-WIN-8, BL-WIN-10 | HiDPI/Scaling, Icons, Doku, Design-Gate. |
-| **Phase 5** | **Deferred / Follow-up** | BL-WIN-6, BL-WIN-7, Codex-Tracking | Secrets/MRR, atomares Schreiben, Codex-Tracking — nach Abstimmung/Recherche. |
+| **Phase 1** | **Foundation** | BL-WIN-1, BL-WIN-2, BL-WIN-9 | The app can be built, packaged, and tested in CI on Windows. |
+| **Phase 2** | **Core Windows Experience** | BL-WIN-3, BL-WIN-4 | Overlay and tray work natively on Windows; the beaver always stays visible, even with a taskbar. |
+| **Phase 3** | **Windows Integrations** | BL-WIN-5 | Claude Code usage tracking works on Windows. |
+| **Phase 4** | **Polish & Release Readiness** | BL-WIN-8, BL-WIN-10 | HiDPI/scaling, icons, docs, design gate. |
+| **Phase 5** | **Deferred / Follow-up** | BL-WIN-6, BL-WIN-7, Codex tracking | Secrets/MRR, atomic writes, Codex tracking — after alignment/research. |
 
 ### Phase 1: Foundation (BL-WIN-1, BL-WIN-2, BL-WIN-9) ✅
 
-**Ziel:** Windows-Build und -Packaging ist stabil.
+**Goal:** Windows build and packaging are stable.
 
-**Status:** Abgeschlossen am 2026-07-15.
+**Status:** Completed on 2026-07-15.
 
-1. **BL-WIN-1** — Build-Scripts plattformunabhängig (`scripts/build-assets.js`).
-2. **BL-WIN-2** — `electron-builder.yml` Windows-Target + Icons.
-3. **BL-WIN-9** — CI-Matrix um `windows-latest` erweitern, inkl. `npm run build`
-   und `electron-builder --win --publish never`.
+1. **BL-WIN-1** — platform-independent build scripts (`scripts/build-assets.js`).
+2. **BL-WIN-2** — `electron-builder.yml` Windows target + icons.
+3. **BL-WIN-9** — extend the CI matrix with `windows-latest`, incl. `npm run build`
+   and `electron-builder --win --publish never`.
 
-**Akzeptanz:** `npm run build` und Packaging laufen lokal und in der CI auf
-Windows durch.
+**Acceptance:** `npm run build` and packaging run locally and in CI on
+Windows.
 
-**Ergebnisse:**
-- `npm run build`, `npm run typecheck`, `npm run lint` und `npm test` laufen lokal
-  auf Windows (Node 22.x) und in der CI (Node 24.x) erfolgreich durch.
-- `npx electron-builder --win --publish never` erzeugt `release/Beaver Buddy Setup 0.1.0.exe`
-  (NSIS-Installer) und `release/Beaver Buddy 0.1.0.exe` (portable Version).
-- Nach Bereinigung unerwünschter ZIP-Artefakte aus `assets/sprites/` beträgt die
-  Installer-Größe ca. 95 MB pro `.exe`.
-- Alle 32 Test-Dateien bestehen auf Windows (292 passed, 6 skipped).
+**Results:**
+- `npm run build`, `npm run typecheck`, `npm run lint`, and `npm test` run
+  successfully locally on Windows (Node 22.x) and in CI (Node 24.x).
+- `npx electron-builder --win --publish never` produces `release/Beaver Buddy Setup 0.1.0.exe`
+  (NSIS installer) and `release/Beaver Buddy 0.1.0.exe` (portable version).
+- After cleaning up unwanted ZIP artifacts from `assets/sprites/`, the
+  installer size is approx. 95 MB per `.exe`.
+- All 32 test files pass on Windows (292 passed, 6 skipped).
 
-**Verbleibende Hinweise:**
-- Der visuelle Smoke-Test des Icons im Installer/Explorer/Task-Manager ist ein
-  manueller Schritt, der noch nachgeholt werden sollte.
-- Der macOS-Build (`electron-builder --mac`) konnte lokal nicht verifiziert
-  werden, da die Umgebung Windows ist; eine Prüfung auf macOS-Hardware oder in
-  einer macOS-CI bleibt empfohlen.
-- Die lokale Entwicklungsumgebung läuft auf Node 22.x, während das Projekt
-  Node 24.x vorsieht; `npm ci` warnt, bricht aber nicht ab. Eine Anhebung der
-  lokalen Node-Version sollte außerhalb der Phase erfolgen.
-- Doku-Updates an `CLAUDE.md`, `PRD.md`, `README.md`, `.gitignore` und
-  `docs/adr/002-cross-platform-scope.md` stammen aus der vorherigen
-  Planungsphase und sind nicht Teil der strikten BL-WIN-1/2/9-Build-Items.
+**Remaining notes:**
+- The visual smoke test of the icon in the installer/Explorer/Task Manager is a
+  manual step that should still be done.
+- The macOS build (`electron-builder --mac`) could not be verified locally
+  because the environment is Windows; a check on macOS hardware or in a
+  macOS CI remains recommended.
+- The local development environment runs Node 22.x, while the project
+  targets Node 24.x; `npm ci` warns but does not abort. Raising the local
+  Node version should happen outside this phase.
+- Doc updates to `CLAUDE.md`, `PRD.md`, `README.md`, `.gitignore`, and
+  `docs/adr/002-cross-platform-scope.md` come from the previous planning
+  phase and are not part of the strict BL-WIN-1/2/9 build items.
 
 ### Phase 2: Core Windows Experience (BL-WIN-3, BL-WIN-4) ✅
 
-**Ziel:** App startet auf Windows und fühlt sich nativ an.
+**Goal:** The app starts on Windows and feels native.
 
-1. **BL-WIN-3** — Overlay-Adapter mit Taskleisten-Erkennung.
-2. **BL-WIN-4** — Tray-Adapter mit Windows-farbigem Icon.
+1. **BL-WIN-3** — overlay adapter with taskbar detection.
+2. **BL-WIN-4** — tray adapter with Windows colored icon.
 
-**Akzeptanz:** Biber ist sichtbar, bleibt bei sichtbarer Taskleiste sichtbar, Tray-Menü
-funktioniert, keine Fokus-Diebstähle.
+**Acceptance:** The beaver is visible, stays visible when the taskbar is visible,
+the tray menu works, no focus stealing.
 
-**Status:** Abgeschlossen am 2026-07-15.
+**Status:** Completed on 2026-07-15.
 
-**Ergebnisse:**
-- `src/main/overlay-adapter.ts` wurde neu eingeführt: `detectTaskbarEdge`,
+**Results:**
+- `src/main/overlay-adapter.ts` was newly introduced: `detectTaskbarEdge`,
   `getPrimaryWorkAreaInfo`, `configureAlwaysOnTop`, `fitWindowToWorkArea`,
   `onWorkAreaChanged`.
-- `src/main/main.ts` verwendet den Adapter, dedupliziert WorkArea-Änderungen und
-  sendet Bounds über `state:bounds` an den Renderer.
-- `src/main/ipc-channels.ts` und `src/main/preload.ts` stellen den neuen
-  `onBoundsChanged`-Kanal bereit.
-- `src/renderer/renderer.ts` und `src/renderer/roam.ts` verwenden die expliziten
-  IPC-Bounds und klemmen den Roaming-State bei Größenänderungen in die neue
-  Work-Area.
-- `src/main/tray.ts` lädt auf Windows `assets/tray-icon.png` und auf macOS weiterhin
-  `assets/tray-iconTemplate.png` mit `setTemplateImage(true)`.
-- Neue Tests: `src/main/overlay-adapter.test.ts` (14 Tests),
-  `src/main/preload.test.ts` (3 Tests), `src/main/tray.test.ts` (+3 Tests).
+- `src/main/main.ts` uses the adapter, deduplicates workArea changes, and
+  sends bounds to the renderer via `state:bounds`.
+- `src/main/ipc-channels.ts` and `src/main/preload.ts` provide the new
+  `onBoundsChanged` channel.
+- `src/renderer/renderer.ts` and `src/renderer/roam.ts` use the explicit
+  IPC bounds and clamp the roaming state into the new work area on size
+  changes.
+- `src/main/tray.ts` loads `assets/tray-icon.png` on Windows and continues to
+  load `assets/tray-iconTemplate.png` with `setTemplateImage(true)` on macOS.
+- New tests: `src/main/overlay-adapter.test.ts` (14 tests),
+  `src/main/preload.test.ts` (3 tests), `src/main/tray.test.ts` (+3 tests).
 - `npm run typecheck`, `npm run lint`, `npm test` (312 passed, 6 skipped),
-  `npm run build` und `npx electron-builder --win --publish never` sind grün.
+  `npm run build`, and `npx electron-builder --win --publish never` are green.
 
-**Verbleibende Warnungen:**
-- **Auto-Hide-Limitation:** `detectTaskbarEdge` vergleicht `display.bounds` mit
-  `display.workArea`. Bei einer Auto-Hide-Taskleiste sind beide auf Windows oft
-  identisch, sodass die Taskleisten-Kante nicht erkannt wird. Das Overlay wird
-  dann auf die volle Bildschirmgröße ausgerichtet; der Biber kann kurzzeitig von
-  der eingeblendeten Taskleiste verdeckt werden. Eine robuste Lösung würde die
-  native Windows AppBar-API erfordern, was neue Dependencies bedeuten würde.
-- **Z-Order-Hardware-Test ausstehend:** `setAlwaysOnTop(true, 'normal')` ist die
-  konservative Startwahl für Windows. Ob diese über der sichtbaren Taskleiste
-  bleibt, kann nur auf echter Windows-Hardware verifiziert werden. Der
-  dokumentierte Fallback ist `setAlwaysOnTop(true, 'pop-up-menu')`.
-- **Tray-Icon-Kontrast:** Das farbige `assets/tray-icon.png` wurde nicht visuell auf
-  dunklen Windows-Taskleisten-Hintergründen geprüft. Phase 4 (BL-WIN-10/HiDPI)
-  sollte ein Design-Gate vorsehen.
+**Remaining warnings:**
+- **Auto-hide limitation:** `detectTaskbarEdge` compares `display.bounds` with
+  `display.workArea`. With an auto-hide taskbar, both are often identical on
+  Windows, so the taskbar edge is not detected. The overlay is then aligned to
+  the full screen size; the beaver can be briefly covered by the taskbar when
+  it slides in. A robust solution would require the native Windows AppBar API,
+  which would mean new dependencies.
+- **Z-order hardware test pending:** `setAlwaysOnTop(true, 'normal')` is the
+  conservative starting choice for Windows. Whether it stays above the visible
+  taskbar can only be verified on real Windows hardware. The documented
+  fallback is `setAlwaysOnTop(true, 'pop-up-menu')`.
+- **Tray icon contrast:** The colored `assets/tray-icon.png` was not visually
+  checked against dark Windows taskbar backgrounds. Phase 4 (BL-WIN-10/HiDPI)
+  should include a design gate.
 
 ### Phase 3: Windows Integrations (BL-WIN-5)
 
-**Ziel:** Token-Burn-Tracking funktioniert auf Windows.
+**Goal:** Token-burn tracking works on Windows.
 
-1. **BL-WIN-5** — Claude-Usage-Log-Pfade Windows-kompatibel machen.
+1. **BL-WIN-5** — make Claude usage log paths Windows-compatible.
 
-**Akzeptanz:** App findet `%USERPROFILE%\.claude` und wertet Logs korrekt aus.
+**Acceptance:** The app finds `%USERPROFILE%\.claude` and evaluates logs correctly.
 
-**Status:** Abgeschlossen am 2026-07-15.
+**Status:** Completed on 2026-07-15.
 
-**Ergebnisse:**
-- `src/main/usage/paths.ts` wurde angepasst: `discoverPaths` und `claudeConfigDirs`
-  erhalten einen optionalen `platform`-Parameter (Default `process.platform`).
-- Auf `win32` wird ausschließlich der Legacy-Pfad `~/.claude` geprüft, der auf
-  Windows zu `%USERPROFILE%\.claude` aufgelöst wird.
-- Auf `darwin`/`linux` bleibt das bestehende Verhalten mit XDG (`~/.config/claude`)
-  plus Legacy-Pfad erhalten.
-- `CLAUDE_CONFIG_DIR` bleibt auf allen Plattformen der Override mit höchster
-  Priorität und akzeptiert nun zusätzlich zum Komma auch Semikolon als Trennzeichen.
-- `src/main/usage/paths.test.ts` wurde um plattformspezifische Tests für Windows
-  und Nicht-Windows erweitert; alle `discoverPaths`-Aufrufe sind explizit parametrisiert.
-- `npm run typecheck`, `npm run lint`, `npm test` (323 passed, 6 skipped) und
-  `npm run build` sind lokal auf Windows grün; `npx electron-builder --win --publish never`
-  erzeugt Installer und portable `.exe` erfolgreich.
+**Results:**
+- `src/main/usage/paths.ts` was adjusted: `discoverPaths` and `claudeConfigDirs`
+  gain an optional `platform` parameter (default `process.platform`).
+- On `win32`, only the legacy path `~/.claude` is checked, which resolves to
+  `%USERPROFILE%\.claude` on Windows.
+- On `darwin`/`linux`, the existing behavior with XDG (`~/.config/claude`)
+  plus the legacy path is preserved.
+- `CLAUDE_CONFIG_DIR` remains the highest-priority override on all platforms
+  and now additionally accepts semicolons as separators alongside commas.
+- `src/main/usage/paths.test.ts` was extended with platform-specific tests for
+  Windows and non-Windows; all `discoverPaths` calls are explicitly parameterized.
+- `npm run typecheck`, `npm run lint`, `npm test` (323 passed, 6 skipped), and
+  `npm run build` are green locally on Windows; `npx electron-builder --win --publish never`
+  successfully produces the installer and portable `.exe`.
 
-**Verbleibende Hinweise:**
-- **Codex-Tracking auf Windows** ist weiterhin zurückgestellt; Codex-Log-Pfade
-  wurden in dieser Phase nicht auf Windows aktiviert (siehe „Verschobene Aufgaben“).
-- Auf nicht gelisteten Plattformen (z. B. `freebsd`, `openbsd`) fällt `discoverPaths`
-  ohne expliziten `platform`-Parameter auf XDG + Legacy zurück, was dem Verhalten
-  vor BL-WIN-5 entspricht. Für typsichere Aufrufe sollten nur `win32`, `darwin`
-  oder `linux` übergeben werden.
-- Die Semikolon-Trennung für `CLAUDE_CONFIG_DIR` war nicht im ursprünglichen Plan
-  vorgesehen, ist aber für Windows-Pfade sinnvoll und wurde dokumentiert.
+**Remaining notes:**
+- **Codex tracking on Windows** remains deferred; Codex log paths were not
+  enabled on Windows in this phase (see "Deferred Tasks").
+- On unlisted platforms (e.g. `freebsd`, `openbsd`), `discoverPaths` without
+  an explicit `platform` parameter falls back to XDG + legacy, matching the
+  behavior before BL-WIN-5. For type-safe calls, only `win32`, `darwin`, or
+  `linux` should be passed.
+- The semicolon separation for `CLAUDE_CONFIG_DIR` was not part of the
+  original plan but makes sense for Windows paths and has been documented.
 
-### Phase 4: Polish & Release-Readiness (BL-WIN-8, BL-WIN-10) ✅
+### Phase 4: Polish & Release Readiness (BL-WIN-8, BL-WIN-10) ✅
 
-**Ziel:** Visuelle Qualität und Dokumentation passen für Windows.
+**Goal:** Visual quality and documentation are fit for Windows.
 
-1. **BL-WIN-8** — HiDPI/Scaling für Windows-Displays.
-2. **BL-WIN-10** — Design-Gate, Screenshots, finale Doku-Updates.
+1. **BL-WIN-8** — HiDPI/scaling for Windows displays.
+2. **BL-WIN-10** — design gate, screenshots, final doc updates.
 
-**Akzeptanz:** Icons und Overlay sehen auf Windows scharf aus; README/PRD/CLAUDE
-sind konsistent.
+**Acceptance:** Icons and overlay look sharp on Windows; README/PRD/CLAUDE
+are consistent.
 
-**Status:** Abgeschlossen am 2026-07-15.
+**Status:** Completed on 2026-07-15.
 
-**Ergebnisse:**
-- `src/renderer/canvas-dpr.ts` neu eingeführt: reine, unit-testbare Hilfsfunktionen
-  `computeCanvasSize` und `applyDpr`.
-- `src/renderer/renderer.ts` angepasst: logische Bounds (`logicalBounds`) werden
-  vom physischen Canvas getrennt; `bounds()` gibt logische Pixel zurück;
-  `ctx.clearRect` verwendet logische Bounds; `window.resize`-Listener erkennt
-  reine DPR-Änderungen.
-- `src/renderer/canvas-dpr.test.ts` (3 Tests) und `src/renderer/renderer.test.ts`
-  (3 Tests) hinzugefügt; sie decken DPR-Mathematik, `bounds()`-Regression und
-  korrekten Clear-Bereich ab.
-- `README.md`, `PRD.md` und `CLAUDE.md` um Windows-HiDPI-Hinweise,
-  Troubleshooting, Design-Gate-Kriterien und Definition-of-Done-Ergänzungen
-  aktualisiert.
-- `docs/design-reviews/phase-4-windows/verdict.md` mit Bewertung der vorläufigen
-  Icons und des HiDPI-Status erstellt.
+**Results:**
+- `src/renderer/canvas-dpr.ts` newly introduced: pure, unit-testable helper
+  functions `computeCanvasSize` and `applyDpr`.
+- `src/renderer/renderer.ts` adjusted: logical bounds (`logicalBounds`) are
+  separated from the physical canvas; `bounds()` returns logical pixels;
+  `ctx.clearRect` uses logical bounds; a `window.resize` listener detects
+  pure DPR changes.
+- `src/renderer/canvas-dpr.test.ts` (3 tests) and `src/renderer/renderer.test.ts`
+  (3 tests) added; they cover DPR math, the `bounds()` regression, and the
+  correct clear area.
+- `README.md`, `PRD.md`, and `CLAUDE.md` updated with Windows HiDPI notes,
+  troubleshooting, design-gate criteria, and definition-of-done additions.
+- `docs/design-reviews/phase-4-windows/verdict.md` created with an assessment
+  of the provisional icons and the HiDPI status.
 - `npm run typecheck`, `npm run lint`, `npm test` (329 passed, 6 skipped),
-  `npm run build` und `npx electron-builder --win --publish never` sind grün.
+  `npm run build`, and `npx electron-builder --win --publish never` are green.
 
-**Verbleibende Hinweise:**
-- **Visuelles Design-Gate auf echter Hardware ausstehend:** Das Verdict basiert
-  auf Code-Review und Architektur; echte Screenshots auf Windows bei 100 %,
-  125 %, 150 % und 200 % Skalierung sollten nachgeholt werden, sobald eine
-  Windows-Testmaschine verfügbar ist.
-- **125 %/150 %-Pixel-Raster:** Bei nicht-integer-DPR kann das Pixel-Raster
-  leicht ungleichmäßig wirken. Dies ist ein fundamentales Limit von
-  nearest-neighbor bei 1.25×/1.5×, kein Implementierungsfehler.
-- **Finales Master-Icon:** Die vorläufigen `assets/icon.ico` und
-  `assets/tray-icon.png` wurden nur gegen Sprite-Assets bewertet. Ein
-  professionelles Master-Icon ist als bekanntes Follow-up in Phase 5
-  verankert.
+**Remaining notes:**
+- **Visual design gate on real hardware pending:** The verdict is based on
+  code review and architecture; real screenshots on Windows at 100%, 125%,
+  150%, and 200% scaling should be taken once a Windows test machine is
+  available.
+- **125%/150% pixel grid:** At non-integer DPR, the pixel grid may look
+  slightly uneven. This is a fundamental limit of nearest-neighbor at
+  1.25×/1.5×, not an implementation bug.
+- **Final master icon:** The provisional `assets/icon.ico` and
+  `assets/tray-icon.png` were only assessed against sprite assets. A
+  professional master icon is anchored as a known follow-up in Phase 5.
 
 ### Phase 5: Deferred / Follow-up
 
-**Ziel:** Offene Punkte nachholen, sobald Klärung vorliegt.
+**Goal:** Catch up on open points as soon as clarification is available.
 
-**Status:** Teilweise abgeschlossen.
+**Status:** Partially completed.
 
-- **BL-WIN-7 — Atomares Schreiben Windows-nativ:** ✅ Abgeschlossen. `atomicWriteFile`
-  wurde asynchron mit Retry-Backoff umgebaut; State-Persistenz ist auf Windows robuster
-  gegen transiente Locks. Alle Tests und Build-Pipelines laufen grün.
-- **Codex-Tracking — Windows-Log-Pfade:** ✅ Abgeschlossen. `discoverPaths` prüft auf
-  Windows nacheinander `CODEX_HOME` (Override), `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`
-  und `~/.codex` (Legacy). Der erste existierende Pfad wird verwendet. Unbekannte
-  Plattformen fallen defensiv auf `linux`-Verhalten zurück. Windows-Tests wurden in
-  `src/main/usage/paths.test.ts` ergänzt.
-- **BL-WIN-6 — Secret-Store / MRR-Mode:** ⏸️ Zurückgestellt. Die Wahl des
-  Windows-Secret-Store-Backends erfordert eine Entscheidung des Projekt-Administrators.
-  Unter den aktuellen `CLAUDE.md`-Restriktionen ist `electron.safeStorage` + verschlüsselte
-  JSON in `userData` die realistische Standardlösung; Windows Credential Manager mit
-  Native-Addon nur bei expliziter Admin-Entscheidung. Der MRR-Mode bleibt auf Windows
-  vorerst deaktiviert.
-- **Finales Master-Icon / Design-Pass** — Zurückgestellter visueller Follow-up;
-  ersetzt die vorläufigen Sprite-generierten `assets/icon.ico` und
-  `assets/tray-icon.png`.
+- **BL-WIN-7 — Windows-native atomic writes:** ✅ Completed. `atomicWriteFile`
+  was rebuilt asynchronously with retry backoff; state persistence on Windows
+  is more robust against transient locks. All tests and build pipelines are green.
+- **Codex tracking — Windows log paths:** ✅ Completed. On Windows, `discoverPaths`
+  checks in order `CODEX_HOME` (override), `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`,
+  and `~/.codex` (legacy). The first existing path is used. Unknown platforms
+  defensively fall back to `linux` behavior. Windows tests were added in
+  `src/main/usage/paths.test.ts`.
+- **BL-WIN-6 — secret store / MRR mode:** ⏸️ Deferred. The choice of the
+  Windows secret-store backend requires a decision by the project administrator.
+  Under the current `CLAUDE.md` restrictions, `electron.safeStorage` + encrypted
+  JSON in `userData` is the realistic default solution; Windows Credential Manager
+  with a native addon only with an explicit admin decision. MRR mode remains
+  disabled on Windows for now.
+- **Final master icon / design pass** — deferred visual follow-up; replaces the
+  provisional sprite-generated `assets/icon.ico` and `assets/tray-icon.png`.
 
-**Verbleibende Blocker:**
-- Admin-Entscheidung für BL-WIN-6 (Secret-Store-Backend).
-- Empirische Verifizierung der Codex-Windows-Pfade auf echter Windows-Hardware wäre
-  wünschenswert, da die aktuelle Lösung auf Kandidatenpfaden basiert.
-- Finales Master-Icon / Design-Pass.
-
----
-
-## 8. Verschobene Aufgaben
-
-### BL-WIN-6: Windows Secret-Store / MRR-Mode
-- **Status:** ⏸️ Zurückgestellt, offen — Admin-Entscheidung ausstehend.
-- **Begründung:** Entscheidung über Secret-Store-Backend (Windows Credential
-  Manager, `electron.safeStorage`, ggf. Win32-API) muss mit dem
-  Projekt-Administrator besprochen werden.
-- **Auswirkung:** MRR-Mode (Stripe/RevenueCat) ist auf Windows vorerst nicht
-  verfügbar. Die App ist ohne Credentials voll funktionsfähig (Overlay, Tray,
-  Animationen, Token-Tracking).
-- **Empfohlung:** Unter den aktuellen `CLAUDE.md`-Restriktionen ist
-  `electron.safeStorage` + verschlüsselte JSON in `userData` die realistische
-  Standardlösung; Windows Credential Manager mit Native-Addon nur bei expliziter
-  Admin-Entscheidung.
-- **Nächster Schritt:** Termin mit Projekt-Administrator; danach Detailplanung
-  und Umsetzung von BL-WIN-6.
-
-### Codex-Usage-Log-Tracking auf Windows
-- **Status:** ✅ Abgeschlossen.
-- **Begründung:** Offizieller Windows-Log-Pfad der Codex-CLI ist nicht klar
-  dokumentiert; daher werden mehrere Kandidatenpfade geprüft.
-- **Umsetzung:** `discoverPaths` prüft auf Windows in dieser Priorität:
-  `CODEX_HOME` (Override) > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` >
-  `~/.codex` (Legacy). Der erste existierende Pfad wird verwendet.
-- **Auswirkung:** Token-Burn-Tracking auf Windows berücksichtigt jetzt auch
-  Codex, sofern einer der Kandidatenpfade existiert.
-- **Hinweis:** Die Lösung basiert auf Kandidatenpfaden, nicht auf empirisch
-  verifizierten offiziellen Codex-Pfaden. Eine Testinstallation auf Windows
-  wäre wünschenswert, um die Reihenfolge ggf. anzupassen.
-
-### Atomares Schreiben auf Windows (BL-WIN-7)
-- **Status:** ✅ Abgeschlossen.
-- **Begründung:** `fs.renameSync` kann auf Windows bei transienten Locks (`EPERM`)
-  fehlschlagen.
-- **Umsetzung:** `atomicWriteFile` wurde asynchron mit Retry-Backoff umgebaut:
-  bis zu 4 Versuche mit Delays `[0, 10, 50, 100]` ms bei `EPERM`/`EBUSY`,
-  Temp-Datei im Zielverzeichnis (Same-Volume-Rename), Cleanup im `finally`.
-- **Auswirkung:** State-Persistenz ist auf Windows robuster gegen transiente
-  Locks. Alle Tests und Build-Pipelines laufen grün.
-- **Hinweis:** Sehr langsame oder lang andauernde Locks können die Heuristik
-  trotzdem überfordern.
-
-### Finales Master-Icon / Design-Pass
-- **Status:** Zurückgestellt, offen.
-- **Begründung:** Es gibt noch kein professionelles Master-Icon; `assets/icon.ico`
-  und `assets/tray-icon.png` sind vorläufig aus Sprite-Assets generiert. Ein
-  Design-Pass muss durchgeführt und abgesegnet werden.
-- **Auswirkung:** App-Icon im Explorer/Installer/Task-Manager und Tray-Icon auf
-  dunklen Taskleisten-Hintergründen erreichen noch nicht das finale
-  Qualitätsniveau.
-- **Nächster Schritt:** Design-Review oder Beauftragung eines Designers; danach
-  Erstellung neuer Assets und Ersetzung der vorläufigen Dateien.
+**Remaining blockers:**
+- Admin decision for BL-WIN-6 (secret-store backend).
+- Empirical verification of the Codex Windows paths on real Windows hardware
+  would be desirable, since the current solution is based on candidate paths.
+- Final master icon / design pass.
 
 ---
 
-## 9. Post-Phase-5 Bugfix: Single-Instance-Schutz ✅
+## 8. Deferred Tasks
 
-**Auslöser:** Beim manuellen Windows-Test wurden zwei Biber-Instanzen gleichzeitig angezeigt.
+### BL-WIN-6: Windows Secret Store / MRR Mode
+- **Status:** ⏸️ Deferred, open — admin decision pending.
+- **Rationale:** The decision on the secret-store backend (Windows Credential
+  Manager, `electron.safeStorage`, possibly Win32 API) must be discussed with
+  the project administrator.
+- **Impact:** MRR mode (Stripe/RevenueCat) is not available on Windows for now.
+  The app is fully functional without credentials (overlay, tray, animations,
+  token tracking).
+- **Recommendation:** Under the current `CLAUDE.md` restrictions,
+  `electron.safeStorage` + encrypted JSON in `userData` is the realistic
+  default solution; Windows Credential Manager with a native addon only with
+  an explicit admin decision.
+- **Next step:** Meeting with the project administrator; then detailed planning
+  and implementation of BL-WIN-6.
 
-**Lösung:** In `src/main/main.ts` wird direkt beim Start ein Electron-Single-Instance-Lock angefordert. Ein zweiter Start beendet sich sofort mit Exit-Code `0` und öffnet kein weiteres Fenster; die laufende Instanz wird in den Vordergrund geholt.
+### Codex Usage Log Tracking on Windows
+- **Status:** ✅ Completed.
+- **Rationale:** The official Windows log path of the Codex CLI is not clearly
+  documented; therefore, several candidate paths are checked.
+- **Implementation:** On Windows, `discoverPaths` checks in this priority:
+  `CODEX_HOME` (override) > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` >
+  `~/.codex` (legacy). The first existing path is used.
+- **Impact:** Token-burn tracking on Windows now also covers Codex, provided
+  one of the candidate paths exists.
+- **Note:** The solution is based on candidate paths, not on empirically
+  verified official Codex paths. A test installation on Windows would be
+  desirable to adjust the order if necessary.
 
-**Akzeptanz:**
-- `npm start` (erster Start) zeigt den Biber.
-- `npm start` (zweiter Start) beendet sich sofort ohne zweites Overlay/Tray-Icon.
-- `npm run typecheck`, `npm run lint`, `npm test` bleiben grün.
+### Atomic Writes on Windows (BL-WIN-7)
+- **Status:** ✅ Completed.
+- **Rationale:** `fs.renameSync` can fail on Windows with transient locks
+  (`EPERM`).
+- **Implementation:** `atomicWriteFile` was rebuilt asynchronously with retry
+  backoff: up to 4 attempts with delays of `[0, 10, 50, 100]` ms on
+  `EPERM`/`EBUSY`, temp file in the target directory (same-volume rename),
+  cleanup in `finally`.
+- **Impact:** State persistence on Windows is more robust against transient
+  locks. All tests and build pipelines are green.
+- **Note:** Very slow or long-lasting locks can still overwhelm the heuristic.
 
-**Details:** Siehe `single-instance-fix.md`.
+### Final Master Icon / Design Pass
+- **Status:** Deferred, open.
+- **Rationale:** There is no professional master icon yet; `assets/icon.ico`
+  and `assets/tray-icon.png` are provisionally generated from sprite assets.
+  A design pass must be carried out and approved.
+- **Impact:** The app icon in Explorer/installer/Task Manager and the tray icon
+  on dark taskbar backgrounds do not yet reach the final quality level.
+- **Next step:** Design review or commissioning a designer; then creation of
+  new assets and replacement of the provisional files.
 
 ---
 
-## 10. Nicht-Ziele
+## 9. Post-Phase-5 Bugfix: Single-Instance Protection ✅
 
-- Keine neuen Features (Chat, Buttons, zusätzliche Animationen).
-- Keine Änderung der Renderer-Logik außer HiDPI/Scaling.
-- Keine Migration bestehender macOS-Keychain-Einträge zu Windows.
-- Kein App-Store-Release für Windows (erstmal natives `.exe` / Installer).
-- Keine aktive Weiterentwicklung der macOS-Version; macOS-Pfade bleiben
-  erhalten, aber der Fokus liegt auf Windows.
+**Trigger:** During manual Windows testing, two beaver instances were displayed at the same time.
+
+**Solution:** In `src/main/main.ts`, an Electron single-instance lock is requested directly at startup. A second launch exits immediately with exit code `0` and does not open another window; the running instance is brought to the foreground.
+
+**Acceptance:**
+- `npm start` (first launch) shows the beaver.
+- `npm start` (second launch) exits immediately without a second overlay/tray icon.
+- `npm run typecheck`, `npm run lint`, `npm test` remain green.
+
+**Details:** See `single-instance-fix.md`.
+
+---
+
+## 10. Non-Goals
+
+- No new features (chat, buttons, additional animations).
+- No changes to renderer logic except HiDPI/scaling.
+- No migration of existing macOS Keychain entries to Windows.
+- No app-store release for Windows (native `.exe` / installer for now).
+- No active further development of the macOS version; macOS paths are
+  preserved, but the focus is on Windows.

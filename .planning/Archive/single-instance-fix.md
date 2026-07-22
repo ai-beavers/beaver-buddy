@@ -1,22 +1,22 @@
-# Single-Instance-Schutz für Beaver Buddy
+# Single-Instance Protection for Beaver Buddy
 
-**Datum:** 2026-07-15  
-**Auslöser:** Beim manuellen Testen der Windows-App wurden zwei Biber-Instanzen gleichzeitig angezeigt. Der Nutzer hat festgelegt, dass nur eine App-Instanz zur gleichen Zeit laufen darf.
+**Date:** 2026-07-15  
+**Trigger:** During manual testing of the Windows app, two beaver instances were displayed at the same time. The user has decided that only one app instance may run at a time.
 
 ---
 
 ## Problem
 
-Beaver Buddy nutzt Electron. Ohne expliziten Schutz startet jeder Aufruf von `npm start` (bzw. jeder Klick auf die `.exe`) eine weitere, vollständige Electron-Hauptprozess-Instanz. Das führt dazu:
+Beaver Buddy uses Electron. Without explicit protection, every call to `npm start` (or every click on the `.exe`) launches another, complete Electron main-process instance. This leads to:
 
-- Mehrere Overlay-Fenster mit Bibern übereinander.
-- Mehrere Tray-Icons.
-- Doppelte Token-Tracking-, XP- und MRR-Prozesse.
-- Inkonsistenten App-Zustand, weil mehrere Prozesse in dieselbe `userData` schreiben.
+- Multiple overlay windows with beavers stacked on top of each other.
+- Multiple tray icons.
+- Duplicate token-tracking, XP, and MRR processes.
+- Inconsistent app state, because multiple processes write to the same `userData`.
 
-## Lösung
+## Solution
 
-In `src/main/main.ts` wurde ganz am Anfang des Hauptprozesses ein Electron-Single-Instance-Lock eingebaut:
+An Electron single-instance lock was added at the very beginning of the main process in `src/main/main.ts`:
 
 ```ts
 const singleInstanceLock = app.requestSingleInstanceLock();
@@ -34,26 +34,26 @@ app.on('second-instance', () => {
 });
 ```
 
-### Verhalten
+### Behavior
 
-- **Erster Start:** Erhält den Lock, Fenster wird erstellt, App läuft normal.
-- **Zweiter Start:** Bekommt keinen Lock, beendet sich sofort mit Exit-Code `0`. Es erscheint kein zweites Fenster, kein zweites Tray-Icon, kein zweiter Tracking-Prozess.
-- **Fokus-Wiederherstellung:** Falls die bestehende Instanz je minimiert sein sollte, wird das Fenster wiederhergestellt und in den Vordergrund geholt.
+- **First launch:** Acquires the lock, the window is created, the app runs normally.
+- **Second launch:** Does not get the lock and exits immediately with exit code `0`. No second window, no second tray icon, no second tracking process appears.
+- **Focus restoration:** If the existing instance is ever minimized, the window is restored and brought to the foreground.
 
-## Betroffene Dateien
+## Affected Files
 
-- `src/main/main.ts` — hinzugefügt: `app.requestSingleInstanceLock()`, `app.on('second-instance', ...)`.
+- `src/main/main.ts` — added: `app.requestSingleInstanceLock()`, `app.on('second-instance', ...)`.
 
-## Tests / Verifikation
+## Tests / Verification
 
 - `npm run typecheck` ✅
 - `npm run lint` ✅
 - `npm test` ✅ (341 passed, 6 skipped)
-- `npm start` (erster Start) zeigt den Biber.
-- `npm start` (zweiter Start) beendet sich sofort, ohne ein zweites Fenster zu öffnen.
+- `npm start` (first launch) shows the beaver.
+- `npm start` (second launch) exits immediately without opening a second window.
 
-## Hinweise / Einschränkungen
+## Notes / Limitations
 
-- Der Lock gilt pro Benutzerprofil (Electron verwendet den App-Namen als Lock-Name). Andere Windows-Benutzer können weiterhin eine eigene Instanz starten — das ist das erwartete Verhalten.
-- Falls Beaver Buddy jemals absichtlich mit separaten Profilen (z. B. `--user-data-dir`) parallel laufen soll, muss der Lock-Mechanismus entsprechend erweitert werden.
-- Der `second-instance`-Handler zeigt das Fenster in den Vordergrund. Da das Overlay-Fenster `focusable: false` und `alwaysOnTop: true` ist, bleibt das Klick-Through-Verhalten erhalten.
+- The lock applies per user profile (Electron uses the app name as the lock name). Other Windows users can still start their own instance — that is the expected behavior.
+- If Beaver Buddy should ever intentionally run in parallel with separate profiles (e.g. `--user-data-dir`), the lock mechanism must be extended accordingly.
+- The `second-instance` handler brings the window to the foreground. Since the overlay window is `focusable: false` and `alwaysOnTop: true`, the click-through behavior is preserved.

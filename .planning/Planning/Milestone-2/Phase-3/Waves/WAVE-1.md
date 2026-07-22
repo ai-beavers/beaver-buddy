@@ -1,132 +1,132 @@
-# Wave 1 — Fallschirm-Drop: Assets (struggle, parachute-wind, land)
+# Wave 1 — Parachute Drop: Assets (struggle, parachute-wind, land)
 
-**Status:** done (Assets generiert + gebacken + smoke-getestet; Intake ins
-committete Sheet = WAVE-2/C4) · **ausführendes Tool: Claude Code** (Comfy-Cloud-MCP
-ist nur dort konfiguriert; pi baut parallel die Runtime-Logik in WAVE-2)
+**Status:** done (assets generated + baked + smoke-tested; intake into the
+committed sheet = WAVE-2/C4) · **executing tool: Claude Code** (Comfy Cloud MCP
+is only configured there; pi builds the runtime logic in parallel in WAVE-2)
 
-## Ergebnis (2026-07-20, Claude Code)
+## Result (2026-07-20, Claude Code)
 
-### Gap-Analyse
-- Rig `beaver-baby` hat alle 8 Parts inkl. `canopy`; das Keyframe-DSL könnte
-  alle drei Animationen prozedural riggen (ein `parachute.ts`-Studio-Recipe
-  existiert bereits, wurde aber nie ins App-Sheet gebacken). Studio-Recipes
-  wären credit-frei und stiltreu gewesen.
-- **Owner-Entscheid: Voll ComfyUI** (2026-07-20) — jede Animation komplett als
-  Sprite-Sheet per Comfy Cloud generiert, für maximalen Ausdruck.
-- Befund nebenbei: Keines der App-Sheets (baby/teen/adult) hatte je eine
-  `parachute`-Row — alle drei Rows sind neu.
+### Gap analysis
+- Rig `beaver-baby` has all 8 parts incl. `canopy`; the keyframe DSL could
+  procedurally rig all three animations (a `parachute.ts` studio recipe
+  already exists but was never baked into the app sheet). Studio recipes
+  would have been credit-free and style-true.
+- **Owner decision: full ComfyUI** (2026-07-20) — every animation generated
+  completely as a sprite sheet via Comfy Cloud, for maximum expression.
+- Side finding: none of the app sheets (baby/teen/adult) ever had a
+  `parachute` row — all three rows are new.
 
-### Generierungs-Record (Comfy Cloud, Workflow `pixelart-builder.json`)
-- Generator-Node: `GeminiNanoBanana2` (Nano Banana 2 / Gemini 3.1 Flash Image),
-  16:9 @ 2K, BiRefNet-BG-Removal, Ausgabe 4×2-Grid = 8 Frames.
-- Referenzbild: `assets-src/reference/beaver-baby-idle.png` (96×96, sauberer
-  idle-Frame) via `upload_file` hochgeladen.
-- **Style-Prompt-Anchoring aktiviert** (offene Modification #2 damit erledigt):
-  „warm golden-brown fur with cream belly and 1px dark outline, side view
+### Generation record (Comfy Cloud, workflow `pixelart-builder.json`)
+- Generator node: `GeminiNanoBanana2` (Nano Banana 2 / Gemini 3.1 Flash Image),
+  16:9 @ 2K, BiRefNet BG removal, output 4×2 grid = 8 frames.
+- Reference image: `assets-src/reference/beaver-baby-idle.png` (96×96, clean
+  idle frame) uploaded via `upload_file`.
+- **Style prompt anchoring enabled** (open modification #2 thereby done):
+  "warm golden-brown fur with cream belly and 1px dark outline, side view
   facing right, same baby beaver character and colors as the reference image,
-  consistent proportions in every frame" im Prompt verankert.
-- Seeds (fixed, reproduzierbar): parachute-wind=810001, struggle=810002,
+  consistent proportions in every frame" anchored in the prompt.
+- Seeds (fixed, reproducible): parachute-wind=810001, struggle=810002,
   land=810003.
 - prompt_ids: parachute-wind `a8aac5c1-…`, struggle `4d6fd4d2-…`, land
-  `75ee2f0c-…`. Rohframes → `assets-src/comfyui/{parachute-wind,struggle,land}-run/`
-  (gitignored Dumps).
+  `75ee2f0c-…`. Raw frames → `assets-src/comfyui/{parachute-wind,struggle,land}-run/`
+  (gitignored dumps).
 
 ### Bake
-- Committeter, reproduzierbarer Ingest-Schritt:
-  `scripts/gen-sprites/ingest-animation-frames.mjs` — reuse der exportierten
-  Funktionen aus `ingest-images.mjs` (flood-fill BG-Removal → crop bbox →
+- Committed, reproducible ingest step:
+  `scripts/gen-sprites/ingest-animation-frames.mjs` — reuses the exported
+  functions from `ingest-images.mjs` (flood-fill BG removal → crop bbox →
   premultiplied-alpha area-average downscale → bottom-aligned placeOnTile),
-  keine neuen Deps. idle/walk werden pixelgenau aus dem bestehenden Sheet
-  kopiert; struggle/parachute-wind/land angehängt.
-- Locked-Scale-Ziele: struggle/land = 82px content-height (Ruhe-/Sitzframes ≈
-  idle-Größe), parachute-wind = 92px (fit-to-tile → Biber im Gleitflug bewusst
-  kleiner; Runtime-Placement ist WAVE-2).
+  no new deps. idle/walk are copied pixel-perfectly from the existing sheet;
+  struggle/parachute-wind/land appended.
+- Locked-scale targets: struggle/land = 82px content height (resting/sitting
+  frames ≈ idle size), parachute-wind = 92px (fit-to-tile → beaver deliberately
+  smaller during glide; runtime placement is WAVE-2).
 - Output: `assets-src/baked/beaver-baby/{sheet.png,sheet.json}` (768×480,
-  Rows idle(1)/walk(2)/struggle(8)/parachute-wind(8)/land(8)) + `_contact.png`.
-- Smoke-Test: alle 5 Rows via App-`frameRect`-Logik korrekt gesliced, saubere
-  Alpha-Freistellung, keine Fringes. Row-Namen matchen exakt pi's
-  `AnimName`-Union in `roam.ts` (idle/walk/struggle/parachute-wind/land).
+  rows idle(1)/walk(2)/struggle(8)/parachute-wind(8)/land(8)) + `_contact.png`.
+- Smoke test: all 5 rows sliced correctly via the app `frameRect` logic, clean
+  alpha cutout, no fringes. Row names exactly match pi's
+  `AnimName` union in `roam.ts` (idle/walk/struggle/parachute-wind/land).
 
-### Offen → WAVE-2/C4 (Integration)
-- **Intake:** `assets-src/baked/beaver-baby/sheet.{png,json}` nach
-  `assets/sprites/beaver-baby.{png,json}` übernehmen (gitignored baked → committed).
-- **Test-Reconciliation:** `scripts/gen-sprites/ingest-images.test.ts` locked
-  aktuell „committed sheet == idle/walk-only-Ingest" (skipIf `assets-src/beaver/`
-  absent — auf dieser Maschine grün, aber latent auf Maschinen MIT Quellbildern).
-  Nach Intake muss der beaver-baby-Byte-Match auf `ingest-animation-frames.mjs`
-  umgezogen werden (oder beaver-baby aus `STAGE_SPECS` gelöst werden).
-- **Design-Gate (#38):** Windows-Screenshots @100%/200% mit *spielender*
-  Animation — braucht die Runtime, daher WAVE-2. Bekannte Punkte fürs Gate:
-  (a) parachute-wind-Biber kleiner (fit-to-tile), (b) einige struggle-Frames
-  zeigen den Biber gedreht/left-facing (panisches Zappeln — bewertet das Gate).
-- **Galerie:** Eintrag in `docs/asset-gallery.md`.
+### Open → WAVE-2/C4 (integration)
+- **Intake:** move `assets-src/baked/beaver-baby/sheet.{png,json}` into
+  `assets/sprites/beaver-baby.{png,json}` (gitignored baked → committed).
+- **Test reconciliation:** `scripts/gen-sprites/ingest-images.test.ts` currently
+  locks "committed sheet == idle/walk-only ingest" (skipIf `assets-src/beaver/`
+  absent — green on this machine, but latent on machines WITH source images).
+  After intake, the beaver-baby byte match must move to
+  `ingest-animation-frames.mjs` (or beaver-baby must be removed from `STAGE_SPECS`).
+- **Design gate (#38):** Windows screenshots @100%/200% with the animation
+  *playing* — needs the runtime, hence WAVE-2. Known points for the gate:
+  (a) parachute-wind beaver smaller (fit-to-tile), (b) some struggle frames
+  show the beaver rotated/left-facing (panicked squirming — the gate evaluates).
+- **Gallery:** entry in `docs/asset-gallery.md`.
 
-## Auftrag für Claude Code (bei `/fp-resume` direkt hier weiterlesen)
+## Assignment for Claude Code (on `/fp-resume` continue reading directly here)
 
-Erzeuge die drei fehlenden Animationen für das `beaver-baby`-Rig und backe sie
-ins App-Sheet-Format. Owner-Freigabe für ComfyUI-Credits liegt vor
-(Spend-Gate-Bestätigungen sind erwünscht, aber kein Blocker).
+Create the three missing animations for the `beaver-baby` rig and bake them
+into the app sheet format. Owner approval for ComfyUI credits is in place
+(spend-gate confirmations are welcome but not a blocker).
 
-1. **Gap-Analyse zuerst** (30 Min): Prüfe, ob `struggle`/`land` als
-   **Studio-Keyframe-Rezepte** aus den vorhandenen Parts
-   (`assets-src/parts/beaver-baby/`) baubar sind (Puppet Studio,
-   `tools/puppet-studio/`). Nur was posen-technisch nicht reicht, wird per
-   **Comfy Cloud** neu generiert. Ergebnis hier dokumentieren.
-2. **Benötigte Rows** (zusätzlich zu idle/walk/parachute):
-   - `struggle` — Biber hängt (an Cursor), strampelt mit Armen/Beinen/Schwanz,
-     Körper rotiert leicht (Zappeln)
-   - `parachute-wind` — Gleitflug mit sichtbarem Wind: Schirm wabert, Biber
-     schwankt; ersetzt/erweitert die bestehende `parachute`-Row (8 Frames)
-   - `land` — Aufsetzen, kurzes Abfedern/Hocken, Übergang in idle-Pose
-3. **Konventionen** (verbindlich):
-   - App-Format: 96×96-Tiles, Alpha, Sheet-Row in `sheet.json` registrieren
-   - Style: `assets/STYLE.md` — **Style-Prompt-Anchoring mitnehmen**
-     (Palette/Outline/Right-Facing explizit in den Prompt; Carry-over aus
-     Phase 2, siehe `docs/comfyui-avatar-generation.md`)
-   - Referenzbild: sauberer idle-Frame aus `assets/sprites/beaver-baby.png`
-     (hochladen via `upload_file`), damit Generierungen zum Charakter passen
-   - Workflow-Basis: gespeicherte Cloud-Workflows `pixelart-builder.json` /
-     `pixelart-parts-builder.json` (Inventory in
+1. **Gap analysis first** (30 min): check whether `struggle`/`land` can be built
+   as **studio keyframe recipes** from the existing parts
+   (`assets-src/parts/beaver-baby/`) (Puppet Studio,
+   `tools/puppet-studio/`). Only what cannot be achieved pose-wise is newly
+   generated via **Comfy Cloud**. Document the result here.
+2. **Required rows** (in addition to idle/walk/parachute):
+   - `struggle` — beaver hangs (on cursor), flails arms/legs/tail,
+     body rotates slightly (squirming)
+   - `parachute-wind` — glide with visible wind: canopy ripples, beaver
+     sways; replaces/extends the existing `parachute` row (8 frames)
+   - `land` — touch down, brief crouch/compression, transition into idle pose
+3. **Conventions** (binding):
+   - App format: 96×96 tiles, alpha, register sheet row in `sheet.json`
+   - Style: `assets/STYLE.md` — **carry style prompt anchoring along**
+     (palette/outline/right-facing explicitly in the prompt; carry-over from
+     Phase 2, see `docs/comfyui-avatar-generation.md`)
+   - Reference image: clean idle frame from `assets/sprites/beaver-baby.png`
+     (upload via `upload_file`) so generations match the character
+   - Workflow base: saved cloud workflows `pixelart-builder.json` /
+     `pixelart-parts-builder.json` (inventory in
      `docs/comfyui-avatar-generation.md`)
-   - Rohdaten nach `assets-src/comfyui/<run-name>/`, Parts-Ingest via
-     `tools/puppet-studio/ingest-parts.mjs`, Bake über Studio
-   - **Asset-Regel:** nur weiterverwendete Assets committen; Dumps bleiben
-     lokal (gitignored)
-4. **Abschluss:** Studio-Smoke-Test (alle Rows spielen fehlerfrei), dann diese
-   Wave + `PHASE.md` + `.flightplan/STATE.md` aktualisieren und in
-   `docs/asset-gallery.md` registrieren (Galerie-Eintrag kann auch WAVE-2).
+   - Raw data to `assets-src/comfyui/<run-name>/`, parts ingest via
+     `tools/puppet-studio/ingest-parts.mjs`, bake via studio
+   - **Asset rule:** only commit reused assets; dumps stay
+     local (gitignored)
+4. **Completion:** studio smoke test (all rows play without errors), then update
+   this wave + `PHASE.md` + `.flightplan/STATE.md` and register in
+   `docs/asset-gallery.md` (gallery entry can also be WAVE-2).
 
 ## Prerequisites
-- [x] Phase 1 + 2 done (Studio lauffähig, Parts vorhanden)
-- [ ] Comfy-Cloud-MCP in Claude Code erreichbar (ggf. neu verbinden:
+- [x] Phase 1 + 2 done (studio functional, parts available)
+- [ ] Comfy Cloud MCP reachable in Claude Code (reconnect if needed:
       `claude mcp add --transport http comfy-cloud https://cloud.comfy.org/mcp`
       + `/mcp` → Authenticate)
 
 ## Tasks
-- [x] Gap-Analyse: Studio-Rezept vs. ComfyUI-Generierung pro Animation
-      (Ergebnis oben dokumentiert; Owner-Entscheid: Voll ComfyUI)
-- [x] `struggle` erzeugen (Comfy Cloud, seed 810002)
-- [x] `parachute-wind` erzeugen (Comfy Cloud, seed 810001; 8 Frames)
-- [x] `land` erzeugen (Comfy Cloud, seed 810003)
-- [x] Bake: Sheet-Rows im App-Format (`assets-src/baked/beaver-baby/`)
-- [x] Smoke-Test aller Rows (frameRect-Slicing + Kontaktübersicht)
-- [ ] Intake ins committete Sheet + Test-Reconciliation + Design-Gate → WAVE-2/C4
+- [x] Gap analysis: studio recipe vs. ComfyUI generation per animation
+      (result documented above; owner decision: full ComfyUI)
+- [x] Create `struggle` (Comfy Cloud, seed 810002)
+- [x] Create `parachute-wind` (Comfy Cloud, seed 810001; 8 frames)
+- [x] Create `land` (Comfy Cloud, seed 810003)
+- [x] Bake: sheet rows in app format (`assets-src/baked/beaver-baby/`)
+- [x] Smoke test of all rows (frameRect slicing + contact overview)
+- [ ] Intake into committed sheet + test reconciliation + design gate → WAVE-2/C4
 
 ## Done when
-- Sheet enthält die Rows `struggle`, `parachute-wind`, `land` (zusätzlich zu
-  idle/walk) im App-Format; Studio zeigt sie fehlerfrei; Analyse + Quellen
-  (Studio-Rezept vs. ComfyUI-Run) sind hier dokumentiert.
+- The sheet contains the rows `struggle`, `parachute-wind`, `land` (in addition
+  to idle/walk) in app format; the studio shows them without errors; the analysis
+  + sources (studio recipe vs. ComfyUI run) are documented here.
 
 ## Carry-over
-- Style-Prompt-Anchoring wurde oben eingefordert — nach dem Run prüfen, ob es
-  im Prompt ankert (offene Modification #2, docs/comfyui-avatar-generation.md).
+- Style prompt anchoring was mandated above — after the run check whether it
+  is anchored in the prompt (open modification #2, docs/comfyui-avatar-generation.md).
 
-## pi-Verifikation (2026-07-20, unabhängig gegengeprüft)
-- 3 Runs vollständig (`struggle/parachute-wind/land-run`, je 8 Frames + Previews)
-- Bake 768×480, 5 Rows; `idle 1 / walk 2` byte-identisch zum Shipped-Sheet
-  (kein Metadaten-Bug — pis früherer Verdacht hat sich aufgelöst)
-- Sheet visuell geprüft: Wind-Wabern im Schirm, Flail-Varianten, Landung → idle ✅
-- Suite 512 Tests grün im gemischten Working Tree
-- **Design-Gate-Frage an Owner (für C4-Verdict):** `struggle` enthält rotierte/
-  left-facing Frames — STYLE.md sagt „right-facing only". Panic-Flail-Ausnahme
-  akzeptabel oder nachgenerieren?
+## pi verification (2026-07-20, independently cross-checked)
+- 3 runs complete (`struggle/parachute-wind/land-run`, 8 frames each + previews)
+- Bake 768×480, 5 rows; `idle 1 / walk 2` byte-identical to the shipped sheet
+  (no metadata bug — pi's earlier suspicion resolved itself)
+- Sheet visually checked: wind ripples in canopy, flail variants, landing → idle ✅
+- Suite 512 tests green in the mixed working tree
+- **Design gate question for owner (for C4 verdict):** `struggle` contains rotated/
+  left-facing frames — STYLE.md says "right-facing only". Is a panic-flail exception
+  acceptable or regenerate?

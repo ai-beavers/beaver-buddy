@@ -1,29 +1,29 @@
-# Bereich 3 — Spend-Tier-Quips (Paritäts-Analyse macOS ↔ Windows)
+# Area 3 — Spend-Tier Quips (Parity Analysis macOS ↔ Windows)
 
-Scope: `src/main/quips/detectors.ts`, `src/main/quips/quips.ts`, `src/main/quips/quip-config.ts`, `src/main/quips/detectors.test.ts` (+ Datenquellen `src/main/usage/totals.ts`, `src/main/usage/tracker.ts`, Verdrahtung `src/main/main.ts`). Stand: Merge `d7acaf0`.
+Scope: `src/main/quips/detectors.ts`, `src/main/quips/quips.ts`, `src/main/quips/quip-config.ts`, `src/main/quips/detectors.test.ts` (+ data sources `src/main/usage/totals.ts`, `src/main/usage/tracker.ts`, wiring `src/main/main.ts`). State: merge `d7acaf0`.
 
-## 1. Urteil: PARITÄT OK
+## 1. Verdict: PARITY OK
 
-0 Lücken, 0 Windows-spezifische Risiken. Die Spend-Tier-Quips (tägliche Token-Count-Tiers, lowercase Voice) hängen an keinerlei macOS-spezifischen Pfaden, Datums- oder Locale-Annahmen; die Merge-Auflösung der Detector↔Tracker-Verdrahtung ist intakt und mit Upstream byte-identisch; alle 66 Tests des Bereichs laufen auf diesem Windows-Rechner grün.
+0 gaps, 0 Windows-specific risks. The spend-tier quips (daily token-count tiers, lowercase voice) do not depend on any macOS-specific paths, date, or locale assumptions; the merge resolution of the detector↔tracker wiring is intact and byte-identical to upstream; all 66 tests in this area pass on this Windows machine.
 
-## 2. Befunde
+## 2. Findings
 
-Keine [lücke]- oder [risiko]-Befunde.
+No [gap] or [risk] findings.
 
-**Paritäts-neutrale Beobachtung (kein Windows-Gap, betrifft beide Plattformen identisch):** Die Tier-Ankündigung beim ersten Snapshot (Mid-Day-Launch, `detectors.ts:69-80`) wird in der Praxis immer verschluckt: `usageTrackerInstance.start()` (`main.ts:358`) feuert den ersten onTick synchron, bevor `rendererReadyForQuips = true` gesetzt wird (`main.ts:400`), und `fireQuip` ist vorher ein No-op (`main.ts:71-72`) — der Detektor markiert den Tier aber bereits als announced (`detectors.ts:77-79`), sodass er bis zum nächsten Tier-Crossing/Mitternacht nicht erneut feuert. Da der Code mit Upstream identisch ist (`git show d7acaf0^2:src/main/main.ts`, Zeilen 297-307), ist das kein Paritätsproblem, sondern eine Upstream-Designfrage. Fix-Vorschlag (ohne neue Dependencies, upstream-tauglich): den ersten Detektor-Lauf erst im `did-finish-load`-Handler füttern oder das Launch-Tier-Event analog zum Evolution-Replay (`main.ts:406-408`) nach dem Laden erneut feuern.
+**Parity-neutral observation (not a Windows gap, affects both platforms identically):** The tier announcement on the first snapshot (mid-day launch, `detectors.ts:69-80`) is in practice always swallowed: `usageTrackerInstance.start()` (`main.ts:358`) fires the first onTick synchronously before `rendererReadyForQuips = true` is set (`main.ts:400`), and `fireQuip` is a no-op before that (`main.ts:71-72`) — but the detector already marks the tier as announced (`detectors.ts:77-79`), so it does not fire again until the next tier crossing/midnight. Since the code is identical to upstream (`git show d7acaf0^2:src/main/main.ts`, lines 297-307), this is not a parity problem but an upstream design question. Fix proposal (no new dependencies, upstream-suitable): feed the first detector run only in the `did-finish-load` handler, or re-fire the launch tier event after loading, analogous to the evolution replay (`main.ts:406-408`).
 
-## 3. Verifiziert-OK-Liste
+## 3. Verified-OK List
 
-- **(a) Herkunft der Tages-Token-Counts:** `todayTotalTokens(totals, nowMs)` liest die `daily`-Map aus `aggregate()` (`src/main/usage/totals.ts:56-58`, `60-71`); Einträge liefern die Parser via `Date.parse(ISO-String)` (`claude-parser.ts:54`, `codex-parser.ts:84`); Einspeisung in den Detektor pro Tick in `main.ts:365-374`.
-- **(b) Keine macOS-Pfade / TZ-Fallen:** `localDateKey` nutzt bewusst lokale Kalendertage (dokumentiert: ccusage-Akzeptanzmetrik, `totals.ts:44-52`) — numerische `getFullYear/getMonth/getDate`, keine ICU/Locale-Abhängigkeit, identische Semantik unter Windows. Pfad-Discovery hat explizite, getestete win32-Zweige (`paths.ts:54-56`, `141-149`; Tests `paths.test.ts:66-104`, `143-178`).
-- **(c) Verdrahtung Detector→Tracker intakt:** Merge-Ergebnis `main.ts:364-374` ist byte-identisch mit Upstream (`d7acaf0^2`, Z. 297-307). tracker.ts-Konfliktauflösung behält Upstreams Opt-in-API (`setEnabledSources`/`getSourcesSnapshot`, `tracker.ts:74-97`) plus unsere async-toleranten Listener (`tracker.ts:100-114`, `207-218`); `onTick` feuert bei jedem Refresh (`tracker.ts:214-218`). Kein `tokenSpike`/`TOKEN_SPIKE`-Rest mehr im Code (Grep über `src/` leer).
-- **Tier-Logik & Mitternachts-Reset:** Tier-Crossing feuert nur aufsteigend (`detectors.ts:100-107`), Reset über lokalen Datums-Key (`detectors.ts:94-99`); über Mitternacht ohne neue Log-Schreibzugriffe liefert `todayTotalTokens` korrekt 0, da die `daily`-Map nach Entry-Zeitstempel bucktet, nicht nach "jetzt".
-- **(d) Tests laufen unter Windows:** `npx vitest run src/main/quips src/main/usage/totals.test.ts src/main/usage/tracker.test.ts` → 66/66 grün auf diesem Rechner. `detectors.test.ts` hat keine Pfad-/Locale-Abhängigkeiten; Mitternachts-Tests (`detectors.test.ts:96-97`, `totals.test.ts:32-33`) konstruieren beide Zeitpunkte in lokaler Zeit → zeitzonen-unabhängig; kein Testdatum liegt auf einer DST-Umstellung.
-- **Lowercase-Voice abgesichert:** Copy-Invarianten-Test inkl. `line.toLowerCase()`-Check (`quips.test.ts:28-32`), plattformunabhängig (ASCII-only Pools).
-- **QA-Flag abgedeckt:** `--quip`-Triggerliste leitet sich aus `Object.keys(QUIP_POOLS)` ab (`main.ts:35`) und enthält `spendWeak/spendOk/spendCrazy` automatisch.
+- **(a) Origin of the daily token counts:** `todayTotalTokens(totals, nowMs)` reads the `daily` map from `aggregate()` (`src/main/usage/totals.ts:56-58`, `60-71`); entries are produced by the parsers via `Date.parse(ISO string)` (`claude-parser.ts:54`, `codex-parser.ts:84`); feeding into the detector per tick in `main.ts:365-374`.
+- **(b) No macOS paths / TZ traps:** `localDateKey` deliberately uses local calendar days (documented: ccusage acceptance metric, `totals.ts:44-52`) — numeric `getFullYear/getMonth/getDate`, no ICU/locale dependency, identical semantics on Windows. Path discovery has explicit, tested win32 branches (`paths.ts:54-56`, `141-149`; tests `paths.test.ts:66-104`, `143-178`).
+- **(c) Detector→tracker wiring intact:** merge result `main.ts:364-374` is byte-identical to upstream (`d7acaf0^2`, ll. 297-307). The tracker.ts conflict resolution keeps upstream's opt-in API (`setEnabledSources`/`getSourcesSnapshot`, `tracker.ts:74-97`) plus our async-tolerant listeners (`tracker.ts:100-114`, `207-218`); `onTick` fires on every refresh (`tracker.ts:214-218`). No `tokenSpike`/`TOKEN_SPIKE` remnant left in the code (grep over `src/` is empty).
+- **Tier logic & midnight reset:** tier crossing fires only on the way up (`detectors.ts:100-107`), reset via local date key (`detectors.ts:94-99`); across midnight without new log writes, `todayTotalTokens` correctly returns 0, because the `daily` map buckets by entry timestamp, not by "now".
+- **(d) Tests run on Windows:** `npx vitest run src/main/quips src/main/usage/totals.test.ts src/main/usage/tracker.test.ts` → 66/66 green on this machine. `detectors.test.ts` has no path/locale dependencies; the midnight tests (`detectors.test.ts:96-97`, `totals.test.ts:32-33`) construct both points in time in local time → timezone-independent; no test date falls on a DST transition.
+- **Lowercase voice safeguarded:** copy invariants test incl. `line.toLowerCase()` check (`quips.test.ts:28-32`), platform-independent (ASCII-only pools).
+- **QA flag covered:** the `--quip` trigger list is derived from `Object.keys(QUIP_POOLS)` (`main.ts:35`) and automatically includes `spendWeak/spendOk/spendCrazy`.
 
-## 4. Vorgeschlagene Flight-Plan-Items
+## 4. Proposed Flight-Plan Items
 
-Keine Lücken → keine Pflicht-Items. Optional (paritäts-neutral, ggf. besser upstream):
+No gaps → no mandatory items. Optional (parity-neutral, possibly better upstream):
 
-- **"Launch-Tier-Quip wird verschluckt"** — Ersten Spend-Tier-Event nach `did-finish-load` replayen (analog Evolution-Replay), damit die Mid-Day-Launch-Ankündigung sichtbar wird; betrifft macOS und Windows gleichermaßen.
+- **"Launch tier quip is swallowed"** — replay the first spend-tier event after `did-finish-load` (analogous to the evolution replay), so that the mid-day launch announcement becomes visible; affects macOS and Windows equally.

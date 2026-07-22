@@ -2,37 +2,37 @@
 
 Branch: `bl-item/pixijs-puppet-studio/BL-14`  
 Reviewer: A (Correctness & Security)  
-Datum: 2026-07-18  
+Date: 2026-07-18  
 
 ## Findings
 
 ### critical
 
-- `src/renderer/index.html:1` — Pet-Overlay-Renderer hat keine `Content-Security-Policy`. Das widerspricht den P1-Electron-Hardening-Invarianten aus `CLAUDE.md` (CSP etc.). Das Settings-Fenster (`src/main/mrr/settings.html`) hat eine CSP, der Pet-Overlay aber nicht. Da der Renderer `fetch` für Sprite-Sheets und Meta-JSON verwendet, erlaubt eine fehlende CSP theoretisch jegliche `connect-src` / Navigation / Script-Ausführung, falls die Invarianten einmal durchkämen.  
-  **Fix:** `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'">` in `src/renderer/index.html` ergänzen.
+- `src/renderer/index.html:1` — Pet overlay renderer has no `Content-Security-Policy`. This contradicts the P1 Electron hardening invariants from `CLAUDE.md` (CSP etc.). The settings window (`src/main/mrr/settings.html`) has a CSP, but the pet overlay does not. Since the renderer uses `fetch` for sprite sheets and meta JSON, a missing CSP theoretically allows any `connect-src` / navigation / script execution if the invariants were ever bypassed.  
+  **Fix:** Add `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self'; connect-src 'self'">` to `src/renderer/index.html`.
 
 ### major
 
-- `src/main/mrr/mrr-engine.ts:38-40` (Start) + `pollNow()` (ab Zeile 55) — `MrrEngine.pollNow()` ist nicht gegen gleichzeitige Ausführung geschützt. Ein Timer-Tick (alle 24 h) und ein manueller `pollNow()` (z. B. über den `--mrr-poll-now`-Flag bei Moduswechsel) können sich überlappen. Beide rufen nacheinander `getLastMrrAwardDate()` auf, sehen beide `null`/einen alten Wert, führen beide Netzwerkabfragen durch und verleihen beide XP für denselben Tag. Die Test-Suite deckt das nicht ab, weil alle Mocks synchron sind.  
-  **Fix:** Ein `private inFlight = false`-Guard in `MrrEngine` einführen; `pollNow()` soll sofort zurückkehren, wenn bereits ein Poll läuft.
+- `src/main/mrr/mrr-engine.ts:38-40` (Start) + `pollNow()` (from line 55) — `MrrEngine.pollNow()` is not protected against concurrent execution. A timer tick (every 24 h) and a manual `pollNow()` (e.g., via the `--mrr-poll-now` flag on mode change) can overlap. Both call `getLastMrrAwardDate()` in sequence, both see `null`/an old value, both perform network queries, and both award XP for the same day. The test suite does not cover this because all mocks are synchronous.  
+  **Fix:** Introduce a `private inFlight = false` guard in `MrrEngine`; `pollNow()` should return immediately if a poll is already running.
 
-- `src/main/mrr/settings-window.ts:147-150` — `win.loadFile(...).catch()` loggt nur `console.error` und lässt das Fenster offen. Wenn das HTML/Preload nicht geladen werden kann, bleibt ein leeres, nicht-funktionales Settings-Fenster bestehen. Für ein Fenster, in dem API-Keys eingegeben werden, ist das eine schwache Error-Recovery.  
-  **Fix:** Im `catch`-Block `win.destroy()` aufrufen und `settingsWindow = null` setzen, damit ein erneuter Aufruf von `openSettingsWindow()` ein neues Fenster aufbaut.
+- `src/main/mrr/settings-window.ts:147-150` — `win.loadFile(...).catch()` only logs `console.error` and leaves the window open. If the HTML/preload cannot be loaded, an empty, non-functional settings window remains. For a window in which API keys are entered, this is weak error recovery.  
+  **Fix:** In the `catch` block call `win.destroy()` and set `settingsWindow = null`, so a subsequent call to `openSettingsWindow()` builds a new window.
 
 ### minor
 
-- `src/main/atomic-file.ts:8` — Kommentar sagt "Three attempts", aber `RETRY_DELAYS_MS = [0, 10, 50, 100]` führt zu vier Versuchen (Attempt 0..3). Der Gesamtworst-Case-Wert stimmt, die Beschreibung ist irreführend.  
-  **Fix:** Kommentar auf "Four attempts" korrigieren oder Array an den Kommentar anpassen.
+- `src/main/atomic-file.ts:8` — Comment says "Three attempts", but `RETRY_DELAYS_MS = [0, 10, 50, 100]` results in four attempts (attempt 0..3). The total worst-case value is correct, the description is misleading.  
+  **Fix:** Correct the comment to "Four attempts" or adjust the array to match the comment.
 
-- `src/main/usage/paths.ts:76-78` — `codexHomes` auf Windows gibt `path.join('', 'Codex')` zurück, wenn `LOCALAPPDATA`/`APPDATA` als leerer String gesetzt sind. Das ist ein relativer Pfad (`'Codex'`) im aktuellen Arbeitsverzeichnis. Zwar filtert `resolveCodexHomes` über `fs.existsSync`, aber falls tatsächlich ein `Codex`-Ordner im Arbeitsverzeichnis liegt, wird er fälschlich als Log-Quelle verwendet.  
-  **Fix:** In `codexHomes` leere Strings vor dem `path.join` filtern oder Pfade auf Absolutheit prüfen.
+- `src/main/usage/paths.ts:76-78` — `codexHomes` on Windows returns `path.join('', 'Codex')` when `LOCALAPPDATA`/`APPDATA` are set to empty strings. That is a relative path (`'Codex'`) in the current working directory. Although `resolveCodexHomes` filters via `fs.existsSync`, if a `Codex` folder actually exists in the working directory, it is incorrectly used as a log source.  
+  **Fix:** Filter empty strings in `codexHomes` before `path.join` or check paths for absoluteness.
 
-- `tools/puppet-studio/studio.ts:50-90` — `loadRig` kann nach `await app.init()` fehlschlagen (z. B. Textur-Laden fehlerhaft). Die neu erstellte `Application` wird dann nicht zerstört, da `session` erst ganz am Ende zugewiesen wird. Bei häufigem Rig-Wechsel im Dev-Tool bleiben PixiJS-Canvas/Texturen im Speicher.  
-  **Fix:** Nach Fehlern in `loadRig` `app.destroy(true)` aufrufen (z. B. in einem `finally` oder dedizierten `catch`).
+- `tools/puppet-studio/studio.ts:50-90` — `loadRig` can fail after `await app.init()` (e.g., texture loading fails). The newly created `Application` is then not destroyed, because `session` is only assigned at the very end. With frequent rig changes in the dev tool, PixiJS canvases/textures remain in memory.  
+  **Fix:** Call `app.destroy(true)` after errors in `loadRig` (e.g., in a `finally` or dedicated `catch`).
 
-## Test-Ergebnis
+## Test result
 
-`npm test` (vitest run) ausgeführt:
+`npm test` (vitest run) run:
 
 ```
 Test Files  46 passed (46)
@@ -40,18 +40,18 @@ Tests       466 passed | 6 skipped (472)
 Duration    3.43s
 ```
 
-Alle 46 Test-Dateien und 466 Tests sind grün. Keine neuen Regressionen.
+All 46 test files and 466 tests are green. No new regressions.
 
-Windows-spezifische Abdeckung ist vorhanden:
-- `src/main/overlay-adapter.test.ts` prüft Windows-Plattform (`win32`), Auto-Hide-Inset, sichtbare Taskbar und `always-on-top` Level.
-- `src/main/usage/paths.test.ts` deckt `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, `~/.codex`, `CLAUDE_CONFIG_DIR` mit Semikolon-Separator und Deduplizierung auf Windows ab.
-- `src/main/atomic-file.test.ts` deckt Windows-typische `EPERM`/`EBUSY`-Rename-Fehler ab.
-- `src/main/mrr/secrets.test.ts` deckt Windows DPAPI (`safeStorage`) für `setSecret`/`getSecret`/`deleteSecret` ab.
-- `src/main/installer-config.test.ts` deckt NSIS-Sprachkonfiguration ab.
+Windows-specific coverage is present:
+- `src/main/overlay-adapter.test.ts` checks Windows platform (`win32`), Auto-Hide inset, visible taskbar and `always-on-top` level.
+- `src/main/usage/paths.test.ts` covers `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, `~/.codex`, `CLAUDE_CONFIG_DIR` with semicolon separator and deduplication on Windows.
+- `src/main/atomic-file.test.ts` covers Windows-typical `EPERM`/`EBUSY` rename errors.
+- `src/main/mrr/secrets.test.ts` covers Windows DPAPI (`safeStorage`) for `setSecret`/`getSecret`/`deleteSecret`.
+- `src/main/installer-config.test.ts` covers NSIS language configuration.
 
-## Geprüfte Dateien
+## Reviewed files
 
-Hauptprozess / Windows:
+Main process / Windows:
 - `src/main/main.ts`
 - `src/main/overlay-adapter.ts` (+ Test)
 - `src/main/tray.ts` (+ Test)
@@ -95,8 +95,8 @@ Puppet Studio:
 
 ## Verdict
 
-**PR-ready: nein.**
+**PR-ready: no.**
 
-Der Code ist grundsätzlich solide, die Test-Suite ist grün und die Windows-Portierung zeigt eine gute Plattform-Abdeckung. Allerdings blockiert das fehlende CSP im Pet-Overlay die Hardening-P1-Invarianten aus `CLAUDE.md`. Zusammen mit dem fehlenden Concurrency-Guard in `MrrEngine.pollNow` (potenzielle Doppel-XP-Verleihung) gibt es zwei konkrete Korrektheits-/Security-Probleme, die vor dem Merge behoben werden müssen. Die Minor-Findings sollten ebenfalls adressiert werden, sind aber kein Blocker.
+The code is fundamentally solid, the test suite is green and the Windows port shows good platform coverage. However, the missing CSP in the pet overlay blocks the hardening P1 invariants from `CLAUDE.md`. Together with the missing concurrency guard in `MrrEngine.pollNow` (potential double XP award) there are two concrete correctness/security problems that must be fixed before merge. The minor findings should also be addressed, but are not a blocker.
 
 Co-authored-by: rodgi040 <220582878+rodgi040@users.noreply.github.com>
