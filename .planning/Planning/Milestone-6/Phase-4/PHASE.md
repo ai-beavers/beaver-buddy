@@ -1,25 +1,25 @@
-# Phase 4 — Release-Pipeline & Distribution (#42–#45) → Z1-Exit
+# Phase 4 — Release Pipeline & Distribution (#42–#45) → Z1 Exit
 
-> Part of Milestone 6. Done when: Release-Pipeline (#42) Version 0.2.0 (#43) mit Changelog
-> (#44) und Update-Mechanismus (#45) ausliefert; Downloads werden gezählt;
-> Zyklus-1-Exit-Kriterien sind messbar. **Multiplattform (Teambeschluss 2026-07-21):
-> Installer für Windows UND macOS nativ aus einer Codebasis.**
+> Part of Milestone 6. Done when: the release pipeline (#42) ships version 0.2.0 (#43)
+> with changelog (#44) and update mechanism (#45); downloads are counted;
+> Cycle 1 exit criteria are measurable. **Multi-platform (team decision 2026-07-21):
+> installers for Windows AND macOS built natively from one codebase.**
 
-**Status:** not-started (Stub — Detail-Definition zu Phasenbeginn mit Rodgi)
+**Status:** not-started (Stub — detailed definition at phase start with Rodgi)
 
 **Accountable:** Rodgi · **Agent:** pi
-**Zyklus:** Zyklus 1
-**Blocked by:** none (Pipeline) — für den echten Release sinnvoll nach M6/P3
-**Blocks:** — (letzter Schritt zu Z1-Exit)
-**Dauer (grob):** ~1 Woche
+**Cycle:** Cycle 1
+**Blocked by:** none (pipeline) — for the real release, sensible after M6/P3
+**Blocks:** — (final step to Z1 exit)
+**Duration (rough):** ~1 week
 
 ## Waves
-- [ ] WAVE-1 — Release-Pipeline + Versionierung 0.2.0 + Changelog (#42–#44)
-  - electron-builder-Targets: **Windows (NSIS) + macOS (dmg/zip, arm64+x64)**
-  - macOS-Signing + Notarisierung (Apple-Developer-Zertifikat — Budget-Entscheid analog #4b; unsigned Fallback dokumentieren)
-  - macOS-Runner in CI (baut + testet den Mac-Build)
-- [ ] WAVE-2 — Update-Mechanismus (#45) + Download-Tracking (GitHub Releases o. ä.)
+- [ ] WAVE-1 — Release pipeline + versioning 0.2.0 + changelog (#42–#44)
+  - electron-builder targets: **Windows (NSIS) + macOS (dmg/zip, arm64+x64)**
+  - macOS signing + notarization (Apple Developer certificate — budget decision analogous to #4b; document unsigned fallback)
+  - macOS runner in CI (builds + tests the Mac build)
+- [ ] WAVE-2 — Update mechanism (#45) + download tracking (GitHub Releases or similar)
 
 ## Notes
-- Z1-Exit: ① App downloadbar ② 100 Downloads ③ 7 Contributors.
-- #4b (SmartScreen-freie Signatur) bleibt Owner-Entscheid mit Budget — nicht exit-blockierend.
+- Z1 exit: ① app downloadable ② 100 downloads ③ 7 contributors.
+- #4b (SmartScreen-free signature) remains an owner decision with budget — not exit-blocking.

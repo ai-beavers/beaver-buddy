@@ -1,13 +1,13 @@
-# Beaver Buddy — Phase 5: Verifikationsbericht
+# Beaver Buddy — Phase 5: Verification Report
 
-**Verifikations-Agent:** Kimi Code CLI  
-**Datum:** 2026-07-15  
-**Geprüfte Basisdokumente:**
+**Verification agent:** Kimi Code CLI  
+**Date:** 2026-07-15  
+**Reviewed base documents:**
 - `.flightplan/Archive/phase-5-plan.md`
 - `.flightplan/Archive/phase-5-plan-review.md`
 - `.flightplan/Archive/phase-5-implementation-log.md`
 
-**Geprüfte Source-Dateien (Phase-5-Änderungen):**
+**Reviewed source files (Phase 5 changes):**
 - `src/main/atomic-file.ts`
 - `src/main/atomic-file.test.ts`
 - `src/main/usage/paths.ts`
@@ -24,79 +24,79 @@
 
 ---
 
-## 1. Zusammenfassung der geprüften Umsetzung
+## 1. Summary of the reviewed implementation
 
-Phase 5 behandelt drei zurückgestellte Windows-Port-Follow-ups. Der Implementierungs-Agent hat zwei der drei Items umgesetzt (BL-WIN-7, Codex-Tracking) und das dritte (BL-WIN-6) korrekt als Administrator-Entscheidung zurückgestellt. Die Review-Befunde aus `phase-5-plan-review.md` wurden großteils in `phase-5-plan.md` übernommen.
+Phase 5 covers three deferred Windows-port follow-ups. The implementation agent implemented two of the three items (BL-WIN-7, Codex tracking) and correctly deferred the third (BL-WIN-6) as an administrator decision. The review findings from `phase-5-plan-review.md` were largely incorporated into `phase-5-plan.md`.
 
-Die Code-Änderungen sind fokussiert und konservativ. Alle Build- und Test-Pipelines laufen auf Windows durch.
-
----
-
-## 2. Punktuelle Prüfung pro Follow-up
-
-### BL-WIN-7: Atomares Schreiben Windows-nativ — ✅ UMGESETZT
-
-| Kriterium | Status | Begründung |
-|-----------|--------|------------|
-| `atomicWriteFile` ist `async` | ✅ | `src/main/atomic-file.ts:21` |
-| Verwendet `fs.promises.writeFile` + `fs.promises.rename` | ✅ | `src/main/atomic-file.ts:27,31` |
-| Retry-Backoff vorhanden | ✅ | 4 Versuche mit Delays `[0, 10, 50, 100]` ms (`atomic-file.ts:12`) |
-| Temp-Datei im Zielverzeichnis | ✅ | `${filePath}.tmp-...` (`atomic-file.ts:24`), Same-Volume-Rename bleibt garantiert |
-| Fehlerklassifikation korrekt | ✅ | `EPERM`/`EBUSY` retriable, `EACCES` nicht retriable (`atomic-file.ts:14-19`) |
-| Temp-Cleanup im Fehlerfall | ✅ | `finally`-Block mit `fs.rm(tmpPath, { force: true })` (`atomic-file.ts:43-49`) |
-| Alle Aufrufer auf `async` umgestellt | ✅ | `saveOnboardingState`, `saveState`, `saveSettingsState`, `XpEngine`-Methoden, `main.ts`, `tray.ts` |
-
-### Codex-Tracking: Windows-Log-Pfade — ✅ UMGESETZT
-
-| Kriterium | Status | Begründung |
-|-----------|--------|------------|
-| Windows-Kandidatenpfade hinzugefügt | ✅ | `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, `~/.codex` (`paths.ts:135-152`) |
-| Pfadpriorisierung korrekt | ✅ | `CODEX_HOME` > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` > `~/.codex` |
-| `CODEX_HOME` bleibt Override | ✅ | Höchste Priorität, alle Plattformen (`paths.ts:136-139`) |
-| Defensiver Plattform-Fallback | ✅ | `normalizePlatform` fällt auf `linux` zurück (`paths.ts:34-39`) |
-| Windows-Tests vorhanden und korrekt | ✅ | 4 Tests in `paths.test.ts:143-181` |
-
-### BL-WIN-6: Windows Secret-Store / MRR-Mode — ⏸️ ZURÜCKGESTELLT
-
-| Kriterium | Status | Begründung |
-|-----------|--------|------------|
-| Kein Code implementiert | ✅ | `src/main/mrr/keychain.ts` unverändert (nur macOS `security`-CLI) |
-| Admin-Entscheidung dokumentiert | ✅ | `phase-5-implementation-log.md:4.1-4.4` |
-| Optionen und Risiken dokumentiert | ✅ | `phase-5-plan.md:2.2-2.3` aktualisiert (`cmdkey.exe` ungeeignet, PowerShell nur POC, Native-Addon nur mit ADR, Option B als Default) |
-| `--keychain-service` Flag erhalten | ✅ | `src/main/main.ts:91-99` unverändert |
+The code changes are focused and conservative. All build and test pipelines pass on Windows.
 
 ---
 
-## 3. Gefundene Fehler / Lücken / Abweichungen
+## 2. Item-by-item review per follow-up
 
-### Kritisch / Hoch
+### BL-WIN-7: Windows-native atomic writes — ✅ IMPLEMENTED
 
-*Keine Blocker gefunden.*
+| Criterion | Status | Rationale |
+|-----------|--------|------------|
+| `atomicWriteFile` is `async` | ✅ | `src/main/atomic-file.ts:21` |
+| Uses `fs.promises.writeFile` + `fs.promises.rename` | ✅ | `src/main/atomic-file.ts:27,31` |
+| Retry backoff present | ✅ | 4 attempts with delays `[0, 10, 50, 100]` ms (`atomic-file.ts:12`) |
+| Temp file in the target directory | ✅ | `${filePath}.tmp-...` (`atomic-file.ts:24`), same-volume rename still guaranteed |
+| Error classification correct | ✅ | `EPERM`/`EBUSY` retriable, `EACCES` not retriable (`atomic-file.ts:14-19`) |
+| Temp cleanup on error | ✅ | `finally` block with `fs.rm(tmpPath, { force: true })` (`atomic-file.ts:43-49`) |
+| All callers migrated to `async` | ✅ | `saveOnboardingState`, `saveState`, `saveSettingsState`, `XpEngine` methods, `main.ts`, `tray.ts` |
 
-### Mittel
+### Codex tracking: Windows log paths — ✅ IMPLEMENTED
 
-1. **Asynchrone Callbacks in `UsageTracker` werden nicht awaited** ⚠️  
-   `src/main/usage/tracker.ts:119,122` ruft `onChange`/`onTick`-Callbacks synchron auf, obwohl der Typ `void | Promise<void>` erlaubt. Wenn ein async Callback rejected, entsteht eine unhandled promise rejection. In der Praxis aktuell unkritisch, weil `xpEngine.ingestLifetimeTokens` Fehler nicht wirft und `main.ts` keine Rejection-Handler hat, aber das Pattern ist inkonsistent mit dem sonstigen `async/await`-Ansatz.
-   - **Empfohlener Fix:** Callbacks mit `await` abarbeiten oder Rejections in `refresh()` fangen und loggen.
+| Criterion | Status | Rationale |
+|-----------|--------|------------|
+| Windows candidate paths added | ✅ | `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, `~/.codex` (`paths.ts:135-152`) |
+| Path prioritization correct | ✅ | `CODEX_HOME` > `%LOCALAPPDATA%\Codex` > `%APPDATA%\Codex` > `~/.codex` |
+| `CODEX_HOME` remains the override | ✅ | Highest priority, all platforms (`paths.ts:136-139`) |
+| Defensive platform fallback | ✅ | `normalizePlatform` falls back to `linux` (`paths.ts:34-39`) |
+| Windows tests present and correct | ✅ | 4 tests in `paths.test.ts:143-181` |
 
-2. **Test-Casts in `atomic-file.test.ts`** ⚠️  
-   `src/main/atomic-file.test.ts:44,58` castet `oldPath`/`newPath` zu `string`, obwohl `fs.promises.rename` eigentlich `PathLike | FileHandle` akzeptiert. Das funktioniert, ist aber typisch gesehen unsauber.
-   - **Empfohlener Fix:** Mock-Typen an `fs.promises.rename` angleichen oder Spy auf `fs.rename` aus `node:fs/promises` einschränken.
+### BL-WIN-6: Windows secret store / MRR mode — ⏸️ DEFERRED
 
-### Niedrig
-
-3. **`phase-5-plan.md` Header noch auf "Planungsphase"** ⚠️  
-   Zeile 3 sagt "Planungsphase — keine Source-Änderungen, keine Commits". Das stimmt nicht mehr: BL-WIN-7 und Codex-Tracking sind umgesetzt.
-   - **Empfohlener Fix:** Header aktualisieren auf "Implementierungsphase — BL-WIN-7 + Codex-Tracking umgesetzt, BL-WIN-6 zurückgestellt".
-
-4. **Review-Befund zur `Platform`-Typproblematik nur teilweise behoben** ⚠️  
-   Der defensive Fallback `normalizePlatform` ist eingebaut, aber `discoverPaths` akzeptiert weiterhin `Platform` als Parameter. Unbekannte Plattformen werden nun korrekt auf `linux` zurückgeführt; dies ist akzeptabel.
+| Criterion | Status | Rationale |
+|-----------|--------|------------|
+| No code implemented | ✅ | `src/main/mrr/keychain.ts` unchanged (macOS `security` CLI only) |
+| Admin decision documented | ✅ | `phase-5-implementation-log.md:4.1-4.4` |
+| Options and risks documented | ✅ | `phase-5-plan.md:2.2-2.3` updated (`cmdkey.exe` unsuitable, PowerShell only for POCs, native addon only with an ADR, Option B as default) |
+| `--keychain-service` flag preserved | ✅ | `src/main/main.ts:91-99` unchanged |
 
 ---
 
-## 4. Ergebnisse der ausgeführten Befehle
+## 3. Found errors / gaps / deviations
 
-Alle Befehle wurden auf Windows (Git Bash) im Projektverzeichnis ausgeführt.
+### Critical / High
+
+*No blockers found.*
+
+### Medium
+
+1. **Asynchronous callbacks in `UsageTracker` are not awaited** ⚠️  
+   `src/main/usage/tracker.ts:119,122` calls `onChange`/`onTick` callbacks synchronously, even though the type allows `void | Promise<void>`. If an async callback rejects, an unhandled promise rejection occurs. In practice currently uncritical, because `xpEngine.ingestLifetimeTokens` does not throw errors and `main.ts` has no rejection handlers, but the pattern is inconsistent with the otherwise `async/await` approach.
+   - **Recommended fix:** Process callbacks with `await`, or catch and log rejections in `refresh()`.
+
+2. **Test casts in `atomic-file.test.ts`** ⚠️  
+   `src/main/atomic-file.test.ts:44,58` casts `oldPath`/`newPath` to `string`, although `fs.promises.rename` actually accepts `PathLike | FileHandle`. This works but is typically considered unclean.
+   - **Recommended fix:** Align the mock types with `fs.promises.rename`, or restrict the spy to `fs.rename` from `node:fs/promises`.
+
+### Low
+
+3. **`phase-5-plan.md` header still says "planning phase"** ⚠️  
+   Line 3 says "planning phase — no source changes, no commits". That is no longer true: BL-WIN-7 and Codex tracking are implemented.
+   - **Recommended fix:** Update the header to "implementation phase — BL-WIN-7 + Codex tracking implemented, BL-WIN-6 deferred".
+
+4. **Review finding on the `Platform` type issue only partially resolved** ⚠️  
+   The defensive fallback `normalizePlatform` is in place, but `discoverPaths` still accepts `Platform` as a parameter. Unknown platforms are now correctly mapped to `linux`; this is acceptable.
+
+---
+
+## 4. Results of the executed commands
+
+All commands were run on Windows (Git Bash) in the project directory.
 
 ### `npm run typecheck`
 
@@ -105,7 +105,7 @@ Alle Befehle wurden auf Windows (Git Bash) im Projektverzeichnis ausgeführt.
 > tsc --noEmit && tsc --noEmit -p src/renderer/tsconfig.json && tsc --noEmit -p scripts/gen-sprites/tsconfig.json
 ```
 
-✅ **Erfolgreich** — keine TypeScript-Fehler.
+✅ **Successful** — no TypeScript errors.
 
 ### `npm run lint`
 
@@ -114,7 +114,7 @@ Alle Befehle wurden auf Windows (Git Bash) im Projektverzeichnis ausgeführt.
 > eslint .
 ```
 
-✅ **Erfolgreich** — keine Lint-Fehler.
+✅ **Successful** — no lint errors.
 
 ### `npm test`
 
@@ -124,7 +124,7 @@ Test Files  37 passed (37)
    Duration  2.73s
 ```
 
-✅ **Erfolgreich** — alle Tests grün.
+✅ **Successful** — all tests green.
 
 ### `npm run build`
 
@@ -135,7 +135,7 @@ Test Files  37 passed (37)
 Assets built successfully.
 ```
 
-✅ **Erfolgreich** — Build und Asset-Generierung laufen durch.
+✅ **Successful** — build and asset generation complete.
 
 ### `npx electron-builder --win --publish never`
 
@@ -146,13 +146,13 @@ Assets built successfully.
 • building        target=portable file=release\Beaver Buddy 0.1.0.exe
 ```
 
-✅ **Erfolgreich** — Windows-Installer und portable EXE wurden erstellt und signiert.
+✅ **Successful** — Windows installer and portable EXE were created and signed.
 
 ---
 
-## 5. Git-Status / Diff-Überprüfung
+## 5. Git status / diff check
 
-`git status --short` zeigt die erwarteten Phase-5-Dateien als geändert bzw. neu:
+`git status --short` shows the expected Phase 5 files as modified or new:
 
 ```
 M src/main/atomic-file.ts
@@ -177,41 +177,41 @@ M src/main/xp/store.ts
 ?? src/main/atomic-file.test.ts
 ```
 
-Zusätzlich sind weitere Dateien aus den vorangegangenen Phasen 1–4 geändert (`.github/workflows/ci.yml`, `CLAUDE.md`, `README.md`, `package.json`, etc.). Diese liegen außerhalb des Scope von Phase 5 und wurden hier nicht geprüft.
+Additionally, other files from the preceding Phases 1–4 are modified (`.github/workflows/ci.yml`, `CLAUDE.md`, `README.md`, `package.json`, etc.). These are outside the scope of Phase 5 and were not reviewed here.
 
-`git diff --stat` für die Phase-5-relevanten Dateien stimmt mit dem Implementation Log überein.
-
----
-
-## 6. Empfohlene Fixes
-
-1. **`UsageTracker.refresh()` sollte async Callbacks robust behandeln.**  
-   Entweder `await` für jeden Listener einführen oder einen `try/catch` pro Listener verwenden, um unhandled rejections zu vermeiden.
-
-2. **Header von `phase-5-plan.md` aktualisieren.**  
-   Status sollte die tatsächliche Umsetzung von BL-WIN-7 und Codex-Tracking widerspiegeln.
-
-3. **`atomic-file.test.ts` Mock-Typen bereinigen (optional).**  
-   Geringe Priorität, da die Tests funktionieren.
-
-4. **BL-WIN-6:** Admin-Entscheidung einholen und anschließend `keychain.ts` in Interface + Factory + plattformspezifische Implementierungen refactoren.
+`git diff --stat` for the Phase 5-relevant files matches the implementation log.
 
 ---
 
-## 7. Gesamt-Status
+## 6. Recommended fixes
+
+1. **`UsageTracker.refresh()` should handle async callbacks robustly.**  
+   Either introduce `await` for each listener or use a `try/catch` per listener to avoid unhandled rejections.
+
+2. **Update the header of `phase-5-plan.md`.**  
+   The status should reflect the actual implementation of BL-WIN-7 and Codex tracking.
+
+3. **Clean up mock types in `atomic-file.test.ts` (optional).**  
+   Low priority, since the tests work.
+
+4. **BL-WIN-6:** Obtain the admin decision and then refactor `keychain.ts` into interface + factory + platform-specific implementations.
+
+---
+
+## 7. Overall status
 
 **PASSED WITH WARNINGS**
 
-BL-WIN-7 und Codex-Tracking sind korrekt umgesetzt, alle Build- und Test-Pipelines laufen erfolgreich durch, und BL-WIN-6 ist angemessen zurückgestellt. Die verbleibenden Warnungen sind keine Blocker, sollten aber vor einem Release bereinigt werden, insbesondere das unhandled-rejection-Risiko in `UsageTracker.refresh()`.
+BL-WIN-7 and Codex tracking are correctly implemented, all build and test pipelines run successfully, and BL-WIN-6 is appropriately deferred. The remaining warnings are not blockers but should be resolved before a release, in particular the unhandled-rejection risk in `UsageTracker.refresh()`.
 
 ---
 
-## 8. Empfohlene nächste Schritte
+## 8. Recommended next steps
 
-1. Admin-Entscheidung für BL-WIN-6 einholen.
-2. `UsageTracker.refresh()` so anpassen, dass async Callbacks entweder awaited oder abgesichert werden.
-3. Optional: `phase-5-plan.md` Header auf aktuellen Status anpassen.
-4. Optional: Windows-Testinstallation durchführen, um die Codex-Pfade empirisch zu verifizieren.
-5. Nach BL-WIN-6-Entscheidung: Refactor von `keychain.ts` und Implementierung des Windows-Secret-Stores.
+1. Obtain the admin decision for BL-WIN-6.
+2. Adjust `UsageTracker.refresh()` so that async callbacks are either awaited or guarded.
+3. Optional: update the `phase-5-plan.md` header to the current status.
+4. Optional: perform a Windows test installation to empirically verify the Codex paths.
+5. After the BL-WIN-6 decision: refactor `keychain.ts` and implement the Windows secret store.
 
-*Keine Source-Dateien wurden durch diesen Verifikations-Agenten geändert.*
+*No source files were changed by this verification agent.*

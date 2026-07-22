@@ -1,19 +1,20 @@
-# Phase 2 — Benachrichtigungs-Darstellung (Bubble/Sign)
+# Phase 2 — Notification Display (Bubble/Sign)
 
-> Part of Milestone 3. Done when: Events aus P1 werden visuell durch den Biber angezeigt
-> (zunächst via bestehendem Bubble/Quip-System), nicht-invasiv, mit Tests und Doku.
+> Part of Milestone 3. Done when: Events from P1 are displayed visually by the
+> beaver (initially via the existing Bubble/Quip system), non-invasively, with
+> tests and docs.
 
-**Status:** not-started (Stub — Detail-Definition zu Phasenbeginn mit Jurij)
+**Status:** not-started (stub — detailed definition at phase start with Jurij)
 
 **Accountable:** Jurij · **Agent:** Claude Code
-**Zyklus:** Zyklus 1
-**Blocked by:** M3/P1 (Event-Modell + Contract)
-**Blocks:** künftige M5-Event-Animationen (z. B. Schild hochhalten)
-**Dauer (grob):** ~1 Woche
+**Cycle:** Cycle 1
+**Blocked by:** M3/P1 (event model + contract)
+**Blocks:** future M5 event animations (e.g. holding up a sign)
+**Duration (rough):** ~1 week
 
 ## Waves
-- [ ] WAVE-1 — Bubble/Quip-Darstellung für die zwei Kern-Events, UX-Regeln (nicht-invasiv, Timing)
-- [ ] WAVE-2 — Tests + Darstellungs-Contract für spätere dedizierte Animationen dokumentieren
+- [ ] WAVE-1 — Bubble/Quip display for the two core events, UX rules (non-invasive, timing)
+- [ ] WAVE-2 — Tests + document the display contract for later dedicated animations
 
 ## Notes
-- Dedizierte Animationen (Schild hochhalten o. ä.) kommen später als neue M5-Phase nach.
+- Dedicated animations (holding up a sign or similar) follow later as a new M5 phase.

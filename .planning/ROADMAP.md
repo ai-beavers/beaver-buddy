@@ -3,73 +3,73 @@
 > The route: milestones and their phases. `[ ]` open · `[x]` done.
 > Waves live in each phase's `Planning/Milestone-N/Phase-N/Waves/WAVE-X.md`.
 > Item-Specs #1–#64: `.flightplan/Reference/windows-native-flight-plan.md` ·
-> Meeting-Quelle Zyklus 1: `.flightplan/Meetings/2026-07-21-planung/`
+> Meeting source Cycle 1: `.flightplan/Meetings/2026-07-21-planung/`
 
-## 🎯 Zyklus 1 (definiert 2026-07-21)
+## 🎯 Cycle 1 (defined 2026-07-21)
 
-**Exit-Kriterien:** ① herunterladbare App (Installer via Release-Pipeline) ② 100 Downloads ③ 7 Contributors (aktuell 3)
-**Horizont:** ~6–8 Wochen bei paralleler Arbeit (M3 ∥ M4 ∥ M5-Assets)
+**Exit criteria:** ① downloadable app (installer via release pipeline) ② 100 downloads ③ 7 contributors (currently 3)
+**Horizon:** ~6–8 weeks with parallel work (M3 ∥ M4 ∥ M5 assets)
 
-**Team & Agenten (verbindlich):**
-| Person | Rolle | Agent |
+**Team & agents (binding):**
+| Person | Role | Agent |
 |---|---|---|
-| Rodgi (Owner) | State-Logik-Definition, Features, Review, Owner-Entscheide | **pi (nur Rodgi)** |
-| Vlady | Sprite-Animationen | **Claude Code** |
-| Jurij | Event-Logik, hart Technisches | **Claude Code** |
+| Rodgi (Owner) | State-logic definition, features, review, owner decisions | **pi (Rodgi only)** |
+| Vlady | Sprite animations | **Claude Code** |
+| Jurij | Event logic, hard tech | **Claude Code** |
 
-Regel: genau **ein Accountable pro Phase**; Agenten arbeiten nur für den Phase-Owner.
+Rule: exactly **one accountable per phase**; agents work only for the phase owner.
 
 ## Milestones
 
-### M1 — Windows-native App ✅ · Z1 (erledigt, Rodgi)
-- [x] Phase 1 — Windows-Infrastruktur (#1–#6)
-- [x] Phase 2 — Runde 2 Parität & Feinschliff (#46–#62)
+### M1 — Windows-native app ✅ · Z1 (done, Rodgi)
+- [x] Phase 1 — Windows infrastructure (#1–#6)
+- [x] Phase 2 — Round 2 parity & polish (#46–#62)
 
-### M2 — Asset-Pipeline & Animationen · läuft (Vlady + Rodgi)
+### M2 — Asset pipeline & animations · in progress (Vlady + Rodgi)
 - [x] Phase 1 — PixiJS Puppet Studio (BL-14)
-- [x] Phase 2 — ComfyUI „PixelArt Builder"
-- [ ] Phase 3 — Fallschirm-Drop · **PAUSIERT** (WAVE-1/2 ✅, WAVE-3 offen → Resume via Claude Code, Spec `Milestone-2/Phase-3/Waves/WAVE-3.md`)
+- [x] Phase 2 — ComfyUI “PixelArt Builder"
+- [ ] Phase 3 — Parachute drop · **PAUSED** (WAVE-1/2 ✅, WAVE-3 open → resume via Claude Code, spec `Milestone-2/Phase-3/Waves/WAVE-3.md`)
 
-### M3 — Recording Agent & Benachrichtigungen · Z1 (**Jurij**, 2–3 W)
-- [ ] Phase 1 — Event-Erkennung via **Herdr** (Open-Source-Agent-Übersicht; fertig / Input nötig) · none
-- [ ] Phase 2 — Benachrichtigungs-Darstellung (Bubble/Sign) · ← M3/P1
-- [ ] Phase 3 — Security-Gate & Event↔Animation-Härtung · ← M3/P1
+### M3 — Recording Agent & notifications · Z1 (**Jurij**, 2–3 w)
+- [ ] Phase 1 — Event detection via **Herdr** (open-source agent overview; done / input needed) · none
+- [ ] Phase 2 — Notification display (bubble/sign) · ← M3/P1
+- [ ] Phase 3 — Security gate & event↔animation hardening · ← M3/P1
 
-### M4 — Level-, XP- & Profil-System · Z1 (**Rodgi**, 3–4 W, ∥ M3)
-- [ ] Phase 1 — Token-Tracking & Aggregation (täglich, pro Modell, ohne Cache; #24/#25) · none
-- [ ] Phase 2 — XP-/Level-Modell + Level-Tabelle 1–32 · ← M4/P1
-- [ ] Phase 3 — Persistenz & Profil (Namensgebung, Achievements) · ← M4/P2
-- [ ] Phase 4 — Character-Map-JSON (Level↔Sprites↔Animationen) · ← M2/P1–P2 ✅
+### M4 — Level, XP & profile system · Z1 (**Rodgi**, 3–4 w, ∥ M3)
+- [ ] Phase 1 — Token tracking & aggregation (daily, per model, no cache; #24/#25) · none
+- [ ] Phase 2 — XP/level model + level table 1–32 · ← M4/P1
+- [ ] Phase 3 — Persistence & profile (naming, achievements) · ← M4/P2
+- [ ] Phase 4 — Character-map JSON (level↔sprites↔animations) · ← M2/P1–P2 ✅
 
-### M5 — Animationen (Rest) · Z1 gestaffelt (**Vlady**, ~1 W/Animation)
-- [ ] P1 Baum (#15) · P2 Coding (#8) · P3 Drinks (#9) · P4 Schlaf (#10) · P5 Stretch (#11) — **Z1-Scope**
-- [ ] P12 Stufen-Art-Paket: junges Baby, älterer Jugendlicher, Erwachsener (#7) — **Z1 (nachgezogen: 5 Lebenszyklen)**
-- [ ] P6–P11 (Sprechen, Sport, Stock, Toilette, Handy, Meeting) — **post-Z1**
+### M5 — Animations (rest) · Z1 staggered (**Vlady**, ~1 w/animation)
+- [ ] P1 Tree (#15) · P2 Coding (#8) · P3 Drinks (#9) · P4 Sleep (#10) · P5 Stretch (#11) — **Z1 scope**
+- [ ] P12 Stage art package: young baby, older teenager, adult (#7) — **Z1 (added later: 5 life stages)**
+- [ ] P6–P11 (Talk, Sport, Stick, Toilet, Phone, Meeting) — **post-Z1**
 
-### M6 — Contribution-Readiness & Release · Z1-Exit (**Rodgi**, ~2 W)
-- [ ] Phase 1 — Contributor-/API-/Asset-Builder-Doku · ← M3, M4
-- [ ] Phase 2 — Einstellungen & Tray (#33–#36) · none
-- [ ] Phase 3 — QA & Design-Gates (#37–#41) · ← M5 Z1-Umfang
-- [ ] Phase 4 — Release-Pipeline & Distribution (#42–#45, Download-Tracking) · none → **Z1-Exit**
+### M6 — Contribution readiness & release · Z1 exit (**Rodgi**, ~2 w)
+- [ ] Phase 1 — Contributor/API/asset-builder docs · ← M3, M4
+- [ ] Phase 2 — Settings & tray (#33–#36) · none
+- [ ] Phase 3 — QA & design gates (#37–#41) · ← M5 Z1 scope
+- [ ] Phase 4 — Release pipeline & distribution (#42–#45, download tracking) · none → **Z1 exit**
 
-### Post-Zyklus 1
-Auth/Account-Verknüpfung · Prestige-System · kosmetische Monetarisierung · MRR #26/#27 ·
-Overlay & Fensterverhalten #28–#32 · Quips/State-Machine-Erweiterungen #19–#23 ·
-M5 P6–P12 · Owner-Entscheide #3/#4b/#63/#64 · Hidden-Easter-Eggs (NOTE.md)
+### Post-Cycle 1
+Auth/account linking · Prestige system · Cosmetic monetization · MRR #26/#27 ·
+Overlay & window behavior #28–#32 · Quips/state-machine extensions #19–#23 ·
+M5 P6–P12 · Owner decisions #3/#4b/#63/#64 · Hidden easter eggs (NOTE.md)
 
-## 🔗 Dependency-Übersicht
+## 🔗 Dependency overview
 
-| Phase | Blocked by | Grund |
+| Phase | Blocked by | Reason |
 |---|---|---|
-| M3/P1, M4/P1, M6/P2, M6/P4 | **none** | sofort parallel startbar |
-| M5 Assets (alle Phasen) | M2/P1–P2 ✅ | bereits erfüllt → Assets sofort startbar |
-| M3/P2, M3/P3 | M3/P1 | Darstellung/Security brauchen Event-Modell |
-| M4/P2 | M4/P1 | XP-Modell braucht Token-Datenbasis |
-| M4/P3 | M4/P2 | Profil/Achievements brauchen Level-Modell |
-| M4/P4 | M2/P1–P2 ✅ | Character-Map nutzt Bake-Format |
-| M5 Runtime (Level-Trigger) | M4/P2 | Freischaltung ab ~Level 8 |
-| Künftige Event-Animationen (neue M5-Phasen, z. B. Schild hochhalten) | M3/P2 | Darstellungs-Contract aus Recording Agent |
-| M6/P1 | M3, M4 | Doku dokumentiert deren Architektur |
-| M6/P3 | M5 P1–P5 | QA/Design-Gates brauchen Z1-Animationsumfang |
+| M3/P1, M4/P1, M6/P2, M6/P4 | **none** | can be started in parallel immediately |
+| M5 assets (all phases) | M2/P1–P2 ✅ | already fulfilled → assets can start immediately |
+| M3/P2, M3/P3 | M3/P1 | display/security need event model |
+| M4/P2 | M4/P1 | XP model needs token data basis |
+| M4/P3 | M4/P2 | profile/achievements need level model |
+| M4/P4 | M2/P1–P2 ✅ | character map uses bake format |
+| M5 runtime (level-trigger) | M4/P2 | unlock from ~level 8 |
+| Future event animations (new M5 phases, e.g. holding up a sign) | M3/P2 | display contract from Recording Agent |
+| M6/P1 | M3, M4 | docs document their architecture |
+| M6/P3 | M5 P1–P5 | QA/design gates need Z1 animation scope |
 
-**Langfassung:** `Blocked by:`-Feld in jeder `PHASE.md`, Abschnitt „Dependencies" in jeder `MILESTONE.md`.
+**Long version:** `Blocked by:` field in every `PHASE.md`, `Dependencies` section in every `MILESTONE.md`.

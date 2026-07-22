@@ -4,7 +4,7 @@
 // or corrupt file is treated as fresh (tokens mode, nothing connected) —
 // never crashes the app. Same shape/atomic-write discipline as xp/store.ts.
 //
-// claudeEnabled / codexEnabled are explicit opt-ins: local logs may exist,
+// Usage-source enabled flags are explicit opt-ins: local logs may exist,
 // but a source only counts (and shows as connected) after the user clicks
 // Connect. Defaults false — never auto-connect on first launch.
 
@@ -20,6 +20,9 @@ export interface SettingsState {
   readonly revenuecatConnected: boolean;
   readonly claudeEnabled: boolean;
   readonly codexEnabled: boolean;
+  readonly piEnabled?: boolean;
+  readonly kimiEnabled?: boolean;
+  readonly opencodeEnabled?: boolean;
 }
 
 const FILE_NAME = 'growth-settings.json';
@@ -31,12 +34,15 @@ export function freshState(): SettingsState {
     revenuecatConnected: false,
     claudeEnabled: false,
     codexEnabled: false,
+    piEnabled: false,
+    kimiEnabled: false,
+    opencodeEnabled: false,
   };
 }
 
 function isValidState(value: unknown): value is SettingsState {
   if (typeof value !== 'object' || value === null) return false;
-  const { mode, stripeConnected, revenuecatConnected, claudeEnabled, codexEnabled } = value as Record<
+  const { mode, stripeConnected, revenuecatConnected, claudeEnabled, codexEnabled, piEnabled, kimiEnabled, opencodeEnabled } = value as Record<
     string,
     unknown
   >;
@@ -45,7 +51,10 @@ function isValidState(value: unknown): value is SettingsState {
     typeof stripeConnected === 'boolean' &&
     typeof revenuecatConnected === 'boolean' &&
     typeof claudeEnabled === 'boolean' &&
-    typeof codexEnabled === 'boolean'
+    typeof codexEnabled === 'boolean' &&
+    (piEnabled === undefined || typeof piEnabled === 'boolean') &&
+    (kimiEnabled === undefined || typeof kimiEnabled === 'boolean') &&
+    (opencodeEnabled === undefined || typeof opencodeEnabled === 'boolean')
   );
 }
 
@@ -62,6 +71,9 @@ function migrateState(value: unknown): SettingsState | null {
     revenuecatConnected: obj.revenuecatConnected,
     claudeEnabled: typeof obj.claudeEnabled === 'boolean' ? obj.claudeEnabled : false,
     codexEnabled: typeof obj.codexEnabled === 'boolean' ? obj.codexEnabled : false,
+    ...(typeof obj.piEnabled === 'boolean' ? { piEnabled: obj.piEnabled } : {}),
+    ...(typeof obj.kimiEnabled === 'boolean' ? { kimiEnabled: obj.kimiEnabled } : {}),
+    ...(typeof obj.opencodeEnabled === 'boolean' ? { opencodeEnabled: obj.opencodeEnabled } : {}),
   };
 }
 

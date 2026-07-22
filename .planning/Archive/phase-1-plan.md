@@ -1,46 +1,46 @@
-# Phase 1: Foundation — Detaillierter Umsetzungsplan
+# Phase 1: Foundation — Detailed Implementation Plan
 
-**Projekt:** Beaver Buddy (Electron-TypeScript-App)  
+**Project:** Beaver Buddy (Electron TypeScript app)  
 **Phase:** 1 / 5  
-**Build-Items:** BL-WIN-1, BL-WIN-2, BL-WIN-9  
-**Ziel:** App lässt sich auf Windows bauen, packen und in der CI testen.  
-**Keine Source-Code-Änderungen in diesem Dokument — nur Planung.**
+**Build Items:** BL-WIN-1, BL-WIN-2, BL-WIN-9  
+**Goal:** The app can be built, packaged, and tested in CI on Windows.  
+**No source code changes in this document — planning only.**
 
 ---
 
-## 1. Zusammenfassung der Phase
+## 1. Phase Summary
 
-Phase 1 legt das fundamentale Build-, Packaging- und CI-Gerüst für den Windows-Port. Die aktuelle Codebasis ist zwar überwiegend plattformneutral, aber der Build-Prozess (`package.json`) verwendet Unix-Shell-Kommandos (`cp`, `rm -rf`, `mkdir -p`), die unter Windows cmd/PowerShell fehlschlagen. Außerdem fehlt im `electron-builder.yml` ein Windows-Target, und die CI läuft ausschließlich auf `ubuntu-latest`.
+Phase 1 lays the fundamental build, packaging, and CI scaffolding for the Windows port. The current codebase is largely platform-neutral, but the build process (`package.json`) uses Unix shell commands (`cp`, `rm -rf`, `mkdir -p`) that fail on Windows cmd/PowerShell. Additionally, `electron-builder.yml` lacks a Windows target, and CI runs exclusively on `ubuntu-latest`.
 
-In Phase 1 werden diese Blocker beseitigt, ohne neue Dependencies einzuführen und ohne Änderungen an der eigentlichen App-Logik (Overlay, Tray, Renderer) vorzunehmen. Die Phase ist abschließbar, sobald `npm run build` und `electron-builder --win --publish never` lokal auf Windows sowie im `windows-latest`-CI-Runner erfolgreich durchlaufen.
+Phase 1 removes these blockers without introducing new dependencies and without changing the actual app logic (overlay, tray, renderer). The phase is complete once `npm run build` and `electron-builder --win --publish never` run successfully both locally on Windows and in the `windows-latest` CI runner.
 
 ---
 
-## 2. Konkrete Schritte pro Build-Item
+## 2. Concrete Steps per Build Item
 
-### BL-WIN-1: Build-Scripts plattformunabhängig
+### BL-WIN-1: Platform-Independent Build Scripts
 
-**Scope:** `package.json`, neues `scripts/build-assets.js`.  
-**Status:** Foundation-Blocker #1 — muss als Erstes gelöst werden.  
-**Ziel:** `npm run build` läuft identisch unter Windows (cmd/PowerShell), macOS und Linux.
+**Scope:** `package.json`, new `scripts/build-assets.js`.  
+**Status:** Foundation blocker #1 — must be solved first.  
+**Goal:** `npm run build` runs identically on Windows (cmd/PowerShell), macOS, and Linux.
 
-#### 2.1 Ist-Zustand analysieren
+#### 2.1 Analyze Current State
 
-Aktuelles `package.json` (Zeile 12):
+Current `package.json` (line 12):
 
 ```json
 "build": "tsc && tsc -p src/renderer/tsconfig.json && cp src/renderer/index.html dist/renderer/index.html && mkdir -p dist/renderer/assets && rm -rf dist/renderer/assets/sprites && cp -R assets/sprites dist/renderer/assets/sprites && cp src/main/mrr/settings.html dist/main/mrr/settings.html"
 ```
 
-Probleme:
-- `cp`, `cp -R` — Unix-only; Windows kennt diese Befehle nicht in cmd/PowerShell.
-- `mkdir -p` — Unter Windows nur mit PowerShell verfügbar, nicht in cmd.
-- `rm -rf` — Unix-only; unter Windows führt dies zu einem Fehler.
-- Lange Shell-Kette ist schwer lesbar, schwer zu testen und brüchig bei Leerzeichen in Pfaden.
+Problems:
+- `cp`, `cp -R` — Unix-only; Windows cmd/PowerShell does not know these commands.
+- `mkdir -p` — On Windows only available in PowerShell, not in cmd.
+- `rm -rf` — Unix-only; causes an error on Windows.
+- A long shell chain is hard to read, hard to test, and fragile with spaces in paths.
 
-#### 2.2 Neues Skript `scripts/build-assets.js` erstellen
+#### 2.2 Create New Script `scripts/build-assets.js`
 
-Ein Node-Skript ersetzt die Shell-Kette vollständig. Es verwendet ausschließlich `node:fs` und `node:path`, also plattformunabhängige Node-APIs.
+A Node script fully replaces the shell chain. It uses only `node:fs` and `node:path`, i.e. platform-independent Node APIs.
 
 ```js
 // scripts/build-assets.js
@@ -80,56 +80,56 @@ function copyDir(src, dst) {
   }
 }
 
-// Lösche vorhandene Sprite-Zielordner (idempotent)
+// Delete existing sprite target folder (idempotent)
 fs.rmSync(spritesDst, { recursive: true, force: true });
 
-// Kopiere statische Assets
+// Copy static assets
 for (const { src, dst } of assets) {
   copyFile(src, dst);
 }
 
-// Kopiere Sprites rekursiv
+// Copy sprites recursively
 copyDir(spritesSrc, spritesDst);
 
 console.log('Assets built successfully.');
 ```
 
-**Design-Entscheidungen:**
-- `fs.rmSync(..., { recursive: true, force: true })` ist seit Node 14.14 verfügbar und funktioniert plattformunabhängig.
-- `fs.copyFileSync` kopiert einzelne Dateien; `fs.readdirSync(..., { withFileTypes: true })` ermöglicht rekursives Kopieren ohne externe Tools.
-- Keine zusätzlichen Dependencies; nur Node-Standardbibliothek.
+**Design decisions:**
+- `fs.rmSync(..., { recursive: true, force: true })` has been available since Node 14.14 and works platform-independently.
+- `fs.copyFileSync` copies individual files; `fs.readdirSync(..., { withFileTypes: true })` enables recursive copying without external tools.
+- No additional dependencies; only the Node standard library.
 
-#### 2.3 `package.json` anpassen
+#### 2.3 Adjust `package.json`
 
-Neues `build`-Script:
+New `build` script:
 
 ```json
 "build": "tsc && tsc -p src/renderer/tsconfig.json && node scripts/build-assets.js"
 ```
 
-Optional kann man `scripts/build-assets.js` als `.ts`-Datei mit einem eigenen `tsconfig.json` umsetzen. Das wäre aber Overhead, da das Skript nur Dateisystemoperationen ausführt und keinen TypeScript-Code benötigt. Ein CommonJS-`.js`-Skript ist ausreichend und minimiert Änderungen.
+Optionally, `scripts/build-assets.js` could be implemented as a `.ts` file with its own `tsconfig.json`. That would be overhead, since the script only performs filesystem operations and needs no TypeScript code. A CommonJS `.js` script is sufficient and minimizes changes.
 
-**Weitere Anpassungen in `package.json`:**
-- `description` aktualisieren (falls gewünscht): `"Pixel-art desktop beaver overlay for macOS and Windows"` — dies ist aber nicht zwingend für Phase 1; empfohlen in BL-WIN-10.
-- Keine neuen `scripts`, keine neuen `devDependencies`.
+**Further adjustments in `package.json`:**
+- Update `description` (if desired): `"Pixel-art desktop beaver overlay for macOS and Windows"` — but this is not mandatory for Phase 1; recommended in BL-WIN-10.
+- No new `scripts`, no new `devDependencies`.
 
-#### 2.4 Erwartetes Ergebnis
+#### 2.4 Expected Result
 
-- `npm run build` läuft unter Windows cmd/PowerShell ohne Fehler durch.
-- `dist/renderer/index.html`, `dist/main/mrr/settings.html` und `dist/renderer/assets/sprites/*` existieren nach dem Build.
-- `npm run build` läuft weiterhin unter macOS und Linux identisch.
+- `npm run build` runs without errors on Windows cmd/PowerShell.
+- `dist/renderer/index.html`, `dist/main/mrr/settings.html`, and `dist/renderer/assets/sprites/*` exist after the build.
+- `npm run build` continues to run identically on macOS and Linux.
 
 ---
 
-### BL-WIN-2: electron-builder Windows-Target + Icon-Assets
+### BL-WIN-2: electron-builder Windows Target + Icon Assets
 
-**Scope:** `electron-builder.yml`, Windows-Icon-Assets.  
-**Abhängigkeit:** BL-WIN-1 (Build muss vor Packaging funktionieren).  
-**Ziel:** `electron-builder --win` erzeugt `.exe` / `.nsis`-Installer; App zeigt Icon im Installer/Explorer.
+**Scope:** `electron-builder.yml`, Windows icon assets.  
+**Dependency:** BL-WIN-1 (build must work before packaging).  
+**Goal:** `electron-builder --win` produces `.exe` / `.nsis` installer; the app shows an icon in the installer/Explorer.
 
-#### 2.5 Ist-Zustand analysieren
+#### 2.5 Analyze Current State
 
-Aktuelles `electron-builder.yml`:
+Current `electron-builder.yml`:
 
 ```yaml
 appId: com.aibeavers.beaverbuddy
@@ -146,14 +146,14 @@ mac:
   target: dmg
 ```
 
-Probleme:
-- Nur `mac:`-Target konfiguriert; kein `win:`-Target.
-- Kein Windows-Icon definiert.
-- `files:` enthält `assets/**/*`, wodurch auch macOS-spezifische Assets im Windows-Build landen — das ist akzeptabel, solange keine Konflikte entstehen.
+Problems:
+- Only a `mac:` target is configured; no `win:` target.
+- No Windows icon defined.
+- `files:` contains `assets/**/*`, so macOS-specific assets also land in the Windows build — acceptable as long as no conflicts arise.
 
-#### 2.6 Windows-Target in `electron-builder.yml` ergänzen
+#### 2.6 Add Windows Target in `electron-builder.yml`
 
-Zielkonfiguration:
+Target configuration:
 
 ```yaml
 appId: com.aibeavers.beaverbuddy
@@ -178,61 +178,61 @@ nsis:
   uninstallerIcon: assets/icon.ico
 ```
 
-**Design-Entscheidungen:**
-- `target: nsis` — Standard-Installer für Windows; erzeugt `Beaver Buddy Setup.exe`.
-- `target: portable` — Zusätzlich eine portable `.exe`, die ohne Installation läuft; nützlich für Smoke-Tests und QA.
-- `icon: assets/icon.ico` — Windows benötigt `.ico` mit mehreren Auflösungen (16x16, 32x32, 48x48, 128x128, 256x256).
-- `publisherName` wird nicht unter `win:` konfiguriert, da `electron-builder` 26.15.3 diesen Schlüssel ablehnt. Stattdessen wird `author` in `package.json` gesetzt (`"author": "AI Beavers"`), woraus `electron-builder` den Herausgeber ableitet.
+**Design decisions:**
+- `target: nsis` — standard installer for Windows; produces `Beaver Buddy Setup.exe`.
+- `target: portable` — additionally a portable `.exe` that runs without installation; useful for smoke tests and QA.
+- `icon: assets/icon.ico` — Windows requires `.ico` with multiple resolutions (16x16, 32x32, 48x48, 128x128, 256x256).
+- `publisherName` is not configured under `win:`, because `electron-builder` 26.15.3 rejects that key. Instead, `author` is set in `package.json` (`"author": "AI Beavers"`), from which `electron-builder` derives the publisher.
 
-#### 2.7 Icon-Assets generieren
+#### 2.7 Generate Icon Assets
 
-**Ausgangslage:**
-- Es gibt noch kein finales Windows-Icon.
-- Vorhandene Sprite-Assets: `assets/sprites/beaver-baby.png`, `assets/sprites/beaver-teen.png`, `assets/sprites/lodge.png`.
-- Aktuelles Tray-Asset: `assets/tray-iconTemplate.png` (macOS-Template, nicht für Windows geeignet).
+**Starting point:**
+- There is no final Windows icon yet.
+- Existing sprite assets: `assets/sprites/beaver-baby.png`, `assets/sprites/beaver-teen.png`, `assets/sprites/lodge.png`.
+- Current tray asset: `assets/tray-iconTemplate.png` (macOS template, not suitable for Windows).
 
-**Vorgehen:**
-1. Wähle ein geeignetes Quell-Sprite, z. B. `assets/sprites/beaver-baby.png` oder `assets/sprites/lodge.png`.
-2. Generiere daraus ein farbiges `assets/tray-icon.png` (für Windows-Tray, ca. 16x16 bis 32x32 px, farbig, nicht transparent als Template).
-3. Generiere `assets/icon.ico` mit mehreren Auflösungen (16, 32, 48, 128, 256 px) für App-Icon, Installer und Explorer.
+**Procedure:**
+1. Choose a suitable source sprite, e.g. `assets/sprites/beaver-baby.png` or `assets/sprites/lodge.png`.
+2. Generate a colored `assets/tray-icon.png` from it (for the Windows tray, approx. 16x16 to 32x32 px, colored, not a transparent template).
+3. Generate `assets/icon.ico` with multiple resolutions (16, 32, 48, 128, 256 px) for the app icon, installer, and Explorer.
 
-**Option A: Manuelle Generierung mit einem Bildbearbeitungs-Tool**
-- Öffne `assets/sprites/beaver-baby.png` in GIMP/Photoshop/Affinity.
-- Extrahiere das erste 96×96-Idle-Tile.
-- Skaliere mit nearest-neighbor auf 192×192 px (exakt 2×).
-- Platziere das 192×192-Bild in einem 256×256-Canvas mit transparentem Rand (horizontal und vertikal zentriert).
-- Exportiere `assets/tray-icon.png` als 32×32-Downsample (192→32 mit nearest-neighbor, 6:1).
-- Exportiere Windows-Icon `assets/icon.ico` mit den Auflösungen 16, 32, 48, 128, 256 px; die 256×256-Version enthält das gepaddete Bild.
+**Option A: Manual generation with an image-editing tool**
+- Open `assets/sprites/beaver-baby.png` in GIMP/Photoshop/Affinity.
+- Extract the first 96×96 idle tile.
+- Scale to 192×192 px with nearest-neighbor (exactly 2×).
+- Place the 192×192 image on a 256×256 canvas with a transparent border (centered horizontally and vertically).
+- Export `assets/tray-icon.png` as a 32×32 downsample (192→32 with nearest-neighbor, 6:1).
+- Export the Windows icon `assets/icon.ico` with the resolutions 16, 32, 48, 128, 256 px; the 256×256 version contains the padded image.
 
-**Option B: Automatisierte Generierung via Node-Skript (empfohlen, falls Sharp verfügbar wäre)**
-- Wird hier **nicht** empfohlen, weil `sharp` oder `canvas` neue native Dependencies wären und gegen die Randbedingung „Keine neuen Dependencies ohne Begründung“ verstoßen.
-- Stattdessen: Erstelle ein kleines Node-Skript, das das vorhandene PNG in eine ICO-Datei umwandelt, **falls** ein passendes reines-JS-Tool gefunden wird. Andernfalls manuell generieren.
+**Option B: Automated generation via Node script (recommended if Sharp were available)**
+- **Not** recommended here, because `sharp` or `canvas` would be new native dependencies and would violate the constraint "no new dependencies without justification".
+- Instead: create a small Node script that converts the existing PNG into an ICO file, **if** a suitable pure-JS tool is found. Otherwise generate manually.
 
-**Empfohlene Zwischenlösung für Phase 1:**
-- Füge `assets/icon.ico` und `assets/tray-icon.png` manuell oder mit einem lokalen Konvertierungs-Tool hinzu.
-- Dokumentiere in `assets/STYLE.md` oder einer neuen Datei, dass diese Icons temporär aus Sprite-Assets generiert sind und durch ein finales Design-Gate ersetzt werden müssen (siehe BL-WIN-10).
+**Recommended interim solution for Phase 1:**
+- Add `assets/icon.ico` and `assets/tray-icon.png` manually or with a local conversion tool.
+- Document in `assets/STYLE.md` or a new file that these icons are temporarily generated from sprite assets and must be replaced by a final design gate (see BL-WIN-10).
 
-#### 2.8 Erwartetes Ergebnis
+#### 2.8 Expected Result
 
-- `electron-builder --win --publish never` erzeugt im `release/`-Verzeichnis:
-  - `Beaver Buddy Setup.exe` (NSIS-Installer)
-  - `Beaver Buddy.exe` (portable Version)
-- Das Windows-Icon wird im Installer, im Explorer und im Task-Manager angezeigt.
-- Der macOS-Build (`electron-builder --mac`) bleibt unverändert funktionsfähig.
+- `electron-builder --win --publish never` produces in the `release/` directory:
+  - `Beaver Buddy Setup.exe` (NSIS installer)
+  - `Beaver Buddy.exe` (portable version)
+- The Windows icon is displayed in the installer, in Explorer, and in Task Manager.
+- The macOS build (`electron-builder --mac`) remains functional unchanged.
 
 ---
 
-### BL-WIN-9: CI um `windows-latest` erweitern
+### BL-WIN-9: Extend CI with `windows-latest`
 
 **Scope:** `.github/workflows/ci.yml`.  
-**Abhängigkeiten:** BL-WIN-1, BL-WIN-2.  
-**Anmerkung:** BL-WIN-5 (Usage-Log-Pfade) ist zwar Phase-3-Item, aber für CI relevant, weil Tests unter Windows laufen müssen. Da BL-WIN-5 in Phase 1 noch nicht umgesetzt wird, müssen die CI-Schritte so konfiguriert werden, dass sie trotzdem grün werden — entweder weil die betroffenen Tests plattformneutral sind oder weil sie vorläufig auf Windows ausgeschlossen/angepasst werden. **In Phase 1 darf CI nur dann auf Windows laufen, wenn die bestehenden Tests dort bestehen.**
+**Dependencies:** BL-WIN-1, BL-WIN-2.  
+**Note:** BL-WIN-5 (usage log paths) is a Phase-3 item, but relevant for CI because tests must run on Windows. Since BL-WIN-5 is not implemented in Phase 1, the CI steps must be configured so they still go green — either because the affected tests are platform-neutral or because they are temporarily excluded/adjusted on Windows. **In Phase 1, CI may only run on Windows if the existing tests pass there.**
 
-**Ziel:** CI-Matrix enthält `windows-latest`; `typecheck`, `lint`, `test`, `npm run build` und `electron-builder --win --publish never` sind grün.
+**Goal:** The CI matrix contains `windows-latest`; `typecheck`, `lint`, `test`, `npm run build`, and `electron-builder --win --publish never` are green.
 
-#### 2.9 Ist-Zustand analysieren
+#### 2.9 Analyze Current State
 
-Aktuelle `.github/workflows/ci.yml`:
+Current `.github/workflows/ci.yml`:
 
 ```yaml
 name: CI
@@ -275,14 +275,14 @@ jobs:
         run: npm test
 ```
 
-Probleme:
-- Nur ein einzelner Job auf `ubuntu-latest`.
-- Kein Build-Schritt (`npm run build`), obwohl dieser für Packaging und Smoke-Tests essenziell ist.
-- Kein Packaging-Schritt für Windows.
+Problems:
+- Only a single job on `ubuntu-latest`.
+- No build step (`npm run build`), even though it is essential for packaging and smoke tests.
+- No packaging step for Windows.
 
-#### 2.10 CI-Matrix erweitern
+#### 2.10 Extend CI Matrix
 
-Zielstruktur:
+Target structure:
 
 ```yaml
 name: CI
@@ -337,28 +337,28 @@ jobs:
         run: npx electron-builder --win --publish never
 ```
 
-**Design-Entscheidungen:**
-- `fail-fast: false` — Damit ein Fehler auf Windows nicht sofort den Ubuntu-Job abbricht und umgekehrt.
-- `matrix.os: [ubuntu-latest, windows-latest]` — Erweiterung auf Windows. `macos-latest` ist vorerst optional; da der ursprüngliche Fokus macOS war und die macOS-Build-Kosten in GitHub Actions höher sind, kann macOS später ergänzt werden (z. B. in BL-WIN-10).
-- Node-Version bleibt bei `24`, wie vom Projekt gefordert.
-- `npm run build` wird vor Packaging ausgeführt, damit `dist/` existiert.
-- `npx electron-builder --win --publish never` wird nur auf Windows ausgeführt, da macOS/Linux keine Windows-Installer erzeugen können.
+**Design decisions:**
+- `fail-fast: false` — so a failure on Windows does not immediately abort the Ubuntu job and vice versa.
+- `matrix.os: [ubuntu-latest, windows-latest]` — extension to Windows. `macos-latest` is optional for now; since the original focus was macOS and macOS build costs in GitHub Actions are higher, macOS can be added later (e.g. in BL-WIN-10).
+- Node version stays at `24`, as required by the project.
+- `npm run build` runs before packaging so that `dist/` exists.
+- `npx electron-builder --win --publish never` runs only on Windows, since macOS/Linux cannot produce Windows installers.
 
-#### 2.11 Umgang mit fehlenden Windows-Abhängigkeiten in CI
+#### 2.11 Handling Missing Windows Dependencies in CI
 
-- `electron-builder` ist bereits als `devDependency` vorhanden.
-- Windows-CI-Runner haben .NET/Visual Studio Build Tools vorinstalliert, sodass `electron-builder` native Abhängigkeiten (z. B. für `app-builder-lib`) normalerweise ohne Zusatzaufwand kompiliert.
-- Falls der Windows-Build an fehlenden Build-Tools scheitert, kann `npm install --global windows-build-tools` oder die Nutzung von `actions/setup-python` helfen. Das sollte aber nicht nötig sein.
+- `electron-builder` is already present as a `devDependency`.
+- Windows CI runners have .NET/Visual Studio Build Tools preinstalled, so `electron-builder` usually compiles native dependencies (e.g. for `app-builder-lib`) without extra effort.
+- If the Windows build fails due to missing build tools, `npm install --global windows-build-tools` or using `actions/setup-python` can help. That should not be necessary, though.
 
-#### 2.12 Erwartetes Ergebnis
+#### 2.12 Expected Result
 
-- CI läuft auf `ubuntu-latest` und `windows-latest`.
-- Alle Schritte (`typecheck`, `lint`, `test`, `build`, `electron-builder --win --publish never`) sind auf beiden Plattformen grün.
-- Build-Artifakte (optional) können als GitHub Actions Artifacts hochgeladen werden, um den Windows-Installer herunterzuladen.
+- CI runs on `ubuntu-latest` and `windows-latest`.
+- All steps (`typecheck`, `lint`, `test`, `build`, `electron-builder --win --publish never`) are green on both platforms.
+- Build artifacts (optional) can be uploaded as GitHub Actions artifacts to download the Windows installer.
 
 ---
 
-## 3. Abhängigkeiten zwischen den Build-Items
+## 3. Dependencies Between the Build Items
 
 ```
 BL-WIN-1 (Build-Scripts)
@@ -370,103 +370,103 @@ BL-WIN-2 (electron-builder Windows-Target)
 BL-WIN-9 (CI Windows-Runner)
 ```
 
-| Abhängigkeit | Begründung |
-|--------------|------------|
-| BL-WIN-2 → BL-WIN-1 | `electron-builder` setzt voraus, dass `npm run build` funktioniert, damit `dist/` vorliegt. Ohne plattformunabhängigen Build kann das Packaging auf Windows nicht gestartet werden. |
-| BL-WIN-9 → BL-WIN-1 | CI führt `npm run build` aus; dies muss auf Windows funktionieren. |
-| BL-WIN-9 → BL-WIN-2 | CI führt `electron-builder --win` aus; dies erfordert die Windows-Konfiguration und das Icon-Asset. |
+| Dependency | Rationale |
+|------------|-----------|
+| BL-WIN-2 → BL-WIN-1 | `electron-builder` requires `npm run build` to work so that `dist/` exists. Without a platform-independent build, packaging on Windows cannot be started. |
+| BL-WIN-9 → BL-WIN-1 | CI runs `npm run build`; this must work on Windows. |
+| BL-WIN-9 → BL-WIN-2 | CI runs `electron-builder --win`; this requires the Windows configuration and the icon asset. |
 
-**Reihenfolge:** BL-WIN-1 → BL-WIN-2 → BL-WIN-9.
-
----
-
-## 4. Akzeptanzkriterien für die gesamte Phase
-
-1. **BL-WIN-1 erfüllt:**
-   - `npm run build` läuft lokal auf Windows (cmd und PowerShell) ohne Fehler.
-   - `npm run build` läuft weiterhin lokal auf macOS und Linux ohne Fehler.
-   - Alle erwarteten Dateien (`dist/renderer/index.html`, `dist/main/mrr/settings.html`, `dist/renderer/assets/sprites/*`) sind nach dem Build vorhanden.
-
-2. **BL-WIN-2 erfüllt:**
-   - `electron-builder --win --publish never` erzeugt im `release/`-Verzeichnis einen NSIS-Installer (`*.exe`) und eine portable Version (`*.exe`).
-   - Das Windows-Icon wird im Installer, im Explorer und im Task-Manager korrekt angezeigt (manueller visueller Smoke-Test).
-   - `electron-builder --mac --publish never` bleibt funktionsfähig (keine Regression).
-
-3. **BL-WIN-9 erfüllt:**
-   - Die CI-Matrix enthält `windows-latest` zusätzlich zu `ubuntu-latest`.
-   - Alle CI-Jobs (`typecheck`, `lint`, `test`, `build`, `package-windows`) sind grün.
-   - Fehlschläge auf einer Plattform brechen die andere nicht ab (`fail-fast: false`).
-
-4. **Cross-Plattform-Regressionen ausgeschlossen:**
-   - Keine Änderungen an Source-Dateien außerhalb der Build-/CI-Konfiguration.
-   - Keine neuen Dependencies eingeführt.
-   - Bestehende macOS-Funktionalität (Build, Packaging) bleibt erhalten.
+**Order:** BL-WIN-1 → BL-WIN-2 → BL-WIN-9.
 
 ---
 
-## 5. Risiken und wie sie gemindert werden
+## 4. Acceptance Criteria for the Entire Phase
 
-| Risiko | Auswirkung | Mitigation |
-|--------|------------|------------|
-| **Icon-Generierung aus Sprites ist manuell/fehleranfällig** | Windows-Icon könnte unscharf oder in falscher Größe geraten. | Pixel-Art mit nearest-neighbor skalieren; mehrere Auflösungen (16–256 px) im `.ico` ablegen; visuellen Smoke-Test im Installer/Explorer machen. |
-| **Node 24.x nicht in lokaler Umgebung verfügbar** | Lokale Tests laufen auf Node 22.x; potenzielle Inkompatibilitäten. | CI explizit auf Node 24.x konfigurieren; `npm ci` warnt auf Node 22.x, bricht aber nicht ab, daher bleibt `engines.node` auf `24.x`. Lokale Entwicklungsumgebung zeitnah auf Node 24.x aktualisieren (außerhalb dieser Phase). |
-| **electron-builder auf Windows benötigt Build-Tools** | CI könnte wegen fehlender VC++ Build Tools fehlschlagen. | GitHub Actions `windows-latest` hat Build Tools vorinstalliert; bei Fehlern alternativ `windows-2019` oder explizite Setup-Steps ergänzen. |
-| **Bestehende Tests sind auf Windows nicht plattformneutral** | CI-Test-Schritt könnte auf Windows rot werden, obwohl Phase 1 keine Teständerungen vorsieht. | Vor Merge Phase 1 kurz prüfen, ob Tests auf Windows laufen; falls nicht, Testfix entweder in Phase 1 (minimal) oder in Phase 3 (BL-WIN-5) einplanen. |
-| **Lange CI-Laufzeiten durch Windows-Runner** | Feedback-Schleifen werden langsamer. | Nur `typecheck`, `lint`, `test`, `build` und Windows-Packaging ausführen; macOS-CI vorerst weglassen. |
-| **Fehlende Code-Signing-Warnungen** | Windows Defender SmartScreen warnt vor unsigniertem Installer. | Akzeptiert für Phase 1; echtes Code-Signing als späteres Build-Item planen. |
+1. **BL-WIN-1 fulfilled:**
+   - `npm run build` runs locally on Windows (cmd and PowerShell) without errors.
+   - `npm run build` continues to run locally on macOS and Linux without errors.
+   - All expected files (`dist/renderer/index.html`, `dist/main/mrr/settings.html`, `dist/renderer/assets/sprites/*`) are present after the build.
+
+2. **BL-WIN-2 fulfilled:**
+   - `electron-builder --win --publish never` produces in the `release/` directory an NSIS installer (`*.exe`) and a portable version (`*.exe`).
+   - The Windows icon is displayed correctly in the installer, in Explorer, and in Task Manager (manual visual smoke test).
+   - `electron-builder --mac --publish never` remains functional (no regression).
+
+3. **BL-WIN-9 fulfilled:**
+   - The CI matrix contains `windows-latest` in addition to `ubuntu-latest`.
+   - All CI jobs (`typecheck`, `lint`, `test`, `build`, `package-windows`) are green.
+   - Failures on one platform do not abort the other (`fail-fast: false`).
+
+4. **Cross-platform regressions ruled out:**
+   - No changes to source files outside the build/CI configuration.
+   - No new dependencies introduced.
+   - Existing macOS functionality (build, packaging) is preserved.
 
 ---
 
-## 6. Test- und Verifikationsschritte
+## 5. Risks and How They Are Mitigated
 
-### 6.1 Lokale Verifikation (Windows)
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| **Icon generation from sprites is manual/error-prone** | Windows icon could end up blurry or in the wrong size. | Scale pixel art with nearest-neighbor; store multiple resolutions (16–256 px) in the `.ico`; do a visual smoke test in the installer/Explorer. |
+| **Node 24.x not available in local environment** | Local tests run on Node 22.x; potential incompatibilities. | Configure CI explicitly on Node 24.x; `npm ci` warns on Node 22.x but does not abort, so `engines.node` stays at `24.x`. Update the local development environment to Node 24.x soon (outside this phase). |
+| **electron-builder on Windows needs build tools** | CI could fail due to missing VC++ Build Tools. | GitHub Actions `windows-latest` has build tools preinstalled; on errors, alternatively add `windows-2019` or explicit setup steps. |
+| **Existing tests are not platform-neutral on Windows** | CI test step could go red on Windows even though Phase 1 plans no test changes. | Before merging Phase 1, briefly check whether tests run on Windows; if not, schedule a test fix either in Phase 1 (minimal) or in Phase 3 (BL-WIN-5). |
+| **Long CI runtimes due to Windows runner** | Feedback loops become slower. | Run only `typecheck`, `lint`, `test`, `build`, and Windows packaging; leave out macOS CI for now. |
+| **Missing code-signing warnings** | Windows Defender SmartScreen warns about the unsigned installer. | Accepted for Phase 1; plan real code signing as a later build item. |
 
-1. **Build-Script testen:**
+---
+
+## 6. Test and Verification Steps
+
+### 6.1 Local Verification (Windows)
+
+1. **Test the build script:**
    ```cmd
    npm run build
    ```
-   - Erwartung: Kein Fehler, `dist/renderer/index.html`, `dist/main/mrr/settings.html`, `dist/renderer/assets/sprites/*` vorhanden.
+   - Expectation: no error; `dist/renderer/index.html`, `dist/main/mrr/settings.html`, `dist/renderer/assets/sprites/*` present.
 
-2. **Packaging testen:**
+2. **Test packaging:**
    ```cmd
    npx electron-builder --win --publish never
    ```
-   - Erwartung: `release/Beaver Buddy Setup.exe` und `release/Beaver Buddy.exe` erzeugt.
+   - Expectation: `release/Beaver Buddy Setup.exe` and `release/Beaver Buddy.exe` produced.
 
-3. **Installer-Smoke-Test:**
-   - `Beaver Buddy Setup.exe` ausführen (lokale Testinstallation).
-   - Prüfen, ob App startet, Icon im Task-Manager/Explorer sichtbar ist, kein Crash beim Start.
+3. **Installer smoke test:**
+   - Run `Beaver Buddy Setup.exe` (local test installation).
+   - Check whether the app starts, the icon is visible in Task Manager/Explorer, and there is no crash on startup.
 
-4. **Portable-Version testen:**
-   - `Beaver Buddy.exe` starten.
-   - Erwartung: App läuft ohne Installation; Overlay erscheint (ggf. noch mit Phase-2-Problemen, aber kein sofortiger Crash).
+4. **Test the portable version:**
+   - Start `Beaver Buddy.exe`.
+   - Expectation: the app runs without installation; the overlay appears (possibly still with Phase-2 issues, but no immediate crash).
 
-### 6.2 Lokale Verifikation (macOS/Linux)
+### 6.2 Local Verification (macOS/Linux)
 
-1. **Build-Script testen:**
+1. **Test the build script:**
    ```bash
    npm run build
    ```
-   - Erwartung: Identisches Ergebnis wie vor der Änderung.
+   - Expectation: identical result as before the change.
 
-2. **macOS-Packaging-Regression testen:**
+2. **Test the macOS packaging regression:**
    ```bash
    npx electron-builder --mac --publish never
    ```
-   - Erwartung: `release/Beaver Buddy.dmg` wird erzeugt.
+   - Expectation: `release/Beaver Buddy.dmg` is produced.
 
-### 6.3 CI-Verifikation
+### 6.3 CI Verification
 
-1. **Workflow auf Feature-Branch auslösen:**
-   - Push auf einen Branch mit offenem Pull-Request.
-   - `.github/workflows/ci.yml` wird auf `ubuntu-latest` und `windows-latest` ausgeführt.
+1. **Trigger the workflow on a feature branch:**
+   - Push to a branch with an open pull request.
+   - `.github/workflows/ci.yml` runs on `ubuntu-latest` and `windows-latest`.
 
-2. **Erfolgskriterien prüfen:**
-   - Beide Jobs grün.
-   - `Package Windows`-Schritt erzeugt Installer/Portable.
+2. **Check success criteria:**
+   - Both jobs green.
+   - The `Package Windows` step produces the installer/portable.
 
-3. **Optional: Artifacts hochladen**
-   Falls QA den Installer herunterladen soll, kann ein Upload-Step ergänzt werden:
+3. **Optional: upload artifacts**
+   If QA should download the installer, an upload step can be added:
    ```yaml
    - name: Upload Windows artifacts
      if: matrix.os == 'windows-latest'
@@ -475,40 +475,40 @@ BL-WIN-9 (CI Windows-Runner)
        name: windows-installer
        path: release/*.exe
    ```
-   Dies ist für Phase 1 optional, aber empfohlen, um manuelle Smoke-Tests zu ermöglichen.
+   This is optional for Phase 1, but recommended to enable manual smoke tests.
 
 ---
 
-## 7. Dateien, die in Phase 1 angefasst werden
+## 7. Files Touched in Phase 1
 
-| Datei / Pfad | Build-Item | Art der Änderung |
-|--------------|------------|------------------|
-| `package.json` | BL-WIN-1 | `build`-Script anpassen |
-| `scripts/build-assets.js` (neu) | BL-WIN-1 | Neues Node-Skript erstellen |
-| `electron-builder.yml` | BL-WIN-2 | `win:`-Target ergänzen |
-| `assets/icon.ico` (neu) | BL-WIN-2 | Aus Sprite-Asset generieren |
-| `assets/tray-icon.png` (neu) | BL-WIN-2 | Aus Sprite-Asset generieren (für spätere Tray-Anpassung in BL-WIN-4) |
-| `.github/workflows/ci.yml` | BL-WIN-9 | Matrix erweitern, Build- und Packaging-Steps ergänzen |
+| File / Path | Build Item | Type of Change |
+|-------------|------------|----------------|
+| `package.json` | BL-WIN-1 | Adjust `build` script |
+| `scripts/build-assets.js` (new) | BL-WIN-1 | Create new Node script |
+| `electron-builder.yml` | BL-WIN-2 | Add `win:` target |
+| `assets/icon.ico` (new) | BL-WIN-2 | Generate from sprite asset |
+| `assets/tray-icon.png` (new) | BL-WIN-2 | Generate from sprite asset (for later tray adjustment in BL-WIN-4) |
+| `.github/workflows/ci.yml` | BL-WIN-9 | Extend matrix, add build and packaging steps |
 
-**Nicht angefasst werden in Phase 1:**
+**Not touched in Phase 1:**
 - `src/main/main.ts`
 - `src/main/tray.ts`
 - `src/main/usage/paths.ts`
 - `src/main/atomic-file.ts`
 - `src/renderer/renderer.ts`
-- Alle Test-Dateien (außer falls CI-Tests auf Windows rot laufen — dann minimaler Ausgleich)
+- All test files (except if CI tests run red on Windows — then minimal adjustment)
 
 ---
 
-## 8. Nächste Schritte nach Phase 1
+## 8. Next Steps After Phase 1
 
-- **Phase 2: Core Windows Experience** — BL-WIN-3 (Overlay-Adapter) und BL-WIN-4 (Tray-Adapter).
-- **Phase 3: Windows Integrations** — BL-WIN-5 (Claude-Usage-Log-Pfade).
-- **Phase 4: Polish & Release-Readiness** — BL-WIN-8 (HiDPI/Scaling) und BL-WIN-10 (Doku/Design-Gate).
-- **Phase 5: Deferred / Follow-up** — BL-WIN-6 (Keychain/Secrets), BL-WIN-7 (atomares Schreiben), Codex-Tracking.
+- **Phase 2: Core Windows Experience** — BL-WIN-3 (overlay adapter) and BL-WIN-4 (tray adapter).
+- **Phase 3: Windows Integrations** — BL-WIN-5 (Claude usage log paths).
+- **Phase 4: Polish & Release Readiness** — BL-WIN-8 (HiDPI/scaling) and BL-WIN-10 (docs/design gate).
+- **Phase 5: Deferred / Follow-up** — BL-WIN-6 (Keychain/secrets), BL-WIN-7 (atomic writes), Codex tracking.
 
 ---
 
-## 9. Zusammenfassung für Stakeholder
+## 9. Summary for Stakeholders
 
-Phase 1 macht Beaver Buddy auf Windows **bau- und paketierbar**, ohne die App-Logik zu verändern. Die drei Build-Items bauen aufeinander auf: zuerst das plattformunabhängige Build-Skript, dann die Windows-Packaging-Konfiguration mit temporären Icons, schließlich die CI-Erweiterung auf `windows-latest`. Nach Abschluss kann das Team Windows-Installer aus der CI herunterladen und mit Phase 2 (Overlay/Tray-Verhalten) fortfahren.
+Phase 1 makes Beaver Buddy **buildable and packageable** on Windows without changing the app logic. The three build items build on each other: first the platform-independent build script, then the Windows packaging configuration with temporary icons, and finally the CI extension to `windows-latest`. After completion, the team can download Windows installers from CI and proceed with Phase 2 (overlay/tray behavior).

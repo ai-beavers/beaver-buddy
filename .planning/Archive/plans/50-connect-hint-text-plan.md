@@ -1,22 +1,22 @@
-# Plan: Flight-Plan Item #50 — Connect-Hint „on this Mac"
+# Plan: Flight-Plan Item #50 — Connect Hint "on this Mac"
 
-## Ziel
-Der Connect-Hint in den Settings nennt „on this Mac"; auf Windows ist das sichtbar falsch.
-Text plattformneutral machen: „on this computer". Rest des Satzes unverändert.
+## Goal
+The Connect hint in the settings says "on this Mac"; on Windows that is visibly wrong.
+Make the text platform-neutral: "on this computer". Rest of the sentence unchanged.
 
-## Alter String (src/main/mrr/settings.html:63)
+## Old string (src/main/mrr/settings.html:63)
 `Opt in to read local Claude Code / Codex usage logs on this Mac — no API keys.`
 
-## Neuer String
+## New string
 `Opt in to read local Claude Code / Codex usage logs on this computer — no API keys.`
 
-## Betroffene Datei
-- src/main/mrr/settings.html (Zeile 63)
-- Grep-Check: kein weiteres Vorkommen von „on this Mac" in src/ (auch nicht in Tests).
+## Affected file
+- src/main/mrr/settings.html (line 63)
+- Grep check: no other occurrence of "on this Mac" in src/ (including tests).
 
-## Verifikation
-1. Grep: kein „on this Mac" mehr in src/, „on this computer" genau 1x.
-2. npm run build (dist/main/mrr/settings.html wird aktualisiert)
-3. npm run test (Baseline: 434 passed / 6 skipped)
+## Verification
+1. Grep: no "on this Mac" left in src/, "on this computer" exactly 1×.
+2. npm run build (dist/main/mrr/settings.html is updated)
+3. npm run test (baseline: 434 passed / 6 skipped)
 4. npm run typecheck
 5. npm run lint

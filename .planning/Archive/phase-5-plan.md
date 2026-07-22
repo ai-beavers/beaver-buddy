@@ -1,400 +1,400 @@
 # Beaver Buddy — Phase 5: Deferred / Follow-up Plan
 
-**Status:** Teilweise umgesetzt — BL-WIN-7 und Codex-Tracking wurden implementiert; BL-WIN-6 bleibt bis zur Admin-Entscheidung zurückgestellt. Keine Commits.  
-**Ziel:** Die drei zurückgestellten Build-Items aus dem Windows-Port (BL-WIN-6, BL-WIN-7, Codex-Tracking) so weit wie möglich vorbereiten, Blocker dokumentieren und nächste Schritte definieren.  
-**Basis:** [Hauptplan `.flightplan/Archive/WINDOWS_PORT_PLAN.md`](./WINDOWS_PORT_PLAN.md), Stand 2026-07-15.
+**Status:** Partially implemented — BL-WIN-7 and Codex tracking were implemented; BL-WIN-6 remains deferred pending the admin decision. No commits.  
+**Goal:** Prepare the three deferred build items from the Windows port (BL-WIN-6, BL-WIN-7, Codex tracking) as far as possible, document blockers, and define next steps.  
+**Basis:** [Main plan `.flightplan/Archive/WINDOWS_PORT_PLAN.md`](./WINDOWS_PORT_PLAN.md), as of 2026-07-15.
 
 ---
 
-## 1. Zusammenfassung der Phase
+## 1. Phase summary
 
-Phase 5 behandelt die Punkte, die in den Phasen 1–4 absichtlich zurückgestellt wurden, weil sie entweder eine Entscheidung des Projekt-Administrators oder externe Recherche erfordern. Die App ist auf Windows bereits voll funktionsfähig (Overlay, Tray, Animationen, Claude-Code-Token-Tracking). Phase 5 schließt die verbleibenden Lücken:
+Phase 5 covers the items that were deliberately deferred in Phases 1–4 because they require either a decision by the project administrator or external research. The app is already fully functional on Windows (overlay, tray, animations, Claude Code token tracking). Phase 5 closes the remaining gaps:
 
-| Item | Thema | Blocker |
+| Item | Topic | Blocker |
 |------|-------|---------|
-| **BL-WIN-6** | Windows Secret-Store / MRR-Mode | Entscheidung des Projekt-Administrators über Secret-Store-Backend |
-| **BL-WIN-7** | Atomares Schreiben Windows-nativ | Recherche nach robusterem Windows-nativem Pattern |
-| **Codex-Tracking** | Windows-Log-Pfade für Codex | Unklarer offizieller Codex-Windows-Log-Pfad |
+| **BL-WIN-6** | Windows secret store / MRR mode | Project administrator decision on the secret-store backend |
+| **BL-WIN-7** | Windows-native atomic writes | Research into a more robust Windows-native pattern |
+| **Codex tracking** | Windows log paths for Codex | Unclear official Codex Windows log path |
 
-Diese Phase kann erst umgesetzt werden, sobald die externen Klärungen vorliegen. Bis dahin dient dieser Plan als zentrale Dokumentation für Status, Optionen und nächste Schritte.
+This phase can only be implemented once the external clarifications are available. Until then, this plan serves as the central documentation for status, options, and next steps.
 
 ---
 
-## 2. BL-WIN-6: Windows Secret-Store / MRR-Mode
+## 2. BL-WIN-6: Windows secret store / MRR mode
 
-### 2.1 Aktueller Status und Blocker
+### 2.1 Current status and blocker
 
-- **Status:** Zurückgestellt, offen.
-- **Begründung:** Die Wahl eines Windows-Secret-Store-Backends (Windows Credential Manager, `electron.safeStorage`, Win32-API) muss mit dem Projekt-Administrator abgestimmt werden.
-- **Code-Lage:** `src/main/mrr/keychain.ts` verwendet ausschließlich die macOS-`security`-CLI (`add-generic-password`, `find-generic-password`, `delete-generic-password`). Es gibt keine plattformabhängige Abstraktion.
-- **Auswirkung:** Der MRR-Mode (Stripe/RevenueCat) ist auf Windows vorerst nicht verfügbar. Die App läuft ohne Credentials weiterhin vollständig (Overlay, Tray, Animationen, Token-Tracking).
+- **Status:** Deferred, open.
+- **Rationale:** The choice of a Windows secret-store backend (Windows Credential Manager, `electron.safeStorage`, Win32 API) must be coordinated with the project administrator.
+- **Code state:** `src/main/mrr/keychain.ts` uses only the macOS `security` CLI (`add-generic-password`, `find-generic-password`, `delete-generic-password`). There is no platform-dependent abstraction.
+- **Impact:** MRR mode (Stripe/RevenueCat) is not available on Windows for now. The app continues to run fully without credentials (overlay, tray, animations, token tracking).
 
-### 2.2 Aktuelle Code-Architektur
+### 2.2 Current code architecture
 
-- `src/main/mrr/keychain.ts` ist **funktionsbasiert**, nicht interfacebasiert. Es exportiert:
+- `src/main/mrr/keychain.ts` is **function-based**, not interface-based. It exports:
   - `setKeychainSecret`, `getKeychainSecret`, `deleteKeychainSecret`
   - `isValidKeychainService`
-- Es gibt **kein Interface, keine Factory und keine Injektion**. Vor der Windows-Implementierung muss `keychain.ts` in ein plattformunabhängiges Interface + Factory + zwei Implementierungen (`keychain-darwin.ts`, `keychain-win32.ts`) refactored werden.
-- Alle Aufrufer (`src/main/mrr/mrr-config.ts`, `src/main/mrr/mrr-engine.ts`, `src/main/mrr/settings-window.ts`, `src/main/main.ts:91-99`) müssen dann über die Factory oder Dependency Injection arbeiten.
-- `--keychain-service` wird in `src/main/main.ts:91-99` geparst und in `src/main/mrr/mrr-config.ts:19` als `DEFAULT_KEYCHAIN_SERVICE = 'beaver-buddy'` definiert. `isValidKeychainService` aus `src/main/mrr/keychain.ts:27` muss auf Windows weiterhin verwendet werden, um Injection in Service-Namen zu verhindern.
-- Eine Windows-Implementierung (`keychain-win32.ts`) muss `logRedacted` aus `src/main/mrr/redact.ts` wiederverwenden, damit Secrets niemals im Log landen.
+- There is **no interface, no factory, and no injection**. Before the Windows implementation, `keychain.ts` must be refactored into a platform-independent interface + factory + two implementations (`keychain-darwin.ts`, `keychain-win32.ts`).
+- All callers (`src/main/mrr/mrr-config.ts`, `src/main/mrr/mrr-engine.ts`, `src/main/mrr/settings-window.ts`, `src/main/main.ts:91-99`) must then work through the factory or dependency injection.
+- `--keychain-service` is parsed in `src/main/main.ts:91-99` and defined as `DEFAULT_KEYCHAIN_SERVICE = 'beaver-buddy'` in `src/main/mrr/mrr-config.ts:19`. `isValidKeychainService` from `src/main/mrr/keychain.ts:27` must continue to be used on Windows to prevent injection into service names.
+- A Windows implementation (`keychain-win32.ts`) must reuse `logRedacted` from `src/main/mrr/redact.ts` so that secrets never end up in the log.
 
-### 2.3 Recherche-/Entscheidungsfragen
+### 2.3 Research/decision questions
 
-1. Welches Secret-Store-Backend entspricht den Sicherheits- und Dependency-Richtlinien des Projekts (insbesondere `CLAUDE.md`)?
-2. Ist die Verwendung von `electron.safeStorage` + verschlüsselter JSON im `userData`-Verzeichnis akzeptabel, oder verstößt das gegen die Regel „secrets never in app-support dir“?
-3. Soll Windows Credential Manager als primärer Store verwendet werden, auch wenn dies ggf. externe CLI-Abhängigkeiten oder einen kleinen Native-Addon erfordert?
-4. Soll ein Adapter-Pattern eingeführt werden (`keychain.ts` als Interface/Factory, `keychain-darwin.ts`, `keychain-win32.ts`)?
-5. Welche Teststrategie ist akzeptabel? (Mocken der externen APIs, Integrationstests auf Windows-CI, manuelle QA?)
-6. Bleibt der `--keychain-service` QA-Flag erhalten und wie wird er auf Windows abgebildet?
+1. Which secret-store backend matches the project's security and dependency policies (in particular `CLAUDE.md`)?
+2. Is using `electron.safeStorage` + encrypted JSON in the `userData` directory acceptable, or does it violate the rule "secrets never in app-support dir"?
+3. Should Windows Credential Manager be used as the primary store, even if this may require external CLI dependencies or a small native addon?
+4. Should an adapter pattern be introduced (`keychain.ts` as interface/factory, `keychain-darwin.ts`, `keychain-win32.ts`)?
+5. Which test strategy is acceptable? (Mocking the external APIs, integration tests on Windows CI, manual QA?)
+6. Does the `--keychain-service` QA flag remain, and how is it mapped on Windows?
 
-### 2.3 Mögliche Lösungsansätze
+### 2.3 Possible approaches
 
-#### Option A: Windows Credential Manager (primärer Prüfkandidat)
+#### Option A: Windows Credential Manager (primary candidate for review)
 
-**Umsetzung:**
-- Einführung eines Adapter-Patterns: `src/main/mrr/keychain.ts` als Interface + Factory, `src/main/mrr/keychain-darwin.ts` mit bestehender `security`-CLI-Logik, `src/main/mrr/keychain-win32.ts` mit Windows-Credential-Manager-Zugriff.
-- Windows-Zugriff entweder über:
-  - **Kleiner Native-Addon** über `node-gyp` mit Win32-Credential-API (`CredWriteW`, `CredReadW`, `CredDeleteW`).
-    Dies ist die einzige seriöse Option für generische Credentials; erfordert aber eine Administrator-Entscheidung und ein ADR für die neue Native-Dependency (Konflikt mit `CLAUDE.md`).
-  - PowerShell `CredentialManager`-Modul — **nur für lokale POCs**, nicht für Shipping, da es nicht standardmäßig installiert ist.
-  - `cmdkey.exe` — **nicht geeignet** für generische Credentials; verwaltet nur Netzwerk-/Remote-Desktop-Credentials.
+**Implementation:**
+- Introduce an adapter pattern: `src/main/mrr/keychain.ts` as interface + factory, `src/main/mrr/keychain-darwin.ts` with the existing `security` CLI logic, `src/main/mrr/keychain-win32.ts` with Windows Credential Manager access.
+- Windows access either via:
+  - **Small native addon** via `node-gyp` with the Win32 Credential API (`CredWriteW`, `CredReadW`, `CredDeleteW`).
+    This is the only serious option for generic credentials; however, it requires an administrator decision and an ADR for the new native dependency (conflict with `CLAUDE.md`).
+  - PowerShell `CredentialManager` module — **only for local POCs**, not for shipping, since it is not installed by default.
+  - `cmdkey.exe` — **not suitable** for generic credentials; it only manages network/Remote Desktop credentials.
 
-**Vorteile:**
-- Echter systemeigener Secret-Store.
-- Geheimnisse werden außerhalb des App-Datenverzeichnisses gehalten.
-- Entspricht der ursprünglichen Design-Philosophie von `CLAUDE.md` (Secrets nicht in JSON im App-Support).
+**Advantages:**
+- A true system-native secret store.
+- Secrets are kept outside the app data directory.
+- Matches the original design philosophy of `CLAUDE.md` (no secrets in JSON in app support).
 
-**Nachteile:**
-- Nur über Native-Addon oder nicht-standardmäßige PowerShell-Module erreichbar; `cmdkey.exe` kann generische Credentials nicht lesen.
-- Native-Addon führt Build-Komplexität und potenzielle Dependency-Probleme ein (verstößt gegen `CLAUDE.md`-Restriktionen, sofern nicht explizit begründet).
-- Benötigt Administrator-Entscheidung, Lizenz-/Sicherheits-Review und ein ADR für die neue Native-Dependency.
+**Disadvantages:**
+- Only reachable via a native addon or non-standard PowerShell modules; `cmdkey.exe` cannot read generic credentials.
+- A native addon introduces build complexity and potential dependency problems (violates `CLAUDE.md` restrictions unless explicitly justified).
+- Requires an administrator decision, license/security review, and an ADR for the new native dependency.
 
-#### Option B: `electron.safeStorage` + verschlüsselte JSON in `userData`
+#### Option B: `electron.safeStorage` + encrypted JSON in `userData`
 
-**Umsetzung:**
-- Adapter-Pattern wie Option A, aber `keychain-win32.ts` verwendet `electron.safeStorage.encryptString` / `decryptString`.
-- Secrets werden in einer verschlüsselten JSON-Datei im `userData`-Verzeichnis gespeichert (z. B. `state/secrets.enc.json`).
-- `electron.safeStorage` ist erst nach `app.whenReady()` nutzbar; MRR-Credentials müssen lazy geladen werden (z. B. erst beim ersten `pollNow()` / Settings-Window-Öffnen), nicht beim App-Start vor Window-Creation.
+**Implementation:**
+- Adapter pattern as in Option A, but `keychain-win32.ts` uses `electron.safeStorage.encryptString` / `decryptString`.
+- Secrets are stored in an encrypted JSON file in the `userData` directory (e.g. `state/secrets.enc.json`).
+- `electron.safeStorage` is only usable after `app.whenReady()`; MRR credentials must be loaded lazily (e.g. only on the first `pollNow()` / settings window open), not at app start before window creation.
 
-**Vorteile:**
-- Keine neue externe Dependency.
-- Einfach zu implementieren und zu testen.
-- Nutzt Windows DPAPI über Electron.
+**Advantages:**
+- No new external dependency.
+- Easy to implement and test.
+- Uses Windows DPAPI via Electron.
 
-**Nachteile:**
-- Verstößt historisch gegen `CLAUDE.md` („secrets never in app-support dir“).
-- Erfordert ein ADR-Update oder eine bewusste Scope-Entscheidung des Administrators.
-- Secrets liegen physisch im App-Datenverzeichnis (verschlüsselt, aber gegen die ursprüngliche Architektur).
+**Disadvantages:**
+- Historically violates `CLAUDE.md` ("secrets never in app-support dir").
+- Requires an ADR update or a conscious scope decision by the administrator.
+- Secrets physically reside in the app data directory (encrypted, but contrary to the original architecture).
 
-**Empfehlung BL-WIN-6:** Unter den aktuellen `CLAUDE.md`-Restriktionen (keine neuen Dependencies ohne ADR) ist **Option B (`electron.safeStorage` + verschlüsselte JSON in `userData`) die realistische Standardlösung**. Option A (Windows Credential Manager) ist nur bei expliziter Administrator-Entscheidung inklusive Native-Addon-ADR und Sicherheits-Review umsetzbar.
+**Recommendation BL-WIN-6:** Under the current `CLAUDE.md` restrictions (no new dependencies without an ADR), **Option B (`electron.safeStorage` + encrypted JSON in `userData`) is the realistic default solution**. Option A (Windows Credential Manager) is only feasible with an explicit administrator decision including a native-addon ADR and security review.
 
-#### Option C: `keytar`-ähnliche Dependency
+#### Option C: `keytar`-like dependency
 
-**Umsetzung:**
-- Einbindung einer etablierten Bibliothek wie `@napi-rs/keyring` oder ähnlichem.
+**Implementation:**
+- Integrate an established library such as `@napi-rs/keyring` or similar.
 
-**Vorteile:**
-- Fertige Cross-Platform-API.
+**Advantages:**
+- Ready-made cross-platform API.
 
-**Nachteile:**
-- `CLAUDE.md` erschwert neue Dependencies; Native-Bindings erhöhen Build-Komplexität.
-- Lizenz- und Sicherheitsprüfung nötig.
-- **Empfehlung:** Vermeiden, sofern Option A oder B umsetzbar sind.
+**Disadvantages:**
+- `CLAUDE.md` makes new dependencies difficult; native bindings increase build complexity.
+- License and security review required.
+- **Recommendation:** Avoid, as long as Option A or B is feasible.
 
-### 2.4 Nächste konkrete Schritte
+### 2.4 Next concrete steps
 
-1. **Termin mit Projekt-Administrator vereinbaren**, um die Secret-Store-Strategie festzulegen.
-2. **Entscheidungsvorlage erstellen** mit den Optionen A–C, Risiken und einem klaren Empfehlungsvorschlag (Option A primär, Option B als dokumentierter Fallback).
-3. **Nach Entscheidung:**
-   - Adapter-Pattern in `src/main/mrr/keychain.ts` einführen.
-   - `keychain-darwin.ts` aus bestehendem Code extrahieren.
-   - `keychain-win32.ts` gemäß gewählter Option implementieren.
-   - Tests anpassen/erweitern (`keychain.test.ts` oder neue `keychain-win32.test.ts`).
-   - `--keychain-service` QA-Flag für Windows-Verhalten dokumentieren.
-   - MRR-Mode auf Windows aktivieren, sobald Secrets robust gespeichert werden können.
+1. **Schedule a meeting with the project administrator** to decide on the secret-store strategy.
+2. **Prepare a decision document** with Options A–C, risks, and a clear recommendation (Option A primary, Option B as documented fallback).
+3. **After the decision:**
+   - Introduce the adapter pattern in `src/main/mrr/keychain.ts`.
+   - Extract `keychain-darwin.ts` from the existing code.
+   - Implement `keychain-win32.ts` according to the chosen option.
+   - Adjust/extend tests (`keychain.test.ts` or a new `keychain-win32.test.ts`).
+   - Document the `--keychain-service` QA flag for Windows behavior.
+   - Enable MRR mode on Windows once secrets can be stored robustly.
 
-### 2.5 Akzeptanzkriterien (sobald umgesetzt)
+### 2.5 Acceptance criteria (once implemented)
 
-- `src/main/mrr/keychain.ts` definiert ein klares, plattformunabhängiges Interface.
-- macOS-Verhalten bleibt unverändert (`security`-CLI).
-- Windows-Implementierung speichert, liest und löscht Secrets robust.
-- `--keychain-service` QA-Flag funktioniert weiterhin.
-- Alle Tests grün (`npm run typecheck`, `npm run lint`, `npm test`).
-- `npm run build` und `npx electron-builder --win --publish never` sind grün.
-- MRR-Mode ist auf Windows aktiviert und dokumentiert.
-
----
-
-## 3. BL-WIN-7: Atomares Schreiben Windows-nativ
-
-### 3.1 Aktueller Status und Blocker
-
-- **Status:** Recherche-Phase / Zurückgestellt.
-- **Begründung:** Einfache Retry-Logik ist bekannt, aber es soll geprüft werden, ob es eine robustere, Windows-nähere Lösung gibt.
-- **Code-Lage:** `src/main/atomic-file.ts` implementiert atomares Schreiben via temporärer Datei + `fs.renameSync(tmpPath, filePath)`. Das funktioniert auf POSIX-Systemen atomar, auf Windows kann `renameSync` jedoch bei transienten Locks (`EPERM`) fehlschlagen, z. B. wenn Virenscanner oder Indexer die temporäre Datei kurz blockieren.
-- **Auswirkung:** State-Dateien werden in der Regel korrekt geschrieben, aber das Risiko eines kurzzeitigen Schreibfehlers bleibt bestehen.
-
-### 3.2 Recherche-/Entscheidungsfragen
-
-1. Ist eine einfache Retry-Logik mit kurzem Backoff für das Projekt ausreichend robust?
-2. Gibt es einen Windows-nativen Weg, der `EPERM`-Fälle bei `rename` zuverlässig vermeidet?
-3. Soll ein Native-Addon (`MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING`) in Betracht gezogen werden?
-4. Sind transaktionale NTFS-Operationen (`CreateTransaction`, `MoveFileTransactedW`) sinnvoll, oder over-engineering?
-5. Gibt es etablierte Node-Bibliotheken, die dieses Problem lösen, ohne neue Dependencies zu erzwingen?
-6. Welche Fehler müssen abgefangen werden (nur `EPERM`, auch `EACCES`, `EBUSY`)?
-
-### 3.3 Mögliche Lösungsansätze
-
-#### Option A: Asynchrone Retry-Logik mit Backoff
-
-**Umsetzung:**
-- `atomicWriteFile` wird asynchron (`async function`) und verwendet `fs.promises.writeFile` + `fs.promises.rename` + `setTimeout`-Backoff.
-- `fs.rename` wird bis zu 4-mal wiederholt (sofort, 10 ms, 50 ms, 100 ms).
-- Fehlerklassifikation: `EPERM` und `EBUSY` sind transient retriable; `EACCES` ist ein dauerhaftes Berechtigungsproblem und wird nicht retriert.
-- Die temporäre Datei bleibt im Zielverzeichnis (`${filePath}.tmp-...`), damit `rename` auf demselben Volume atomar bleibt.
-
-**Vorteile:**
-- Minimale Code-Änderung.
-- Keine neuen Dependencies.
-- Löst die meisten transienten Lock-Probleme.
-
-**Nachteile:**
-- Nicht deterministisch; sehr lange Blockaden können trotzdem scheitern.
-- Keine echte Garantie atomaren Verhaltens unter Windows.
-- Testbarkeit erschwert (Timing-abhängig).
-- Erfordert Anpassung aller synchronen Aufrufer (`saveOnboardingState`, `saveState`, `saveSettingsState`) und deren Tests.
-
-#### Option B: `MoveFileExW` via Native-Addon oder NAPI
-
-**Umsetzung:**
-- Kleiner Native-Addon, der `MoveFileExW` mit `MOVEFILE_REPLACE_EXISTING` aufruft.
-- Optional mit `MOVEFILE_WRITE_THROUGH` für synchrones Commit.
-
-**Vorteile:**
-- Windows-native API, häufig robuster gegen Lock-Konflikte.
-- Explizites Überschreiben der Zieldatei ist möglich.
-
-**Nachteile:**
-- Einführung von Native-Code/Build-Komplexität.
-- Ggf. Konflikt mit `CLAUDE.md`-Restriktionen gegen neue Dependencies.
-- Testbarkeit auf Nicht-Windows-Systemen erschwert.
-
-#### Option C: Transaktionale NTFS-Operationen
-
-**Umsetzung:**
-- Verwendung von `CreateTransaction`, `MoveFileTransactedW`, `CommitTransaction` über Native-Addon.
-
-**Vorteile:**
-- Strengste Konsistenzgarantie.
-
-**Nachteile:**
-- Stark over-engineering für eine einzelne State-Datei.
-- NTFS-transaktionale APIs sind veraltet/deprecated und nicht empfohlen.
-- Hohe Komplexität, geringer Nutzen.
-- **Empfehlung:** Nicht verfolgen.
-
-#### Option D: Kombination aus Retry + robuster Fehlerbehandlung
-
-**Umsetzung:**
-- Asynchrone Retry-Logik wie Option A, aber zusätzlich:
-  - Explizite Prüfung auf `EPERM`/`EBUSY` (retriable) vs. `EACCES` (nicht retriable).
-  - Temporäre Datei bleibt im Zielverzeichnis (Same-Volume-Rename ist die entscheidende Atomaritätsgarantie).
-  - Bei wiederholtem Scheitern: Aufräumen und aussagekräftige Fehlermeldung.
-
-**Vorteile:**
-- Pragmatisch und gut testbar.
-- Keine neuen Dependencies.
-- Bessere Diagnosemöglichkeiten.
-
-**Nachteile:**
-- Bleibt eine Heuristik, keine 100 %-Garantie.
-
-### 3.4 Recherche-Abbruchkriterien
-
-- **Zeitbox:** maximal 4 Stunden Recherche.
-- **Abbruchkriterium:** Wenn innerhalb der Zeitbox kein empirischer Beweis gefunden wird, dass ein Windows-nativer Ansatz (Option B) deutlich zuverlässiger ist als Retry-Backoff, wird **Option A/D** als Default gewählt.
-- **Fallback:** Option A/D ist jederzeit umsetzbar und erfordert keine neuen Dependencies.
-
-### 3.5 Nächste konkrete Schritte
-
-1. **Recherche durchführen:**
-   - Erfahrungen aus dem Node-Ökosystem sammeln (z. B. wie `electron-store`, `conf`, `write-file-atomic` das Problem lösen).
-   - Windows-API-Dokumentation zu `MoveFileExW` und `ReplaceFile` prüfen.
-2. **Entscheidung treffen**, ob Option A/D oder B verfolgt wird.
-3. **Proof-of-Concept erstellen** für die gewählte Lösung.
-4. **Tests erweitern:**
-   - Unit-Tests für Retry-Logik mit gemocktem `fs`.
-   - Ggf. Windows-CI-Integrationstest für atomares Schreiben.
-5. **Dokumentation aktualisieren** in `CLAUDE.md` oder ADR, falls das Vorgehen von der ursprünglichen POSIX-Annahme abweicht.
-6. **Umsetzung in `src/main/atomic-file.ts`** und Regressionstests laufen lassen.
-
-### 3.6 Akzeptanzkriterien (sobald umgesetzt)
-
-- `atomicWriteFile` schreibt State-Dateien auf Windows zuverlässig, auch unter transienten Lock-Bedingungen.
-- Das Schreiben bleibt atomar: Leser sehen niemals eine partielle Datei.
-- Alle bestehenden Tests bleiben grün.
-- Die Lösung ist dokumentiert (Warum wurde diese Option gewählt? Welche Fehler werden abgefangen?).
-- `npm run build` und `npx electron-builder --win --publish never` bleiben grün.
+- `src/main/mrr/keychain.ts` defines a clear, platform-independent interface.
+- macOS behavior remains unchanged (`security` CLI).
+- The Windows implementation stores, reads, and deletes secrets robustly.
+- The `--keychain-service` QA flag continues to work.
+- All tests green (`npm run typecheck`, `npm run lint`, `npm test`).
+- `npm run build` and `npx electron-builder --win --publish never` are green.
+- MRR mode is enabled and documented on Windows.
 
 ---
 
-## 4. Codex-Tracking: Windows-Log-Pfade recherchieren und ergänzen
+## 3. BL-WIN-7: Windows-native atomic writes
 
-### 4.1 Aktueller Status und Blocker
+### 3.1 Current status and blocker
 
-- **Status:** Zurückgestellt, offen.
-- **Begründung:** Der offizielle Windows-Log-Pfad der Codex-CLI ist nicht klar dokumentiert; die Windows-Unterstützung der Codex-CLI selbst kann experimentell oder versionabhängig sein.
-- **Code-Lage:** `src/main/usage/paths.ts` verwendet für Codex standardmäßig `path.join(home, '.codex')` (bzw. `CODEX_HOME`-Override). Dieser Pfad funktioniert auf macOS/Linux; auf Windows ist unklar, ob Codex tatsächlich `%USERPROFILE%\.codex` verwendet oder einen anderen Ort (z. B. `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, etc.). Der aktuelle Cast `process.platform as Platform` in `src/main/usage/paths.ts:129` ist für unbekannte Plattformen (z. B. `freebsd`) latent fehlerhaft.
-- **Auswirkung:** Token-Burn-Tracking auf Windows berücksichtigt vorerst nur Claude Code. Codex-Logs werden weiterhin nur auf macOS/Linux über `~/.codex` verarbeitet.
+- **Status:** Research phase / deferred.
+- **Rationale:** A simple retry logic is known, but it should be checked whether a more robust, more Windows-native solution exists.
+- **Code state:** `src/main/atomic-file.ts` implements atomic writes via a temporary file + `fs.renameSync(tmpPath, filePath)`. This works atomically on POSIX systems; on Windows, however, `renameSync` can fail on transient locks (`EPERM`), e.g. when a virus scanner or indexer briefly blocks the temporary file.
+- **Impact:** State files are usually written correctly, but the risk of a transient write failure remains.
 
-### 4.2 Recherche-/Entscheidungsfragen
+### 3.2 Research/decision questions
 
-1. Welchen Pfad verwendet Codex auf Windows für seine Log-Dateien?
-2. Verwendet Codex `%USERPROFILE%\.codex`, `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, oder einen anderen Ort?
-3. Gibt es offizielle Dokumentation oder Issue-Diskussionen zu Codex-Windows-Pfaden?
-4. Unterscheidet sich das Verhalten zwischen Codex-CLI-Versionen?
-5. Soll `CODEX_HOME` als Override weiterhin höchste Priorität haben?
-6. Soll auf Windows mehr als ein Pfad geprüft werden (z. B. Legacy + moderner AppData-Pfad)?
+1. Is a simple retry logic with a short backoff robust enough for the project?
+2. Is there a Windows-native way to reliably avoid `EPERM` cases on `rename`?
+3. Should a native addon (`MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`) be considered?
+4. Are transactional NTFS operations (`CreateTransaction`, `MoveFileTransactedW`) sensible, or over-engineering?
+5. Are there established Node libraries that solve this problem without forcing new dependencies?
+6. Which errors must be caught (only `EPERM`, also `EACCES`, `EBUSY`)?
 
-### 4.3 Mögliche Lösungsansätze
+### 3.3 Possible approaches
 
-#### Option A: Recherche + Testinstallation
+#### Option A: Asynchronous retry logic with backoff
 
-**Umsetzung:**
-- Codex-CLI auf einer Windows-Maschine installieren und ausführen.
-- Beobachten, welche Verzeichnisse angelegt werden.
-- Offizielle Dokumentation, README und GitHub-Issues prüfen.
+**Implementation:**
+- `atomicWriteFile` becomes asynchronous (`async function`) and uses `fs.promises.writeFile` + `fs.promises.rename` + `setTimeout` backoff.
+- `fs.rename` is retried up to 4 times (immediately, 10 ms, 50 ms, 100 ms).
+- Error classification: `EPERM` and `EBUSY` are transiently retriable; `EACCES` is a permanent permission problem and is not retried.
+- The temporary file stays in the target directory (`${filePath}.tmp-...`) so that `rename` remains atomic on the same volume.
 
-**Vorteile:**
-- Empirisch gesicherte Erkenntnis.
-- Vermeidet falsche Annahmen.
+**Advantages:**
+- Minimal code change.
+- No new dependencies.
+- Solves most transient lock problems.
 
-**Nachteile:**
-- Erfordert Zugriff auf Windows-Testumgebung.
-- Zeitaufwändig.
+**Disadvantages:**
+- Not deterministic; very long blocks can still fail.
+- No real guarantee of atomic behavior on Windows.
+- Harder to test (timing-dependent).
+- Requires adjusting all synchronous callers (`saveOnboardingState`, `saveState`, `saveSettingsState`) and their tests.
 
-#### Option B: Mehrere Kandidatenpfade prüfen
+#### Option B: `MoveFileExW` via native addon or NAPI
 
-**Umsetzung:**
-- In `discoverPaths` für `win32` mehrere potenzielle Codex-Home-Verzeichnisse in dieser Priorität prüfen:
-  1. `env.CODEX_HOME` (Override)
-  2. `path.join(env.LOCALAPPDATA || '', 'Codex')` (modernster Windows-AppData-Pfad)
+**Implementation:**
+- Small native addon that calls `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`.
+- Optionally with `MOVEFILE_WRITE_THROUGH` for a synchronous commit.
+
+**Advantages:**
+- Windows-native API, often more robust against lock conflicts.
+- Explicit overwrite of the target file is possible.
+
+**Disadvantages:**
+- Introduces native code/build complexity.
+- Possible conflict with `CLAUDE.md` restrictions against new dependencies.
+- Harder to test on non-Windows systems.
+
+#### Option C: Transactional NTFS operations
+
+**Implementation:**
+- Use `CreateTransaction`, `MoveFileTransactedW`, `CommitTransaction` via a native addon.
+
+**Advantages:**
+- Strictest consistency guarantee.
+
+**Disadvantages:**
+- Heavily over-engineered for a single state file.
+- Transactional NTFS APIs are outdated/deprecated and not recommended.
+- High complexity, low benefit.
+- **Recommendation:** Do not pursue.
+
+#### Option D: Combination of retry + robust error handling
+
+**Implementation:**
+- Asynchronous retry logic as in Option A, plus:
+  - Explicit check for `EPERM`/`EBUSY` (retriable) vs. `EACCES` (not retriable).
+  - Temporary file stays in the target directory (same-volume rename is the crucial atomicity guarantee).
+  - On repeated failure: clean up and produce a meaningful error message.
+
+**Advantages:**
+- Pragmatic and easy to test.
+- No new dependencies.
+- Better diagnostic options.
+
+**Disadvantages:**
+- Remains a heuristic, not a 100% guarantee.
+
+### 3.4 Research abort criteria
+
+- **Timebox:** maximum 4 hours of research.
+- **Abort criterion:** If no empirical evidence is found within the timebox that a Windows-native approach (Option B) is significantly more reliable than retry backoff, **Option A/D** is chosen as the default.
+- **Fallback:** Option A/D is implementable at any time and requires no new dependencies.
+
+### 3.5 Next concrete steps
+
+1. **Do the research:**
+   - Gather experience from the Node ecosystem (e.g. how `electron-store`, `conf`, `write-file-atomic` solve the problem).
+   - Review the Windows API documentation for `MoveFileExW` and `ReplaceFile`.
+2. **Decide** whether Option A/D or B is pursued.
+3. **Create a proof of concept** for the chosen solution.
+4. **Extend tests:**
+   - Unit tests for the retry logic with a mocked `fs`.
+   - Possibly a Windows CI integration test for atomic writes.
+5. **Update documentation** in `CLAUDE.md` or an ADR if the approach deviates from the original POSIX assumption.
+6. **Implement in `src/main/atomic-file.ts`** and run regression tests.
+
+### 3.6 Acceptance criteria (once implemented)
+
+- `atomicWriteFile` writes state files reliably on Windows, even under transient lock conditions.
+- Writes remain atomic: readers never see a partial file.
+- All existing tests stay green.
+- The solution is documented (Why was this option chosen? Which errors are caught?).
+- `npm run build` and `npx electron-builder --win --publish never` stay green.
+
+---
+
+## 4. Codex tracking: research and add Windows log paths
+
+### 4.1 Current status and blocker
+
+- **Status:** Deferred, open.
+- **Rationale:** The official Windows log path of the Codex CLI is not clearly documented; Windows support of the Codex CLI itself may be experimental or version-dependent.
+- **Code state:** `src/main/usage/paths.ts` uses `path.join(home, '.codex')` for Codex by default (or the `CODEX_HOME` override). This path works on macOS/Linux; on Windows it is unclear whether Codex actually uses `%USERPROFILE%\.codex` or another location (e.g. `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, etc.). The current cast `process.platform as Platform` in `src/main/usage/paths.ts:129` is latently incorrect for unknown platforms (e.g. `freebsd`).
+- **Impact:** Token-burn tracking on Windows currently only covers Claude Code. Codex logs continue to be processed only on macOS/Linux via `~/.codex`.
+
+### 4.2 Research/decision questions
+
+1. Which path does Codex use on Windows for its log files?
+2. Does Codex use `%USERPROFILE%\.codex`, `%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, or another location?
+3. Is there official documentation or issue discussions about Codex Windows paths?
+4. Does the behavior differ between Codex CLI versions?
+5. Should `CODEX_HOME` as an override continue to have the highest priority?
+6. Should more than one path be checked on Windows (e.g. legacy + modern AppData path)?
+
+### 4.3 Possible approaches
+
+#### Option A: Research + test installation
+
+**Implementation:**
+- Install and run the Codex CLI on a Windows machine.
+- Observe which directories are created.
+- Check the official documentation, README, and GitHub issues.
+
+**Advantages:**
+- Empirically verified knowledge.
+- Avoids wrong assumptions.
+
+**Disadvantages:**
+- Requires access to a Windows test environment.
+- Time-consuming.
+
+#### Option B: Check multiple candidate paths
+
+**Implementation:**
+- In `discoverPaths`, check multiple potential Codex home directories for `win32` in this priority:
+  1. `env.CODEX_HOME` (override)
+  2. `path.join(env.LOCALAPPDATA || '', 'Codex')` (most modern Windows AppData path)
   3. `path.join(env.APPDATA || '', 'Codex')`
-  4. `path.join(home, '.codex')` (Legacy / WSL-ähnliche Umgebungen)
-- Erster existierender Pfad gewinnt.
-- Unbekannte `process.platform`-Werte werden defensiv auf `linux`-Verhalten zurückgeführt, statt blind `as Platform` zu casten.
+  4. `path.join(home, '.codex')` (legacy / WSL-like environments)
+- First existing path wins.
+- Unknown `process.platform` values are defensively mapped to `linux` behavior instead of blindly casting `as Platform`.
 
-**Vorteile:**
-- Robust gegen unterschiedliche Codex-Versionen.
-- Schnell umsetzbar.
+**Advantages:**
+- Robust against different Codex versions.
+- Quick to implement.
 
-**Nachteile:**
-- Könnte versehentlich falsche/veraltete Verzeichnisse einlesen.
-- Erfordert sorgfältige Priorisierung und Tests.
+**Disadvantages:**
+- Could accidentally read wrong/outdated directories.
+- Requires careful prioritization and tests.
 
-#### Option C: `CODEX_HOME`-Override beibehalten + Dokumentation
+#### Option C: Keep the `CODEX_HOME` override + documentation
 
-**Umsetzung:**
-- Vorerst nur `~/.codex` prüfen (aktuelles Verhalten).
-- `CODEX_HOME`-Override bleibt als Ausweg für Windows-Nutzer erhalten.
-- Dokumentation ergänzen, wie Windows-Nutzer Codex-Tracking manuell aktivieren können.
+**Implementation:**
+- For now, only check `~/.codex` (current behavior).
+- Keep the `CODEX_HOME` override as an escape hatch for Windows users.
+- Add documentation on how Windows users can manually enable Codex tracking.
 
-**Vorteile:**
-- Kein Code-Risiko.
-- Sofort umsetzbar.
+**Advantages:**
+- No code risk.
+- Immediately implementable.
 
-**Nachteile:**
-- Keine Out-of-the-Box-Codex-Unterstützung auf Windows.
-- Schlechtere User Experience.
+**Disadvantages:**
+- No out-of-the-box Codex support on Windows.
+- Worse user experience.
 
-### 4.4 Nächste konkrete Schritte
+### 4.4 Next concrete steps
 
-1. **Recherche:**
-   - Offizielle Codex-Dokumentation und Repository nach Windows-Pfaden durchsuchen.
-   - GitHub-Issues/Discussions zu Codex + Windows durchsuchen.
-2. **Testinstallation:**
-   - Codex-CLI auf Windows installieren und ausführen.
-   - Protokollieren, welche Pfade angelegt werden.
-3. **Entscheidung treffen**, welche Pfade auf Windows geprüft werden sollen.
-4. **Code-Anpassung in `src/main/usage/paths.ts`:**
-   - Plattformspezifische Codex-Logik ähnlich `claudeConfigDirs` einführen.
-   - `CODEX_HOME` bleibt Override mit höchster Priorität.
-5. **Tests erweitern** in `src/main/usage/paths.test.ts` für Windows-Codex-Szenarien.
-6. **Dokumentation aktualisieren** (`README.md`, `CLAUDE.md`), falls ein zusätzlicher Windows-Pfad hinzukommt.
+1. **Research:**
+   - Search the official Codex documentation and repository for Windows paths.
+   - Search GitHub issues/discussions for Codex + Windows.
+2. **Test installation:**
+   - Install and run the Codex CLI on Windows.
+   - Record which paths are created.
+3. **Decide** which paths should be checked on Windows.
+4. **Code changes in `src/main/usage/paths.ts`:**
+   - Introduce platform-specific Codex logic similar to `claudeConfigDirs`.
+   - `CODEX_HOME` remains the highest-priority override.
+5. **Extend tests** in `src/main/usage/paths.test.ts` for Windows Codex scenarios.
+6. **Update documentation** (`README.md`, `CLAUDE.md`) if an additional Windows path is added.
 
-### 4.5 Akzeptanzkriterien (sobald umgesetzt)
+### 4.5 Acceptance criteria (once implemented)
 
-- `discoverPaths` findet Codex-Log-Dateien auf Windows automatisch am korrekten, dokumentierten Ort.
-- `CODEX_HOME` bleibt auf allen Plattformen der Override mit höchster Priorität.
-- Die Pfadauflösung ist plattformspezifisch und testbar.
-- Alle Tests grün (`npm run typecheck`, `npm run lint`, `npm test`).
-- `npm run build` bleibt grün.
-
----
-
-## 5. Querschnittliche Hinweise
-
-### 5.1 Zu aktualisierende Testdateien
-
-- `src/main/atomic-file.test.ts` — **neu erstellen** (gibt aktuell keine eigene Testdatei).
-- `src/main/mrr/keychain.test.ts` — muss bei einem Adapter-Refactor komplett umgebaut werden.
-- `src/main/usage/paths.test.ts` — muss um Windows-Codex-Szenarien erweitert werden.
-
-### 5.2 Security: `logRedacted` wiederverwenden
-
-Eine zukünftige `keychain-win32.ts` muss `logRedacted` aus `src/main/mrr/redact.ts` verwenden, damit Secrets niemals im Log landen — analog zur aktuellen macOS-Implementierung.
-
-### 5.3 Finales Master-Icon / Design-Pass
-
-Das **finale Master-Icon / Design-Pass** aus `WINDOWS_PORT_PLAN.md:511-513` ist kein technisches Build-Item, sondern ein visuelles Follow-up. Es wird in Phase 5 nicht umgesetzt, sondern als separater Design-Pass nachgelagert.
+- `discoverPaths` automatically finds Codex log files on Windows at the correct, documented location.
+- `CODEX_HOME` remains the highest-priority override on all platforms.
+- Path resolution is platform-specific and testable.
+- All tests green (`npm run typecheck`, `npm run lint`, `npm test`).
+- `npm run build` stays green.
 
 ---
 
-## 6. Abhängigkeiten zu externen Entscheidungen/Recherchen
+## 5. Cross-cutting notes
 
-| Item | Externer Blocker | Wer klärt? | Nächster Schritt |
+### 5.1 Test files to update
+
+- `src/main/atomic-file.test.ts` — **create new** (there is currently no dedicated test file).
+- `src/main/mrr/keychain.test.ts` — must be completely rebuilt in an adapter refactor.
+- `src/main/usage/paths.test.ts` — must be extended with Windows Codex scenarios.
+
+### 5.2 Security: reuse `logRedacted`
+
+A future `keychain-win32.ts` must use `logRedacted` from `src/main/mrr/redact.ts` so that secrets never end up in the log — analogous to the current macOS implementation.
+
+### 5.3 Final master icon / design pass
+
+The **final master icon / design pass** from `WINDOWS_PORT_PLAN.md:511-513` is not a technical build item but a visual follow-up. It is not implemented in Phase 5 and is deferred as a separate design pass.
+
+---
+
+## 6. Dependencies on external decisions/research
+
+| Item | External blocker | Who clarifies? | Next step |
 |------|------------------|-----------|------------------|
-| **BL-WIN-6** | Wahl des Windows-Secret-Store-Backends | Projekt-Administrator | Termin vereinbaren, Entscheidungsvorlage präsentieren |
-| **BL-WIN-7** | Recherche nach Windows-nativem atomarem Schreib-Pattern | Entwicklungsteam | Recherche durchführen, POC erstellen, Entscheidung dokumentieren |
-| **Codex-Tracking** | Offizieller Windows-Log-Pfad der Codex-CLI | Entwicklungsteam + ggf. Codex-Community | Testinstallation und Dokumentationssuche |
+| **BL-WIN-6** | Choice of the Windows secret-store backend | Project administrator | Schedule a meeting, present the decision document |
+| **BL-WIN-7** | Research into a Windows-native atomic write pattern | Development team | Do the research, create a POC, document the decision |
+| **Codex tracking** | Official Windows log path of the Codex CLI | Development team + possibly the Codex community | Test installation and documentation search |
 
-**Wichtig:** Ohne diese externen Klärungen kann Phase 5 nicht vollständig abgeschlossen werden. Dieser Plan sollte als lebendes Dokument gepflegt werden, sobald neue Erkenntnisse vorliegen.
+**Important:** Without these external clarifications, Phase 5 cannot be fully completed. This plan should be maintained as a living document as new findings become available.
 
 ---
 
-## 7. Risiken und Mitigationen
+## 7. Risks and mitigations
 
-| Risiko | Auswirkung | Mitigation |
+| Risk | Impact | Mitigation |
 |--------|------------|------------|
-| **BL-WIN-6:** Administrator-Entscheidung verzögert sich | MRR-Mode bleibt auf Windows länger deaktiviert | App ohne Credentials weiterhin voll funktionsfähig halten; klare Kommunikation im UI/Doku |
-| **BL-WIN-6:** Gewähltes Backend verstößt gegen `CLAUDE.md` | Review-Blocker, ggf. Rework | Vorab ADR/Scope-Update einplanen; Optionen mit Vor-/Nachteilen transparent dokumentieren |
-| **BL-WIN-7:** Recherche ergibt kein deutlich besseres Pattern als Retry | Zeitverlust, keine Verbesserung | Option A/D als Fallback sofort umsetzbar halten; klare Abbruchkriterien für Recherche definieren |
-| **BL-WIN-7:** Native-Addon erhöht Build-Komplexität | CI-Probleme, Portabilitätsrisiken | Nur verwenden, wenn empirisch belegt, dass Retry nicht ausreicht |
-| **Codex-Tracking:** Codex-Windows-Support selbst ist experimentell; Pfad kann sich zwischen Versionen ändern | Tracking funktioniert nicht für alle Nutzer | Mehrere Kandidatenpfade prüfen, `CODEX_HOME`-Override prominent dokumentieren |
-| **Allgemein:** Phase 5 wird nicht priorisiert | Technische Schuld bleibt bestehen | Regelmäßiges Review des Plans im Team; klare Definition-of-Done für jedes Item |
+| **BL-WIN-6:** Administrator decision is delayed | MRR mode stays disabled on Windows for longer | Keep the app fully functional without credentials; clear communication in the UI/docs |
+| **BL-WIN-6:** Chosen backend violates `CLAUDE.md` | Review blocker, possible rework | Plan an ADR/scope update in advance; document options with pros and cons transparently |
+| **BL-WIN-7:** Research finds no significantly better pattern than retry | Time lost, no improvement | Keep Option A/D immediately implementable as a fallback; define clear abort criteria for the research |
+| **BL-WIN-7:** Native addon increases build complexity | CI problems, portability risks | Only use if it is empirically proven that retry is insufficient |
+| **Codex tracking:** Codex Windows support itself is experimental; the path can change between versions | Tracking does not work for all users | Check multiple candidate paths, document the `CODEX_HOME` override prominently |
+| **General:** Phase 5 is not prioritized | Technical debt remains | Regular team review of the plan; clear definition of done for each item |
 
 ---
 
-## 8. Empfohlene Reihenfolge
+## 8. Recommended order
 
-1. **Codex-Tracking-Recherche** (niedrigster externer Blocker, schnellster Wert für Windows-Nutzer).
-2. **BL-WIN-7-Recherche + POC** (kann parallel laufen; Fallback-Implementierung ist trivial).
-3. **BL-WIN-6-Administrator-Termin** (größter Entscheidungsblocker; erst danach Umsetzung möglich).
+1. **Codex tracking research** (lowest external blocker, fastest value for Windows users).
+2. **BL-WIN-7 research + POC** (can run in parallel; the fallback implementation is trivial).
+3. **BL-WIN-6 administrator meeting** (biggest decision blocker; implementation only possible afterwards).
 
 ---
 
-## 9. Notizen zum Vorgehen
+## 9. Notes on the approach
 
-- **Keine Source-Änderungen** in dieser Planungsphase — nur dieses Dokument wird erstellt.
-- **Keine Commits** — der Plan ist lokal in `.flightplan/Archive/phase-5-plan.md` hinterlegt.
-- Sobald die externen Klärungen vorliegen, sollten die einzelnen Items in eigene Build-Items/Branches aufgeteilt und mit dem üblichen Test- und Review-Prozess umgesetzt werden.
+- **No source changes** in this planning phase — only this document is created.
+- **No commits** — the plan is stored locally in `.flightplan/Archive/phase-5-plan.md`.
+- Once the external clarifications are available, the individual items should be split into their own build items/branches and implemented with the usual test and review process.
 
-### 9.1 Definition of Done für diese Planungsphase
+### 9.1 Definition of Done for this planning phase
 
-- [ ] Technische Fehler im Plan korrigiert (BL-WIN-6 Option A, BL-WIN-7 Option A).
-- [ ] BL-WIN-6: Entscheidungsvorlage mit klarer Empfehlung (Option B als Default) vorhanden.
-- [ ] BL-WIN-7: Recherche-Zeitbox und Abbruchkriterien definiert.
-- [ ] Codex-Tracking: Kandidatenpfade priorisiert; defensiver Plattform-Fallback dokumentiert.
-- [ ] Querschnittliche Test- und Security-Hinweise ergänzt.
-- [ ] Offene Punkte, Blocker und nächste Schritte sind kommuniziert.
+- [ ] Technical errors in the plan corrected (BL-WIN-6 Option A, BL-WIN-7 Option A).
+- [ ] BL-WIN-6: decision document with a clear recommendation (Option B as default) available.
+- [ ] BL-WIN-7: research timebox and abort criteria defined.
+- [ ] Codex tracking: candidate paths prioritized; defensive platform fallback documented.
+- [ ] Cross-cutting test and security notes added.
+- [ ] Open items, blockers, and next steps are communicated.

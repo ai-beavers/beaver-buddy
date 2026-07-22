@@ -1,112 +1,112 @@
-# Review B — Lücken & Vollständigkeit (Windows-native M1)
+# Review B — Gaps & Completeness (Windows-native M1)
 
 **Branch:** `bl-item/pixijs-puppet-studio/BL-14`
-**Scope:** Milestone 1 Windows-native Items #1–#6 und Runde-2 Paritäts-Items #46–#62; aktueller Branch enthält zusätzlich Puppet Studio (BL-14 / PR #28, nicht Teil von M1).
-**Reviewer:** Reviewer B (Lücken & Vollständigkeit)
+**Scope:** Milestone 1 Windows-native Items #1–#6 and Round-2 parity items #46–#62; current branch also contains Puppet Studio (BL-14 / PR #28, not part of M1).
+**Reviewer:** Reviewer B (Gaps & Completeness)
 **Date:** 2026-07-18
 
 ---
 
-## Zusammenfassung
+## Summary
 
-M1 ist **technisch durchimplementiert**: alle als `done` markierten Items haben Code-Belege und passende Tests. Es gibt jedoch **mehrere Doku-Lücken in `README.md`**, die den Windows-Stand aktiv falsch beschreiben, und zwei **Test-Lücken bei zentralen Sicherheits-/Lifecycle-Modulen**. Diese sollten vor dem nächsten Merge geschlossen werden.
+M1 is **technically fully implemented**: all items marked `done` have code evidence and matching tests. However, there are **several documentation gaps in `README.md`** that actively misrepresent the Windows state, and two **test gaps in central security/lifecycle modules**. These should be closed before the next merge.
 
 ---
 
-## Lücken
+## Gaps
 
 ### Major
 
-#### 1. README.md behauptet fälschlich, MRR-Modus sei auf Windows nicht verfügbar
-- **Schwere:** major
-- **Beleg:** `README.md:40` — *"Optional MRR mode … Not available on Windows yet"*; `README.md:101` — *"MRR mode is not available on Windows yet"*
-- **Was fehlt:** Der Code unterstützt MRR auf Windows vollständig: `src/main/mrr/secrets.ts` verwendet unter `win32` `electron.safeStorage` (DPAPI) für verschlüsselte Key-Dateien; `src/main/main.ts` startet `MrrEngine` und lässt den Modus-Wechsel über das Tray-Menü/Settings-Fenster zu; `src/main/tray.ts` blendet MRR erst ein, wenn mindestens eine Quelle verbunden ist; `src/main/mrr/settings-window.ts` speichert Stripe/RevenueCat-Keys.
-- **Empfehlung:** README.md korrigieren: MRR ist auf Windows verfügbar, sobald ein Stripe- oder RevenueCat-Key hinterlegt ist; der Hinweis auf die noch ausstehende Administrator-Entscheidung ist überholt (durch #1 erledigt).
+#### 1. README.md falsely claims MRR mode is not available on Windows
+- **Severity:** major
+- **Evidence:** `README.md:40` — *"Optional MRR mode … Not available on Windows yet"*; `README.md:101` — *"MRR mode is not available on Windows yet"*
+- **What is missing:** The code fully supports MRR on Windows: `src/main/mrr/secrets.ts` uses `electron.safeStorage` (DPAPI) under `win32` for encrypted key files; `src/main/main.ts` starts `MrrEngine` and allows mode switching via the tray menu/settings window; `src/main/tray.ts` only shows MRR once at least one source is connected; `src/main/mrr/settings-window.ts` stores Stripe/RevenueCat keys.
+- **Recommendation:** Correct `README.md`: MRR is available on Windows as soon as a Stripe or RevenueCat key is stored; the note about the pending admin decision is obsolete (handled by #1).
 
-#### 2. README.md behauptet fälschlich, unter Windows würden nur Claude-Code-Logs verfolgt
-- **Schwere:** major
-- **Beleg:** `README.md:36` — *"On Windows only Claude Code logs are tracked for now"*
-- **Was fehlt:** Flight-Plan-Item #49 ist umgesetzt: `src/main/usage/paths.ts` scannt unter Windows Union aller Codex-Kandidaten (`%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, `~/.codex`) und dedupliziert nach relativem Pfad. `paths.test.ts` deckt das ab.
-- **Empfehlung:** Abschnitt "Windows usage tracking" neu schreiben: sowohl Claude Code (XDG + Legacy) als auch Codex (Union aller Kandidaten) werden auf Windows verfolgt.
+#### 2. README.md falsely claims only Claude Code logs are tracked on Windows
+- **Severity:** major
+- **Evidence:** `README.md:36` — *"On Windows only Claude Code logs are tracked for now"*
+- **What is missing:** Flight-plan item #49 is implemented: `src/main/usage/paths.ts` scans under Windows the union of all Codex candidates (`%LOCALAPPDATA%\Codex`, `%APPDATA%\Codex`, `~/.codex`) and deduplicates by relative path. `paths.test.ts` covers this.
+- **Recommendation:** Rewrite the "Windows usage tracking" section: both Claude Code (XDG + Legacy) and Codex (union of all candidates) are tracked on Windows.
 
-#### 3. `src/main/hardening.ts` hat keine Unit-Tests trotz P1-Invarianten
-- **Schwere:** major
-- **Beleg:** `src/main/hardening.ts` (keine `hardening.test.ts`); `CLAUDE.md` fordert P1-Überprüfung in Review und "Every logic module ships with a vitest test".
-- **Was fehlt:** Keine automatisierte Prüfung, dass `will-navigate`, `setWindowOpenHandler`, `setPermissionRequestHandler` und `will-download` tatsächlich blockieren/ablehnen.
-- **Empfehlung:** `hardening.test.ts` anlegen, das `BrowserWindow`/`session` mockt und jeden Handler auf `preventDefault` / `action: deny` / `callback(false)` prüft.
+#### 3. `src/main/hardening.ts` has no unit tests despite P1 invariants
+- **Severity:** major
+- **Evidence:** `src/main/hardening.ts` (no `hardening.test.ts`); `CLAUDE.md` requires P1 review check and "Every logic module ships with a vitest test".
+- **What is missing:** No automated check that `will-navigate`, `setWindowOpenHandler`, `setPermissionRequestHandler` and `will-download` actually block/deny.
+- **Recommendation:** Create `hardening.test.ts` that mocks `BrowserWindow`/`session` and checks each handler for `preventDefault` / `action: deny` / `callback(false)`.
 
-#### 4. `src/main/main.ts` hat keine Unit-Tests für zentrale App-Lifecycle-Logik
-- **Schwere:** major
-- **Beleg:** `src/main/main.ts` (keine `main.test.ts`).
-- **Was fehlt:** Single-instance lock, `second-instance` Restore/Focus, Flag-Parsing (`--quip`, `--inject-xp`, `--keychain-service`), `onProgressReset`-Resync-Fallback (#57) und die Interaktion zwischen `XpEngine`, `UsageTracker`, `MrrEngine` und Tray sind ungetestet.
-- **Empfehlung:** Zumindest die pure Flag-Parser-Logik in eine separate Datei auslagern und testen; den Single-Instance- und Reset-Resync-Pfad mit spärlichen Electron-Mocks abdecken (Rest bleibt Integration/E2E).
+#### 4. `src/main/main.ts` has no unit tests for central app lifecycle logic
+- **Severity:** major
+- **Evidence:** `src/main/main.ts` (no `main.test.ts`).
+- **What is missing:** Single-instance lock, `second-instance` restore/focus, flag parsing (`--quip`, `--inject-xp`, `--keychain-service`), `onProgressReset`-resync-fallback (#57) and the interaction between `XpEngine`, `UsageTracker`, `MrrEngine` and Tray are untested.
+- **Recommendation:** At least extract the pure flag-parser logic into a separate file and test it; cover the single-instance and reset-resync path with sparse Electron mocks (rest remains integration/E2E).
 
 ### Minor
 
-#### 5. README.md nennt Windows-Builds weiterhin "currently unsigned"
-- **Schwere:** minor
-- **Beleg:** `README.md:78` — *"currently unsigned, so Windows Defender SmartScreen may show a warning"*
-- **Was fehlt:** Flight-Plan-Item #4a ist umgesetzt (`electron-builder.yml` `signtoolOptions`, `scripts/new-dev-signing-cert.ps1`, `scripts/verify-signatures.ps1`, CI-Integration, `docs/code-signing.md`). Self-signed Signatur ist aktiv, auch wenn SmartScreen weiterhin warnt (#4b).
-- **Empfehlung:** Formulierung auf "self-signed code signing is active in CI/dev builds; SmartScreen still warns until a publicly trusted certificate lands (#4b)" anpassen.
+#### 5. README.md still calls Windows builds "currently unsigned"
+- **Severity:** minor
+- **Evidence:** `README.md:78` — *"currently unsigned, so Windows Defender SmartScreen may show a warning"*
+- **What is missing:** Flight-plan item #4a is implemented (`electron-builder.yml` `signtoolOptions`, `scripts/new-dev-signing-cert.ps1`, `scripts/verify-signatures.ps1`, CI integration, `docs/code-signing.md`). Self-signed signature is active, even though SmartScreen still warns (#4b).
+- **Recommendation:** Adjust wording to "self-signed code signing is active in CI/dev builds; SmartScreen still warns until a publicly trusted certificate lands (#4b)".
 
-#### 6. `docs/design-reviews/phase-4-windows/verdict.md` widerspricht vorhandenen Screenshots
-- **Schwere:** minor
-- **Beleg:** `docs/design-reviews/phase-4-windows/verdict.md:86` — *"Screenshots: not captured in this CLI-only environment"*; tatsächlich existieren `idle.png`, `quip-bubble.png`, `hatch.png`, `evolution-flash.png` im selben Verzeichnis.
-- **Was fehlt:** Verdict wurde nach dem Hinzufügen der Screenshots nicht aktualisiert.
-- **Empfehlung:** Verdict mit den Screenshot-Dateien verknüpfen und den Satz "provisional until real Windows screenshots can be added" anpassen oder entfernen.
+#### 6. `docs/design-reviews/phase-4-windows/verdict.md` contradicts existing screenshots
+- **Severity:** minor
+- **Evidence:** `docs/design-reviews/phase-4-windows/verdict.md:86` — *"Screenshots: not captured in this CLI-only environment"*; in fact `idle.png`, `quip-bubble.png`, `hatch.png`, `evolution-flash.png` exist in the same directory.
+- **What is missing:** Verdict was not updated after adding the screenshots.
+- **Recommendation:** Link the verdict to the screenshot files and adjust or remove the sentence "provisional until real Windows screenshots can be added".
 
-#### 7. Leere `NUL`-Datei liegt im Working Tree
-- **Schwere:** minor
-- **Beleg:** `git status` zeigt `?? NUL` (0 Byte, 2026-07-18).
-- **Was fehlt:** Die Datei ist vermutlich ein Artefakt eines fehlgeschlagenen `> NUL`-Redirects auf Windows und hat keinen Inhalt.
-- **Empfehlung:** `rm NUL` und ggf. `.gitignore` prüfen, ob `NUL` explizit ausgeschlossen werden sollte.
+#### 7. Empty `NUL` file lies in the working tree
+- **Severity:** minor
+- **Evidence:** `git status` shows `?? NUL` (0 bytes, 2026-07-18).
+- **What is missing:** The file is probably an artifact of a failed `> NUL` redirect on Windows and has no content.
+- **Recommendation:** `rm NUL` and check `.gitignore` whether `NUL` should be explicitly excluded.
 
-#### 8. Haupt-Overlay-Fenster verwendet auf Windows weiterhin das PNG-Icon statt der ICO-Datei
-- **Schwere:** minor
-- **Beleg:** `src/main/main.ts:120` — `icon: appIconPath()` -> `assets/beaver-buddy-icon.png`; `settings-window.ts` wurde dagegen in #59 auf `icon.ico` umgestellt.
-- **Was fehlt:** `createWindow()` nutzt kein plattformspezifisches Icon. Da `skipTaskbar: true` gesetzt ist, ist der Effekt begrenzt, aber für Task-Manager/Alt-Tab wäre `assets/icon.ico` konventioneller.
-- **Empfehlung:** Analog zu `settings-window.ts` unter `win32` `assets/icon.ico` verwenden; Test ergänzen, falls das Fenster-Icon je geprüft wird.
+#### 8. Main overlay window still uses PNG icon on Windows instead of the ICO file
+- **Severity:** minor
+- **Evidence:** `src/main/main.ts:120` — `icon: appIconPath()` → `assets/beaver-buddy-icon.png`; `settings-window.ts` was switched to `icon.ico` in #59.
+- **What is missing:** `createWindow()` does not use a platform-specific icon. Since `skipTaskbar: true` is set, the effect is limited, but for Task Manager/Alt-Tab `assets/icon.ico` would be more conventional.
+- **Recommendation:** Use `assets/icon.ico` under `win32` analogous to `settings-window.ts`; add a test if the window icon is ever checked.
 
 ---
 
 ## Item-Coverage
 
-| Item | Beschreibung | Status | Code-Beleg / Test-Beleg | Anmerkung |
+| Item | Description | Status | Code evidence / Test evidence | Note |
 |---|---|---|---|---|
-| #1 | Windows Secret Store | done | `src/main/mrr/secrets.ts`, `secrets.test.ts` | DPAPI + `safeStorage` unter `win32` |
-| #2 | Auto-Hide Taskbar Robustheit | done | `src/main/overlay-adapter.ts:36-50`, `overlay-adapter.test.ts` | 2-DIP-Inset bei `workArea === bounds` |
-| #3 | Professioneller Icon-Pass | provisional | `assets/icon.ico`, `assets/tray-icon.png`, `scripts/gen-sprites/build-icons.ts` | Placeholder aus Sprite-Frame; finaler Design-Pass offen |
-| #4a | Signing-Infrastruktur | done | `electron-builder.yml`, `scripts/new-dev-signing-cert.ps1`, `scripts/verify-signatures.ps1`, `docs/code-signing.md` | Self-signed-CI-Pipeline |
-| #4b | SmartScreen-freie Auslieferung | dokumentiert | `docs/code-signing.md` | Erfordert echtes Zertifikat/Azure Trusted Signing (#42) |
-| #5 | Installer-Lokalisierung | done | `electron-builder.yml:21-22`, `installer-config.test.ts` | `en_US`, `de_DE` |
-| #6 | Startmenü-/Desktop-Shortcut | done | `electron-builder.yml:15-19` | `createDesktopShortcut`, `createStartMenuShortcut` |
-| #46 | Reset-Button im Einstellungsfenster | done | `src/main/mrr/settings-window.ts`, `settings.html`, `settings-window.test.ts` | Two-click arming |
-| #47 | Tray-Einzelklick | done | `src/main/tray.ts:106-108`, `tray.test.ts` | `popUpContextMenu()` unter `win32` |
-| #48 | Taskbar-Sprung-Animation | offen Idee | nur dokumentiert | keine Umsetzungsverpflichtung |
-| #49 | Codex-Homes unter Windows vereinigen | done | `src/main/usage/paths.ts:162-191`, `paths.test.ts` | Union + Dedup |
-| #50 | Connect-Hint plattformneutral | done | `src/main/mrr/settings.html:63` | "on this computer" |
-| #51 | Settings-Fensterhöhe | done | `src/main/mrr/settings-window.ts:60-72`, `settings-window.test.ts` | 713 px, `useContentSize` |
-| #52 | DPR-Drift-Guard im Renderer | done | `src/renderer/renderer.ts:230-238`, `renderer.test.ts` | rAF-Loop + resize-Handler |
-| #53 | Claude-XDG-Union + CRLF-Test | done | `src/main/usage/paths.ts:54-60`, `paths.test.ts`, `read-lines.test.ts` | `win32` prüft XDG + Legacy |
-| #54 | npm ci auf Lockfile-Stand | done | `package-lock.json` | lokal gemeldet |
-| #55 | TS-7-ready tsconfig | done | `tsconfig.json:6` | `moduleResolution: nodenext` |
-| #56 | @types/node an Node 24 | done | `package.json:32` | `^24.0.0` |
-| #57 | Resync nach fehlgeschlagenem Reset | done | `src/main/main.ts:225-237` | Catch-Pfad sendet PET_CHANGED |
-| #58 | Renderer-Tests für Mid-Session-Reset | done | `src/renderer/renderer.test.ts:141-202` | Hatch cancelt Evolution + Stage-Snap |
-| #59 | Windows-Fenster-Icon auf ICO | done | `src/main/mrr/settings-window.ts:279`, `settings-window.test.ts` | `icon.ico` unter `win32` |
-| #60 | Live-Gate Renderer-Visuals | done | `docs/design-reviews/phase-4-windows/*.png` | 4 Screenshots vorhanden |
-| #61 | Windows-Verhaltens-Doku | done | `README.md:117-128` | Occlusion + Fractional-DPR |
-| #62 | WSL-Usage-Logs Doku | done | `README.md:103-111` | Override-Workaround |
-| #63 | Bubble-Outline fraktionelles DPR | optional | — | nicht umgesetzt, Owner-Entscheidung offen |
-| #64 | Launch-Tier-Quip Replay | optional | — | nicht umgesetzt, upstream-Kandidat |
+| #1 | Windows Secret Store | done | `src/main/mrr/secrets.ts`, `secrets.test.ts` | DPAPI + `safeStorage` under `win32` |
+| #2 | Auto-Hide Taskbar Robustness | done | `src/main/overlay-adapter.ts:36-50`, `overlay-adapter.test.ts` | 2-DIP inset when `workArea === bounds` |
+| #3 | Professional Icon Pass | provisional | `assets/icon.ico`, `assets/tray-icon.png`, `scripts/gen-sprites/build-icons.ts` | Placeholder from sprite frame; final design pass open |
+| #4a | Signing Infrastructure | done | `electron-builder.yml`, `scripts/new-dev-signing-cert.ps1`, `scripts/verify-signatures.ps1`, `docs/code-signing.md` | Self-signed CI pipeline |
+| #4b | SmartScreen-Free Delivery | documented | `docs/code-signing.md` | Requires real certificate/Azure Trusted Signing (#42) |
+| #5 | Installer Localization | done | `electron-builder.yml:21-22`, `installer-config.test.ts` | `en_US`, `de_DE` |
+| #6 | Start Menu/Desktop Shortcut | done | `electron-builder.yml:15-19` | `createDesktopShortcut`, `createStartMenuShortcut` |
+| #46 | Reset Button in Settings Window | done | `src/main/mrr/settings-window.ts`, `settings.html`, `settings-window.test.ts` | Two-click arming |
+| #47 | Tray Single Click | done | `src/main/tray.ts:106-108`, `tray.test.ts` | `popUpContextMenu()` under `win32` |
+| #48 | Taskbar Jump Animation | open idea | documented only | no implementation obligation |
+| #49 | Unify Codex Homes on Windows | done | `src/main/usage/paths.ts:162-191`, `paths.test.ts` | Union + dedup |
+| #50 | Connect Hint Platform-Neutral | done | `src/main/mrr/settings.html:63` | "on this computer" |
+| #51 | Settings Window Height | done | `src/main/mrr/settings-window.ts:60-72`, `settings-window.test.ts` | 713 px, `useContentSize` |
+| #52 | DPR Drift Guard in Renderer | done | `src/renderer/renderer.ts:230-238`, `renderer.test.ts` | rAF loop + resize handler |
+| #53 | Claude-XDG-Union + CRLF Test | done | `src/main/usage/paths.ts:54-60`, `paths.test.ts`, `read-lines.test.ts` | `win32` checks XDG + Legacy |
+| #54 | npm ci to Lockfile State | done | `package-lock.json` | locally reported |
+| #55 | TS-7-Ready tsconfig | done | `tsconfig.json:6` | `moduleResolution: nodenext` |
+| #56 | Couple @types/node to Node 24 | done | `package.json:32` | `^24.0.0` |
+| #57 | Resync after Failed Reset | done | `src/main/main.ts:225-237` | Catch path sends `PET_CHANGED` |
+| #58 | Renderer Tests for Mid-Session Reset | done | `src/renderer/renderer.test.ts:141-202` | Hatch cancels evolution + stage snap |
+| #59 | Switch Windows Window Icon to ICO | done | `src/main/mrr/settings-window.ts:279`, `settings-window.test.ts` | `icon.ico` under `win32` |
+| #60 | Live-Gate Renderer Visuals | done | `docs/design-reviews/phase-4-windows/*.png` | 4 screenshots available |
+| #61 | Windows Behavior Docs | done | `README.md:117-128` | Occlusion + fractional DPR |
+| #62 | WSL Usage Logs Docs | done | `README.md:103-111` | Override workaround |
+| #63 | Bubble Outline Fractional DPR | optional | — | not implemented, owner decision open |
+| #64 | Launch Tier Quip Replay | optional | — | not implemented, upstream candidate |
 
 ---
 
-## Geprüfte Dateien
+## Reviewed Files
 
 - `PRD.md` (Product Source of Truth)
 - `CLAUDE.md` (Guardrails, Definition of Done)
-- `.flightplan/Reference/windows-native-flight-plan.md` (M1-Item-Spezifikation)
+- `.flightplan/Reference/windows-native-flight-plan.md` (M1 item specification)
 - `.flightplan/ROADMAP.md` (Milestones)
 - `src/main/main.ts`
 - `src/main/overlay-adapter.ts` + `.test.ts`
@@ -128,16 +128,16 @@ M1 ist **technisch durchimplementiert**: alle als `done` markierten Items haben 
 - `CONTRIBUTING.md`
 - `docs/code-signing.md`
 - `docs/design-reviews/phase-4-windows/verdict.md` + Screenshots
-- `tools/puppet-studio/README.md` (Kurzcheck, nicht M1-Scope)
+- `tools/puppet-studio/README.md` (Quick check, not M1 scope)
 
 ---
 
 ## Verdict
 
-- **M1-done gerechtfertigt:** **Ja** — alle in M1 erfassten Items (#1–#6, #46–#62) sind entweder vollständig implementiert, bewusst als provisional markiert (#3, #7) oder dokumentiert offen (#4b, #48, #63, #64). Es gibt keine Hinweise auf unvollständige oder stubhafte Implementierungen bei als `done` markierten Items.
-- **PR-ready:** **Nein** — die `README.md`-Lücken (#1, #2, #5) und die fehlenden Tests für `hardening.ts`/`main.ts` (#3, #4) sollten vor dem nächsten Merge geschlossen werden. Sie sind schnell zu beheben und verhindern, dass ein öffentlicher Branch mit falschen Nutzerversprechen oder ungetesteten P1-Invarianten landet.
-- **Empfohlene nächste Schritte:**
-  1. `README.md` Windows-Abschnitt korrigieren (MRR, Codex, Signing).
-  2. `hardening.test.ts` und `main.test.ts` (zumindest Pure-Logic-Teile) ergänzen.
-  3. `NUL` aus dem Working Tree entfernen.
-  4. `docs/design-reviews/phase-4-windows/verdict.md` auf die vorhandenen Screenshots aktualisieren.
+- **M1-done justified:** **Yes** — all items covered in M1 (#1–#6, #46–#62) are either fully implemented, deliberately marked as provisional (#3, #7), or documented as open (#4b, #48, #63, #64). There are no indications of incomplete or stub implementations in items marked `done`.
+- **PR-ready:** **No** — the `README.md` gaps (#1, #2, #5) and the missing tests for `hardening.ts`/`main.ts` (#3, #4) should be closed before the next merge. They are quick to fix and prevent a public branch from landing with false user promises or untested P1 invariants.
+- **Recommended next steps:**
+  1. Correct `README.md` Windows section (MRR, Codex, signing).
+  2. Add `hardening.test.ts` and `main.test.ts` (at least the pure-logic parts).
+  3. Remove `NUL` from the working tree.
+  4. Update `docs/design-reviews/phase-4-windows/verdict.md` to the existing screenshots.

@@ -8,15 +8,17 @@
 // nothing changed (that's the definition of idle), so it rides onTick
 // instead of a second polling loop.
 //
-// Claude Code / Codex logs are discovered (directory listing only) before
-// opt-in so Connect UI can show "logs found". File contents are parsed only
-// after setEnabledSources enables that source — never before.
+// Coding-agent logs are discovered (directory listing only) before opt-in so
+// Connect UI can show "logs found". File contents are parsed only after
+// setEnabledSources enables that source — never before.
 
 import fs from 'node:fs';
 import os from 'node:os';
-import { discoverPaths, type PathEnv } from './paths';
+import { discoverPaths, type DiscoveredPaths, type PathEnv } from './paths';
 import { parseClaudeFile } from './claude-parser';
 import { dedupeCodexEntries, parseCodexFile } from './codex-parser';
+import { parseGenericUsageFile } from './generic-parser';
+import { emptyEnabledSources, USAGE_SOURCE_IDS, type UsageSourceId } from './sources';
 import { aggregate, todayTotalTokens, type UsageEntry, type UsageTotals } from './totals';
 import { USAGE_REFRESH_MS } from './config';
 
@@ -25,10 +27,7 @@ interface FileCacheEntry {
   readonly entries: readonly UsageEntry[];
 }
 
-export interface EnabledSources {
-  readonly claude: boolean;
-  readonly codex: boolean;
-}
+export type EnabledSources = Partial<Record<UsageSourceId, boolean>>;
 
 export interface SourceUsageSnapshot {
   readonly enabled: boolean;
@@ -39,10 +38,11 @@ export interface SourceUsageSnapshot {
   readonly todayTokens: number;
 }
 
-export interface UsageSourcesSnapshot {
-  readonly claude: SourceUsageSnapshot;
-  readonly codex: SourceUsageSnapshot;
-}
+export type UsageSourcesSnapshot = Record<'claude' | 'codex', SourceUsageSnapshot> & {
+  readonly pi?: SourceUsageSnapshot;
+  readonly kimi?: SourceUsageSnapshot;
+  readonly opencode?: SourceUsageSnapshot;
+};
 
 function emptyUsageTotals(): UsageTotals {
   return aggregate([]);
@@ -55,11 +55,11 @@ export class UsageTracker {
   private readonly listeners = new Set<(totals: UsageTotals) => void>();
   private readonly tickListeners = new Set<(totals: UsageTotals) => void>();
   private totals: UsageTotals = emptyUsageTotals();
-  private claudeTotals: UsageTotals = emptyUsageTotals();
-  private codexTotals: UsageTotals = emptyUsageTotals();
-  private claudeLogsFound = false;
-  private codexLogsFound = false;
-  private enabled: EnabledSources = { claude: false, codex: false };
+  private sourceTotals: Record<UsageSourceId, UsageTotals> = Object.fromEntries(
+    USAGE_SOURCE_IDS.map((source) => [source, emptyUsageTotals()]),
+  ) as Record<UsageSourceId, UsageTotals>;
+  private logsFound: Record<UsageSourceId, boolean> = emptyEnabledSources();
+  private enabled: Record<UsageSourceId, boolean> = emptyEnabledSources();
   private timer: ReturnType<typeof setInterval> | null = null;
 
   constructor(env: PathEnv = process.env, home: string = os.homedir()) {
@@ -72,27 +72,30 @@ export class UsageTracker {
   }
 
   getSourcesSnapshot(nowMs: number = Date.now()): UsageSourcesSnapshot {
-    return {
-      claude: {
-        enabled: this.enabled.claude,
-        logsFound: this.claudeLogsFound,
-        connected: this.enabled.claude && this.claudeLogsFound,
-        lifetimeTokens: this.enabled.claude ? this.claudeTotals.lifetime.totalTokens : 0,
-        todayTokens: this.enabled.claude ? todayTotalTokens(this.claudeTotals, nowMs) : 0,
-      },
-      codex: {
-        enabled: this.enabled.codex,
-        logsFound: this.codexLogsFound,
-        connected: this.enabled.codex && this.codexLogsFound,
-        lifetimeTokens: this.enabled.codex ? this.codexTotals.lifetime.totalTokens : 0,
-        todayTokens: this.enabled.codex ? todayTotalTokens(this.codexTotals, nowMs) : 0,
-      },
-    };
+    return Object.fromEntries(
+      USAGE_SOURCE_IDS.map((source) => {
+        const totals = this.sourceTotals[source];
+        return [
+          source,
+          {
+            enabled: this.enabled[source],
+            logsFound: this.logsFound[source],
+            connected: this.enabled[source] && this.logsFound[source],
+            lifetimeTokens: this.enabled[source] ? totals.lifetime.totalTokens : 0,
+            todayTokens: this.enabled[source] ? todayTotalTokens(totals, nowMs) : 0,
+          },
+        ];
+      }),
+    ) as unknown as UsageSourcesSnapshot;
   }
 
   setEnabledSources(enabled: EnabledSources): void {
-    if (this.enabled.claude === enabled.claude && this.enabled.codex === enabled.codex) return;
-    this.enabled = enabled;
+    const next = { ...this.enabled };
+    for (const source of USAGE_SOURCE_IDS) {
+      if (Object.prototype.hasOwnProperty.call(enabled, source)) next[source] = Boolean(enabled[source]);
+    }
+    if (USAGE_SOURCE_IDS.every((source) => this.enabled[source] === next[source])) return;
+    this.enabled = next;
     this.refresh();
   }
 
@@ -131,10 +134,9 @@ export class UsageTracker {
   // Missing dirs/files produce empty discovery results, not errors, so this
   // never throws and never retries — a single scan per call is enough.
   refresh(): void {
-    const { claudeFiles, codexFiles } = discoverPaths(this.env, this.home);
+    const discovered = discoverPaths(this.env, this.home);
     const liveFiles = new Set<string>();
-    const claudeEntries: UsageEntry[] = [];
-    const codexEntries: UsageEntry[] = [];
+    const sourceEntries = Object.fromEntries(USAGE_SOURCE_IDS.map((source) => [source, []])) as unknown as Record<UsageSourceId, UsageEntry[]>;
     let changed = false;
 
     const processFile = (filePath: string, parse: (f: string) => UsageEntry[], sink: UsageEntry[]): void => {
@@ -157,13 +159,12 @@ export class UsageTracker {
       sink.push(...(this.fileCache.get(filePath)?.entries ?? []));
     };
 
-    // Parse only opted-in sources. Disabled sources contribute logsFound via
-    // discovery alone; their cache entries fall out of liveFiles and evict.
-    if (this.enabled.claude) {
-      for (const filePath of claudeFiles) processFile(filePath, parseClaudeFile, claudeEntries);
-    }
-    if (this.enabled.codex) {
-      for (const filePath of codexFiles) processFile(filePath, parseCodexFile, codexEntries);
+    const filesFor = (paths: DiscoveredPaths, source: UsageSourceId): readonly string[] => paths[`${source}Files` as keyof DiscoveredPaths];
+
+    for (const source of USAGE_SOURCE_IDS) {
+      if (!this.enabled[source]) continue;
+      const parse = source === 'claude' ? parseClaudeFile : source === 'codex' ? parseCodexFile : parseGenericUsageFile;
+      for (const filePath of filesFor(discovered, source)) processFile(filePath, parse, sourceEntries[source]);
     }
 
     // Drop cache entries for files that no longer show up among enabled
@@ -176,31 +177,35 @@ export class UsageTracker {
       }
     }
 
-    const nextClaudeLogs = claudeFiles.length > 0;
-    const nextCodexLogs = codexFiles.length > 0;
-    if (nextClaudeLogs !== this.claudeLogsFound || nextCodexLogs !== this.codexLogsFound) {
-      this.claudeLogsFound = nextClaudeLogs;
-      this.codexLogsFound = nextCodexLogs;
-      changed = true;
+    for (const source of USAGE_SOURCE_IDS) {
+      const nextLogsFound = filesFor(discovered, source).length > 0;
+      if (nextLogsFound !== this.logsFound[source]) {
+        this.logsFound[source] = nextLogsFound;
+        changed = true;
+      }
     }
 
-    const nextClaudeTotals = aggregate(claudeEntries);
-    // Codex event dedup is cross-file, so it runs over the combined set here
-    // rather than inside the per-file parser.
-    const nextCodexTotals = aggregate(dedupeCodexEntries(codexEntries));
-    const combined: UsageEntry[] = [];
-    if (this.enabled.claude) combined.push(...claudeEntries);
-    if (this.enabled.codex) combined.push(...dedupeCodexEntries(codexEntries));
+    const nextSourceTotals = Object.fromEntries(
+      USAGE_SOURCE_IDS.map((source) => {
+        const entries = source === 'codex' ? dedupeCodexEntries(sourceEntries.codex) : sourceEntries[source];
+        return [source, aggregate(entries)];
+      }),
+    ) as Record<UsageSourceId, UsageTotals>;
+
+    const combined = USAGE_SOURCE_IDS.flatMap((source) => {
+      if (!this.enabled[source]) return [];
+      return source === 'codex' ? dedupeCodexEntries(sourceEntries.codex) : sourceEntries[source];
+    });
     const nextTotals = aggregate(combined);
 
     const totalsChanged =
       changed ||
       nextTotals.lifetime.totalTokens !== this.totals.lifetime.totalTokens ||
-      nextClaudeTotals.lifetime.totalTokens !== this.claudeTotals.lifetime.totalTokens ||
-      nextCodexTotals.lifetime.totalTokens !== this.codexTotals.lifetime.totalTokens;
+      USAGE_SOURCE_IDS.some(
+        (source) => nextSourceTotals[source].lifetime.totalTokens !== this.sourceTotals[source].lifetime.totalTokens,
+      );
 
-    this.claudeTotals = nextClaudeTotals;
-    this.codexTotals = nextCodexTotals;
+    this.sourceTotals = nextSourceTotals;
 
     if (totalsChanged) {
       this.totals = nextTotals;

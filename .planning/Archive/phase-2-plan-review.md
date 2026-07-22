@@ -1,170 +1,170 @@
-# Kritischer Review: Phase 2 — Core Windows Experience
+# Critical Review: Phase 2 — Core Windows Experience
 
-**Geprüfter Plan:** `.flightplan/Archive/phase-2-plan.md`  
-**Hauptplan-Referenz:** `.flightplan/Archive/WINDOWS_PORT_PLAN.md`, Abschnitt „Phase 2: Core Windows Experience"  
-**Quelldateien:** `src/main/main.ts`, `src/main/tray.ts`, `src/renderer/roam.ts`, `src/main/ipc-channels.ts`, `src/main/preload.ts`, `src/renderer/renderer.ts`, `src/main/tray.test.ts`  
-**Review-Datum:** 2026-07-15  
-**Reviewer:** Kritischer Review-Agent
-
----
-
-## 1. Zusammenfassung des geprüften Plans
-
-Phase 2 adressiert die beiden sichtbarsten Windows-Blocker aus dem Hauptplan:
-
-- **BL-WIN-3:** Einführung eines `src/main/overlay-adapter.ts`, der `setAlwaysOnTop`-Level, Taskleisten-Erkennung via `screen.getPrimaryDisplay().workArea` und Neuausrichtung des Overlay-Fensters bei Display-/Taskleisten-Änderungen kapselt. Der Adapter kommuniziert neue Bounds über den neuen IPC-Kanal `state:bounds` an den Renderer.
-- **BL-WIN-4:** Plattformspezifische Icon-Auswahl in `src/main/tray.ts` — auf Windows wird `assets/tray-icon.png` geladen und `setTemplateImage` nur auf macOS aufgerufen.
-
-Der Plan ist klein, fokussiert, führt keine neuen Dependencies ein und beschränkt sich weitgehend auf den Main-Prozess. Die grundsätzliche Architektur (Adapter-Modul, plattformspezifische Verzweigungen, manuelle Smoke-Tests) ist solide.
-
-**Allerdings überschätzt der Plan die Robustheit der Taskleisten-Erkennung und unterschätzt die Synchronisation zwischen Main-Prozess und Renderer bei Fenster-Resizes.** Unter Windows führen Auto-Hide-Taskleisten und die asynchrone Natur von Electron-Fenster-Animationen zu konkreten Lücken, die vor der Umsetzung geschlossen werden sollten.
+**Reviewed plan:** `.flightplan/Archive/phase-2-plan.md`  
+**Main plan reference:** `.flightplan/Archive/WINDOWS_PORT_PLAN.md`, section "Phase 2: Core Windows Experience"  
+**Source files:** `src/main/main.ts`, `src/main/tray.ts`, `src/renderer/roam.ts`, `src/main/ipc-channels.ts`, `src/main/preload.ts`, `src/renderer/renderer.ts`, `src/main/tray.test.ts`  
+**Review date:** 2026-07-15  
+**Reviewer:** Critical review agent
 
 ---
 
-## 2. Gefundene Probleme / Lücken / Fehler
+## 1. Summary of the reviewed plan
 
-### 2.1 Auto-Hide-Taskleiste wird nicht erkannt — Plan suggeriert das Gegenteil
+Phase 2 addresses the two most visible Windows blockers from the main plan:
 
-**Schweregrad:** Blocker
+- **BL-WIN-3:** Introduction of a `src/main/overlay-adapter.ts` that encapsulates the `setAlwaysOnTop` level, taskbar detection via `screen.getPrimaryDisplay().workArea`, and realignment of the overlay window on display/taskbar changes. The adapter communicates new bounds to the renderer via the new IPC channel `state:bounds`.
+- **BL-WIN-4:** Platform-specific icon selection in `src/main/tray.ts` — on Windows `assets/tray-icon.png` is loaded and `setTemplateImage` is only called on macOS.
 
-Der vorgeschlagene `detectTaskbarEdge` vergleicht `display.bounds` mit `display.workArea`. Bei einer **Auto-Hide-Taskleiste** ist `workArea` auf Windows in der Regel **identisch mit `bounds`**, solange die Leiste ausgeblendet ist. Wenn sie einblendet, reserviert sie zwar visuell Platz, ändert die `workArea` des Electron-Displays aber nicht zwangsläufig.
+The plan is small, focused, introduces no new dependencies, and is largely confined to the main process. The basic architecture (adapter module, platform-specific branches, manual smoke tests) is solid.
 
-Das bedeutet:
-- `detectTaskbarEdge` gibt bei Auto-Hide `'none'` zurück.
-- Das Overlay-Fenster wird auf die volle Bildschirmgröße ausgerichtet.
-- Der Biber kann hinter der eingeblendeten Taskleiste verschwinden — genau das Gegenteil von BL-WIN-3.
-
-Der Plan schreibt im Akzeptanzkriterium: „Bei Änderung der Taskleisten-Position, -Größe oder des Auto-Hide-Zustands wird workArea neu berechnet und das Fenster sanft angepasst" und im Testplan: „detectTaskbarEdge für alle vier Kanten + Auto-Hide (simuliert durch unterschiedliche bounds/workArea)". Das ist irreführend: Unterschiedliche `bounds`/`workArea` simulieren eine **sichtbare** Taskleiste, nicht Auto-Hide.
-
-**Referenz:** `src/main/overlay-adapter.ts` (geplant), Abschnitt 3.3; Akzeptanzkriterien Abschnitt 5.
+**However, the plan overestimates the robustness of taskbar detection and underestimates the synchronization between the main process and the renderer during window resizes.** On Windows, auto-hide taskbars and the asynchronous nature of Electron window animations lead to concrete gaps that should be closed before implementation.
 
 ---
 
-### 2.2 `fitWindowToWorkArea` mit `animate: true` ist für transparente Overlays problematisch
+## 2. Found problems / gaps / errors
 
-**Schweregrad:** Hoch
+### 2.1 Auto-hide taskbar is not detected — the plan suggests the opposite
 
-Der Plan verwendet `win.setBounds({...}, true)` (animate: `true`), um das Fenster bei Taskleisten-Änderungen „sanft" zu verschieben. Das ist problematisch aus zwei Gründen:
+**Severity:** Blocker
 
-1. **Asynchrone Renderer-Synchronisation:** Während das Fenster animiert skaliert, ändern sich `window.innerWidth`/`innerHeight` nicht atomar. Der Renderer bekommt das `resize`-Event und/oder die IPC-Nachricht `state:bounds` zu einem beliebigen Zeitpunkt der Animation. Der Plan behauptet: „Fenstergröße wurde vom Main-Prozess angepasst; innerWidth/innerHeight sollten bereits next entsprechen" — das ist eine ungültige Annahme.
-2. **Artefakte bei transparentem Fenster:** Electron-Window-Animationen auf transparenten, klick-durch-Fenstern können auf Windows zu Flackern oder Ghosting führen, weil der Window-Manager das Fenster während der Animation neu composited.
+The proposed `detectTaskbarEdge` compares `display.bounds` with `display.workArea`. With an **auto-hide taskbar**, `workArea` on Windows is typically **identical to `bounds`** as long as the bar is hidden. When it slides in, it visually reserves space but does not necessarily change the Electron display's `workArea`.
 
-**Referenz:** `src/main/overlay-adapter.ts` (geplant), Abschnitt 3.3; `src/renderer/renderer.ts` (geplant), Abschnitt 3.5.
+This means:
+- `detectTaskbarEdge` returns `'none'` with auto-hide.
+- The overlay window is aligned to the full screen size.
+- The beaver can disappear behind the taskbar when it slides in — exactly the opposite of BL-WIN-3.
 
----
+The plan states in the acceptance criterion: "When the taskbar position, size, or auto-hide state changes, the workArea is recalculated and the window smoothly adjusted" and in the test plan: "detectTaskbarEdge for all four edges + auto-hide (simulated by different bounds/workArea)". That is misleading: different `bounds`/`workArea` simulate a **visible** taskbar, not auto-hide.
 
-### 2.3 `setAlwaysOnTop(true, 'normal')` ist unverifiziert und möglicherweise unzureichend
-
-**Schweregrad:** Hoch
-
-Die zentrale Design-Entscheidung von BL-WIN-3 ist, dass das Overlay über der Windows-Taskleiste bleibt. Der Plan setzt auf `setAlwaysOnTop(true, 'normal')` mit dem Fallback `'pop-up-menu'`. Das ist richtig gedacht, aber:
-
-- Auf Windows wird durch `setAlwaysOnTop` das Fenster zu `HWND_TOPMOST`. Ob es über der Taskleiste (`Shell_TrayWnd`, ebenfalls topmost) liegt, hängt von der Aktivierungsreihenfolge und dem konkreten Level ab.
-- `'normal'` ist laut Electron-Dokumentation ein gültiger Windows-Level, aber es gibt keine Garantie, dass er über der Taskleiste liegt.
-- `'pop-up-menu'` liegt höher, kann aber dazu führen, dass das Overlay über Vollbild-Apps und sogar über dem Task-Manager bleibt — was laut Akzeptanzkriterium „Vollbild-App" gewünscht, aber in Spielen/Videos störend sein kann.
-
-Der Plan behandelt das als „Mittel"-Risiko und akzeptiert manuelle Tests. Das ist akzeptabel, aber der Implementierungs-Agent muss **beide Level empirisch testen** und nicht einfach `normal` als fertige Lösung übernehmen.
-
-**Referenz:** `src/main/overlay-adapter.ts` (geplant), `configureAlwaysOnTop`; Abschnitt 3.3; Risikotabelle Abschnitt 6.
+**Reference:** `src/main/overlay-adapter.ts` (planned), section 3.3; acceptance criteria section 5.
 
 ---
 
-### 2.4 Keine Deduplizierung von WorkArea-Änderungen
+### 2.2 `fitWindowToWorkArea` with `animate: true` is problematic for transparent overlays
 
-**Schweregrad:** Mittel
+**Severity:** High
 
-`onWorkAreaChanged` ruft bei jedem `display-added`, `display-removed` und `display-metrics-changed` sofort `fitWindowToWorkArea` auf. `display-metrics-changed` feuert jedoch auch bei DPI-/Scaling-Änderungen, die die `workArea` nicht verändern. Das führt zu unnötigen `setBounds`-Aufrufen und potenziellem Flackern.
+The plan uses `win.setBounds({...}, true)` (animate: `true`) to "smoothly" move the window on taskbar changes. This is problematic for two reasons:
 
-**Empfohlene Korrektur:** Vorherige `workArea` speichern und nur bei tatsächlicher Änderung neu setzen.
+1. **Asynchronous renderer synchronization:** While the window animates its resize, `window.innerWidth`/`innerHeight` do not change atomically. The renderer receives the `resize` event and/or the IPC message `state:bounds` at an arbitrary point during the animation. The plan claims: "The window size was adjusted by the main process; innerWidth/innerHeight should already match next" — that is an invalid assumption.
+2. **Artifacts with a transparent window:** Electron window animations on transparent, click-through windows can cause flickering or ghosting on Windows, because the window manager recomposites the window during the animation.
 
-**Referenz:** `src/main/overlay-adapter.ts` (geplant), `onWorkAreaChanged`.
-
----
-
-### 2.5 Renderer empfängt initiale Bounds nicht explizit
-
-**Schweregrad:** Mittel
-
-Der Plan setzt die Canvas-Größe initial auf `window.innerWidth`/`window.innerHeight`. Das funktioniert, solange das Fenster beim Laden bereits seine finale Größe hat. Durch den geplanten `fitWindowToWorkArea`-Aufruf mit Animation nach `createWindow()` kann das Fenster aber noch animieren, wenn der Renderer `did-finish-load` erreicht. Dann stimmen `canvas.width/height` kurzzeitig nicht mit der tatsächlichen workArea überein.
-
-**Referenz:** `src/main/main.ts` (geplant), Abschnitt 3.4; `src/renderer/renderer.ts` (geplant), Abschnitt 3.5.
+**Reference:** `src/main/overlay-adapter.ts` (planned), section 3.3; `src/renderer/renderer.ts` (planned), section 3.5.
 
 ---
 
-### 2.6 Renderer-Handler mischt `window.innerWidth/Height` mit expliziten IPC-Bounds
+### 2.3 `setAlwaysOnTop(true, 'normal')` is unverified and possibly insufficient
 
-**Schweregrad:** Mittel
+**Severity:** High
 
-Der geplante Handler:
+The central design decision of BL-WIN-3 is that the overlay stays above the Windows taskbar. The plan relies on `setAlwaysOnTop(true, 'normal')` with the fallback `'pop-up-menu'`. That is well considered, but:
+
+- On Windows, `setAlwaysOnTop` makes the window `HWND_TOPMOST`. Whether it lies above the taskbar (`Shell_TrayWnd`, also topmost) depends on the activation order and the specific level.
+- `'normal'` is a valid Windows level per the Electron documentation, but there is no guarantee it lies above the taskbar.
+- `'pop-up-menu'` lies higher, but can cause the overlay to stay above fullscreen apps and even above the Task Manager — which the "fullscreen app" acceptance criterion wants, but which can be disruptive in games/videos.
+
+The plan treats this as a "Medium" risk and accepts manual tests. That is acceptable, but the implementation agent must **test both levels empirically** and not simply adopt `normal` as the finished solution.
+
+**Reference:** `src/main/overlay-adapter.ts` (planned), `configureAlwaysOnTop`; section 3.3; risk table section 6.
+
+---
+
+### 2.4 No deduplication of work-area changes
+
+**Severity:** Medium
+
+`onWorkAreaChanged` calls `fitWindowToWorkArea` immediately on every `display-added`, `display-removed`, and `display-metrics-changed`. However, `display-metrics-changed` also fires on DPI/scaling changes that do not alter the `workArea`. This leads to unnecessary `setBounds` calls and potential flickering.
+
+**Recommended fix:** Store the previous `workArea` and only reapply on an actual change.
+
+**Reference:** `src/main/overlay-adapter.ts` (planned), `onWorkAreaChanged`.
+
+---
+
+### 2.5 Renderer does not receive initial bounds explicitly
+
+**Severity:** Medium
+
+The plan initially sets the canvas size from `window.innerWidth`/`window.innerHeight`. That works as long as the window already has its final size when loading. With the planned `fitWindowToWorkArea` call with animation after `createWindow()`, however, the window may still be animating when the renderer reaches `did-finish-load`. Then `canvas.width/height` temporarily do not match the actual workArea.
+
+**Reference:** `src/main/main.ts` (planned), section 3.4; `src/renderer/renderer.ts` (planned), section 3.5.
+
+---
+
+### 2.6 Renderer handler mixes `window.innerWidth/Height` with explicit IPC bounds
+
+**Severity:** Medium
+
+The planned handler:
 
 ```ts
 window.beaverBuddy.onBoundsChanged((next) => {
-  resizeCanvas(); // setzt canvas.width = window.innerWidth
+  resizeCanvas(); // sets canvas.width = window.innerWidth
   roamState = clampRoamStateToBounds(roamState, bounds());
 });
 ```
 
-- `resizeCanvas()` verwendet `window.innerWidth/Height`, ignoriert aber den expliziten `next`-Payload.
-- Wenn `window.innerWidth/Height` noch nicht aktualisiert ist (siehe 2.2 und 2.5), wird die Canvas auf falsche Werte gesetzt.
-- `clampRoamStateToBounds` wird nur einmal aufgerufen. Während der Biber in einem `walk` oder `climb` ist, kann er kurzzeitig außerhalb der neuen Bounds gezeichnet werden, bis `tick()` ihn zurückholt.
+- `resizeCanvas()` uses `window.innerWidth/Height` but ignores the explicit `next` payload.
+- If `window.innerWidth/Height` has not been updated yet (see 2.2 and 2.5), the canvas is set to wrong values.
+- `clampRoamStateToBounds` is only called once. While the beaver is in a `walk` or `climb`, it can briefly be drawn outside the new bounds until `tick()` pulls it back.
 
-**Referenz:** `src/renderer/renderer.ts` (geplant), Abschnitt 3.5.
-
----
-
-### 2.7 Keine automatisierten Tests für die Renderer-Integration
-
-**Schweregrad:** Mittel
-
-Der Plantestplan sieht Unit-Tests für `overlay-adapter.ts` vor, aber keine Tests für die Interaktion zwischen `main.ts` → IPC → `preload.ts` → `renderer.ts`. Genau diese Kette ist aber der riskante Teil von BL-WIN-3. Die Komplexität liegt nicht im reinen `detectTaskbarEdge`, sondern in der synchronen/asynchronen Interaktion zwischen Main-Prozess und Renderer.
-
-**Referenz:** Abschnitt 7.2 des Plans.
+**Reference:** `src/renderer/renderer.ts` (planned), section 3.5.
 
 ---
 
-### 2.8 Tray-Icon-Qualität auf Windows nicht geprüft
+### 2.7 No automated tests for the renderer integration
 
-**Schweregrad:** Niedrig
+**Severity:** Medium
 
-Der Plan lädt `assets/tray-icon.png` auf Windows. Windows-Tray-Icons sollten typischerweise 16×16 px (bzw. 20×20/32×32 je nach DPI) sein. Ein großes PNG wird von Electron skaliert, was auf HiDPI-Displays unscharf wirken kann. Das ist zwar in Phase 4 (BL-WIN-10/HiDPI) vorgesehen, sollte aber im Testplan explizit als manueller Check vermerkt werden.
+The plan's test plan provides unit tests for `overlay-adapter.ts`, but no tests for the interaction between `main.ts` → IPC → `preload.ts` → `renderer.ts`. Yet exactly this chain is the risky part of BL-WIN-3. The complexity lies not in the pure `detectTaskbarEdge`, but in the synchronous/asynchronous interaction between the main process and the renderer.
 
-**Referenz:** `src/main/tray.ts` (geplant), Abschnitt 4.3; Risikotabelle Abschnitt 6.
-
----
-
-### 2.9 Smoke-Test `--smoke` prüft nicht die WorkArea-Ausrichtung
-
-**Schweregrad:** Niedrig
-
-Der bestehende Smoke-Test in `src/main/main.ts` prüft `windowCreated`, `alwaysOnTop`, `ignoresMouse`, `transparent` und `paused`. Er könnte ohne großen Aufwand um `win.getBounds()` vs. `screen.getPrimaryDisplay().workArea` erweitert werden, um Regressionen bei der WorkArea-Ausrichtung automatisch zu erkennen.
-
-**Referenz:** `src/main/main.ts:136-150`; Testplan Abschnitt 7.1/7.3.
+**Reference:** Section 7.2 of the plan.
 
 ---
 
-### 2.10 Redundanter erster `fitWindowToWorkArea`-Aufruf
+### 2.8 Tray icon quality on Windows not checked
 
-**Schweregrad:** Niedrig
+**Severity:** Low
 
-`createWindow()` in `src/main/main.ts` erstellt das Fenster bereits mit `x/y/width/height = workArea` (Zeilen 95-101). Der Plan fügt danach nochmals `fitWindowToWorkArea(mainWindow, workAreaInfo)` hinzu. Das ist redundant und sollte entweder entfallen oder durch einen Kommentar erklärt werden. Wenn `fitWindowToWorkArea` animiert, entsteht hier ein unnötiger Animationsschritt mit Größe 0.
+The plan loads `assets/tray-icon.png` on Windows. Windows tray icons should typically be 16×16 px (or 20×20/32×32 depending on DPI). A large PNG is scaled by Electron, which can look blurry on HiDPI displays. This is planned for Phase 4 (BL-WIN-10/HiDPI), but should be explicitly noted in the test plan as a manual check.
 
-**Referenz:** `src/main/main.ts` (geplant), Abschnitt 3.4.
+**Reference:** `src/main/tray.ts` (planned), section 4.3; risk table section 6.
 
 ---
 
-## 3. Konkrete Verbesserungsvorschläge
+### 2.9 Smoke test `--smoke` does not check the work-area alignment
 
-### 3.1 Auto-Hide korrekt behandeln
+**Severity:** Low
 
-**Dateien:** `src/main/overlay-adapter.ts`, `WINDOWS_PORT_PLAN.md`
+The existing smoke test in `src/main/main.ts` checks `windowCreated`, `alwaysOnTop`, `ignoresMouse`, `transparent`, and `paused`. It could easily be extended with `win.getBounds()` vs. `screen.getPrimaryDisplay().workArea` to automatically detect regressions in the work-area alignment.
 
-- **Option A (empfohlen):** Dokumentieren, dass `workArea/bounds` Auto-Hide **nicht** zuverlässig erkennt. Akzeptanzkriterium anpassen: „Der Biber bleibt bei sichtbarer Taskleiste sichtbar; bei Auto-Hide kann er kurzzeitig von der eingeblendeten Leiste verdeckt werden, sofern keine native AppBar-API verwendet wird."
-- **Option B:** Windows-AppBar-API (z. B. `SHAppBarMessage`) über einen kleinen native Node-Addon oder `node-ffi-napi` aufrufen. Das würde aber eine native Dependency erfordern und verstößt gegen das CLAUDE.md-Prinzip, keine neuen Dependencies einzuführen. Daher nur empfehlenswert, wenn Auto-Hide als harter Anforderung gilt.
-- **Option C (Kompromiss):** Bei unklarer Taskleisten-Kante einen kleinen Sicherheitsabstand (z. B. 8 px) vom jeweiligen Bildschirmrand einhalten, bis die Kante eindeutig ist.
+**Reference:** `src/main/main.ts:136-150`; test plan section 7.1/7.3.
 
-### 3.2 `fitWindowToWorkArea` ohne Animation verwenden
+---
 
-**Datei:** `src/main/overlay-adapter.ts`
+### 2.10 Redundant first `fitWindowToWorkArea` call
+
+**Severity:** Low
+
+`createWindow()` in `src/main/main.ts` already creates the window with `x/y/width/height = workArea` (lines 95-101). The plan then adds another `fitWindowToWorkArea(mainWindow, workAreaInfo)`. That is redundant and should either be dropped or explained with a comment. If `fitWindowToWorkArea` animates, this creates an unnecessary animation step from size 0.
+
+**Reference:** `src/main/main.ts` (planned), section 3.4.
+
+---
+
+## 3. Concrete improvement suggestions
+
+### 3.1 Handle auto-hide correctly
+
+**Files:** `src/main/overlay-adapter.ts`, `WINDOWS_PORT_PLAN.md`
+
+- **Option A (recommended):** Document that `workArea/bounds` does **not** reliably detect auto-hide. Adjust the acceptance criterion: "The beaver stays visible with a visible taskbar; with auto-hide it can briefly be obscured by the bar sliding in, unless the native AppBar API is used."
+- **Option B:** Call the Windows AppBar API (e.g. `SHAppBarMessage`) via a small native Node addon or `node-ffi-napi`. That would require a native dependency and violates the CLAUDE.md principle of introducing no new dependencies. Therefore only recommendable if auto-hide is treated as a hard requirement.
+- **Option C (compromise):** When the taskbar edge is unclear, keep a small safety margin (e.g. 8 px) from the respective screen edge until the edge is unambiguous.
+
+### 3.2 Use `fitWindowToWorkArea` without animation
+
+**File:** `src/main/overlay-adapter.ts`
 
 ```ts
 export function fitWindowToWorkArea(win: BrowserWindow, info: WorkAreaInfo): void {
@@ -172,11 +172,11 @@ export function fitWindowToWorkArea(win: BrowserWindow, info: WorkAreaInfo): voi
 }
 ```
 
-Stattdessen die „Sanftheit" im Renderer erreichen: Wenn die Bounds kleiner werden, setzt der Renderer das nächste Roaming-Ziel (`targetX`, ggf. `climbTargetY`) so, dass der Biber selbst in die neue Fläche läuft. Das vermeidet Fenster-Animationen und hält die Pixel-Art integer.
+Instead, achieve the "smoothness" in the renderer: when the bounds shrink, the renderer sets the next roaming target (`targetX`, possibly `climbTargetY`) so that the beaver walks itself into the new area. This avoids window animations and keeps the pixel art integer-aligned.
 
-### 3.3 Renderer verwendet explizite IPC-Bounds, nicht `window.innerWidth/Height`
+### 3.3 Renderer uses explicit IPC bounds, not `window.innerWidth/Height`
 
-**Dateien:** `src/main/preload.ts`, `src/renderer/renderer.ts`
+**Files:** `src/main/preload.ts`, `src/renderer/renderer.ts`
 
 ```ts
 // preload.ts
@@ -193,11 +193,11 @@ window.beaverBuddy.onBoundsChanged((next) => {
 });
 ```
 
-Damit entfällt die unsichere Annahme, dass `window.innerWidth/Height` bereits aktualisiert ist.
+This removes the unsafe assumption that `window.innerWidth/Height` has already been updated.
 
-### 3.4 Deduplizierung der WorkArea-Änderungen
+### 3.4 Deduplication of work-area changes
 
-**Datei:** `src/main/main.ts`
+**File:** `src/main/main.ts`
 
 ```ts
 let lastWorkArea = getPrimaryWorkAreaInfo();
@@ -222,21 +222,21 @@ const unsubscribeWorkArea = onWorkAreaChanged((next) => {
 });
 ```
 
-### 3.5 Z-Order-Level empirisch ermitteln und dokumentieren
+### 3.5 Determine the Z-order level empirically and document it
 
-**Datei:** `src/main/overlay-adapter.ts`
+**File:** `src/main/overlay-adapter.ts`
 
-- `configureAlwaysOnTop` sollte leicht austauschbar sein (Konstante oder Parameter).
-- Der Implementierungs-Agent muss auf echter Windows-Hardware testen:
-  1. `'normal'` — Taskleiste sichtbar + Auto-Hide.
-  2. `'pop-up-menu'` — falls `'normal'` versagt.
-- Ergebnis in Code-Kommentar und Plan dokumentieren. Akzeptanzkriterium erweitern: „Für den finalen Level existiert ein dokumentierter Smoke-Test auf Windows 10/11."
+- `configureAlwaysOnTop` should be easily swappable (constant or parameter).
+- The implementation agent must test on real Windows hardware:
+  1. `'normal'` — taskbar visible + auto-hide.
+  2. `'pop-up-menu'` — if `'normal'` fails.
+- Document the result in a code comment and in the plan. Extend the acceptance criterion: "For the final level there is a documented smoke test on Windows 10/11."
 
-### 3.6 `clampRoamStateToBounds` in `roam.ts` integrieren
+### 3.6 Integrate `clampRoamStateToBounds` into `roam.ts`
 
-**Datei:** `src/renderer/roam.ts`
+**File:** `src/renderer/roam.ts`
 
-Da `roam.ts` bereits `maxX(bounds)` und `groundY(bounds)` berechnet, sollte `clampRoamStateToBounds` dort als Export leben und die bestehenden Hilfsfunktionen wiederverwenden:
+Since `roam.ts` already computes `maxX(bounds)` and `groundY(bounds)`, `clampRoamStateToBounds` should live there as an export and reuse the existing helper functions:
 
 ```ts
 export function clampRoamStateToBounds(state: RoamState, bounds: Bounds): RoamState {
@@ -252,11 +252,11 @@ export function clampRoamStateToBounds(state: RoamState, bounds: Bounds): RoamSt
 }
 ```
 
-Vermeidet Duplikation der `BEAVER_TILE_PX * PET_SCALE`-Berechnung.
+Avoids duplication of the `BEAVER_TILE_PX * PET_SCALE` computation.
 
-### 3.7 Smoke-Test um WorkArea-Prüfung erweitern
+### 3.7 Extend the smoke test with a work-area check
 
-**Datei:** `src/main/main.ts`
+**File:** `src/main/main.ts`
 
 ```ts
 const result = {
@@ -273,57 +273,57 @@ const result = {
 };
 ```
 
-### 3.8 Testplan um Renderer-Integration erweitern
+### 3.8 Extend the test plan with renderer integration
 
-**Datei:** `.flightplan/Archive/phase-2-plan.md`
+**File:** `.flightplan/Archive/phase-2-plan.md`
 
-- Explizit vermerken, dass `renderer.ts`/`preload.ts` nicht ohne laufenden Electron-Prozess unit-getestet werden können.
-- Mindestens einen manuellen Test definieren, der nachweist, dass `state:bounds` im Renderer ankommt und die Canvas-Größe korrekt aktualisiert wird (z. B. durch DevTools-Logging oder `--debug-bounds`-Flag).
-
----
-
-## 4. GO / NO-GO Empfehlung
-
-**Empfehlung: GO — mit kritischen Vorbedingungen**
-
-Phase 2 ist prinzipiell sinnvoll und umsetzbar. Die grundsätzliche Richtung (Adapter-Modul, plattformspezifische Verzweigungen, minimale Eingriffe) stimmt. Allerdings darf der Implementierungs-Agent die in Abschnitt 2 genannten Probleme nicht ignorieren.
-
-**Vorbedingungen für GO:**
-
-1. **Auto-Hide-Realität klären:** Entweder Auto-Hide aus dem Akzeptanzkriterium entfernen **oder** eine konkrete Lösung (AppBar-API, Sicherheitsabstand) planen. Der aktuelle Plan suggeriert eine Robustheit, die der Algorithmus nicht bietet.
-2. **Animation aus `fitWindowToWorkArea` entfernen:** Verwenden Sie `setBounds(..., false)` und verschieben Sie die Bewegungssanftheit in den Renderer/Roaming-Code.
-3. **Renderer verwendet explizite IPC-Bounds:** Keine Annahmen über `window.innerWidth/Height` während eines Resizes.
-4. **Z-Order-Level empirisch testen:** Dokumentieren Sie, warum `'normal'` oder `'pop-up-menu'` gewählt wurde, auf Basis echter Windows-Tests.
-5. **Deduplizierung einbauen:** `setBounds` nur aufrufen, wenn sich `workArea` tatsächlich geändert hat.
-
-Wenn diese Vorbedingungen erfüllt werden, ist Phase 2 ein risikoarmer, gut reviewbarer Schritt.
+- Explicitly note that `renderer.ts`/`preload.ts` cannot be unit-tested without a running Electron process.
+- Define at least one manual test proving that `state:bounds` arrives in the renderer and the canvas size is updated correctly (e.g. via DevTools logging or a `--debug-bounds` flag).
 
 ---
 
-## 5. Wichtige Hinweise für den Implementierungs-Agenten
+## 4. GO / NO-GO recommendation
 
-1. **Testen Sie auf echter Windows-Hardware (nicht nur CI).** Die Z-Order- und Taskleisten-Erkennung sind stark vom konkreten Windows-Build, DPI-Einstellungen und Taskleisten-Konfiguration abhängig. Insbesondere Auto-Hide und Taskleisten an linken/rechten/oberen Kanten müssen manuell geprüft werden.
+**Recommendation: GO — with critical preconditions**
 
-2. **Vermeiden Sie `setBounds` mit Animation auf transparenten Overlays.** Das führt zu Flackern und Asynchronität. Setzen Sie Bounds sofort und lassen Sie den Biber selbst in die neue Fläche laufen.
+Phase 2 is sensible and feasible in principle. The general direction (adapter module, platform-specific branches, minimal interventions) is right. However, the implementation agent must not ignore the problems listed in section 2.
 
-3. **Halten Sie den IPC-Kanal `state:bounds` eng gekoppelt an die tatsächliche Fenstergröße.** Senden Sie die Bounds nicht nur bei `display-*`-Events, sondern stellen Sie sicher, dass der Renderer initial und bei jedem tatsächlichen Resize die korrekten Werte erhält.
+**Preconditions for GO:**
 
-4. **Prüfen Sie `tray-icon.png` visuell im Windows-Tray.** Dunkle Taskleisten können ein farbiges Icon verschlucken. Notieren Sie, falls ein kontrastreicheres Icon für Phase 4 nötig ist.
+1. **Clarify the auto-hide reality:** Either remove auto-hide from the acceptance criterion **or** plan a concrete solution (AppBar API, safety margin). The current plan suggests a robustness the algorithm does not provide.
+2. **Remove the animation from `fitWindowToWorkArea`:** Use `setBounds(..., false)` and move the smoothness of movement into the renderer/roaming code.
+3. **Renderer uses explicit IPC bounds:** No assumptions about `window.innerWidth/Height` during a resize.
+4. **Test the Z-order level empirically:** Document why `'normal'` or `'pop-up-menu'` was chosen, based on real Windows tests.
+5. **Build in deduplication:** Only call `setBounds` when the `workArea` has actually changed.
 
-5. **Lassen Sie `src/renderer/roam.ts` frei von Plattform-Logik.** Bewegen Sie `clampRoamStateToBounds` als reinen State-Helfer nach `roam.ts`, aber führen Sie keine `process.platform`-Abfragen im Renderer ein.
-
-6. **Erweitern Sie den Smoke-Test um `boundsMatchWorkArea`.** Das ist ein günstiger automatisierter Regressionsschutz für die zentrale Behauptung von BL-WIN-3.
-
-7. **Achten Sie auf `win.setIgnoreMouseEvents(true)`.** Das wird nur in `createWindow()` gesetzt und muss nach einem `setBounds` nicht neu gesetzt werden — verifizieren Sie das aber in den Smoke-Tests.
-
-8. **Keine neuen Dependencies ohne separate Abstimmung.** Der Plan hält sich an CLAUDE.md. Wenn Auto-Hide eine native AppBar-API erfordert, muss das explizit mit dem Projektleiter abgestimmt werden.
+If these preconditions are met, Phase 2 is a low-risk, well-reviewable step.
 
 ---
 
-## 6. Datei-Assets geprüft
+## 5. Important notes for the implementation agent
 
-- `assets/tray-icon.png`: Vorhanden ✅
-- `assets/tray-iconTemplate.png`: Vorhanden ✅
-- `assets/icon.ico`: Vorhanden ✅
+1. **Test on real Windows hardware (not only CI).** The Z-order and taskbar detection depend heavily on the specific Windows build, DPI settings, and taskbar configuration. In particular, auto-hide and taskbars on the left/right/top edges must be checked manually.
 
-Die in BL-WIN-2 erzeugten Assets existieren, sodass BL-WIN-4 nicht durch fehlende Dateien blockiert ist.
+2. **Avoid `setBounds` with animation on transparent overlays.** It causes flickering and asynchrony. Set bounds immediately and let the beaver walk itself into the new area.
+
+3. **Keep the IPC channel `state:bounds` tightly coupled to the actual window size.** Do not send the bounds only on `display-*` events; make sure the renderer receives the correct values initially and on every actual resize.
+
+4. **Check `tray-icon.png` visually in the Windows tray.** Dark taskbars can swallow a colored icon. Note if a higher-contrast icon is needed for Phase 4.
+
+5. **Keep `src/renderer/roam.ts` free of platform logic.** Move `clampRoamStateToBounds` to `roam.ts` as a pure state helper, but do not introduce any `process.platform` checks in the renderer.
+
+6. **Extend the smoke test with `boundsMatchWorkArea`.** This is a cheap automated regression guard for the central claim of BL-WIN-3.
+
+7. **Watch out for `win.setIgnoreMouseEvents(true)`.** It is only set in `createWindow()` and does not need to be re-applied after a `setBounds` — but verify this in the smoke tests.
+
+8. **No new dependencies without separate agreement.** The plan adheres to CLAUDE.md. If auto-hide requires a native AppBar API, that must be explicitly agreed with the project lead.
+
+---
+
+## 6. Checked file assets
+
+- `assets/tray-icon.png`: Present ✅
+- `assets/tray-iconTemplate.png`: Present ✅
+- `assets/icon.ico`: Present ✅
+
+The assets created in BL-WIN-2 exist, so BL-WIN-4 is not blocked by missing files.

@@ -1,106 +1,106 @@
 # Beaver Buddy — Phase 2 Completion: Core Windows Experience
 
-**Datum:** 2026-07-15
-**Build-Items:** BL-WIN-3 (Overlay-Adapter für Windows), BL-WIN-4 (Tray-Adapter für Windows)
-**Status:** ✅ Abgeschlossen
+**Date:** 2026-07-15
+**Build items:** BL-WIN-3 (Overlay adapter for Windows), BL-WIN-4 (Tray adapter for Windows)
+**Status:** ✅ Completed
 
 ---
 
-## Zusammenfassung
+## Summary
 
-Phase 2 hat die beiden zentralen sichtbaren Windows-Blocker gelöst:
+Phase 2 resolved the two central visible Windows blockers:
 
-- **BL-WIN-3:** Das Overlay-Fenster verhält sich auf Windows nativ. Es wird an die
-  verfügbare Arbeitsfläche (`workArea`) des primären Displays ausgerichtet, reagiert
-  auf Display-/Taskleisten-Änderungen und kommuniziert neue Bounds über den
-  IPC-Kanal `state:bounds` an den Renderer.
-- **BL-WIN-4:** Das Tray-Icon lädt auf Windows das farbige `assets/tray-icon.png`
-  und behält auf macOS das Template-Image-Verhalten bei.
+- **BL-WIN-3:** The overlay window now behaves natively on Windows. It is aligned
+  to the available work area (`workArea`) of the primary display, reacts to
+  display/taskbar changes, and communicates new bounds to the renderer via the
+  IPC channel `state:bounds`.
+- **BL-WIN-4:** The tray icon loads the colored `assets/tray-icon.png` on
+  Windows and retains the template-image behavior on macOS.
 
-Alle automatisierten Checks (Typecheck, Lint, Tests, Build, Windows-Packaging)
-laufen erfolgreich durch.
-
----
-
-## Umgesetzte Build-Items
-
-| Build-Item | Status | Kurzbeschreibung |
-|------------|--------|------------------|
-| BL-WIN-3 | ✅ Abgeschlossen | Overlay-Adapter für Windows: Z-Order, WorkArea, Taskleisten-Kante, Bounds-IPC |
-| BL-WIN-4 | ✅ Abgeschlossen | Tray-Adapter für Windows: farbiges Icon auf Windows, Template-Image auf macOS |
+All automated checks (typecheck, lint, tests, build, Windows packaging)
+pass successfully.
 
 ---
 
-## Geänderte Dateien
+## Implemented build items
 
-| Datei | Änderung |
-|-------|----------|
-| `src/main/overlay-adapter.ts` | Neu: Plattform-Adapter für AlwaysOnTop, WorkArea, Taskleisten-Kante |
-| `src/main/overlay-adapter.test.ts` | Neu: 14 Unit-Tests für den Overlay-Adapter |
-| `src/main/preload.test.ts` | Neu: 3 Tests für `onBoundsChanged` |
-| `src/main/main.ts` | Overlay-Adapter-Integration, Bounds-IPC, Deduplizierung, Smoke-Test-Erweiterung |
-| `src/main/ipc-channels.ts` | Neuer Kanal `BOUNDS_CHANGED_CHANNEL = 'state:bounds'` |
-| `src/main/preload.ts` | `onBoundsChanged` via `contextBridge` exposed |
-| `src/renderer/renderer.ts` | Bounds-Change-Handler, Canvas-Resize aus IPC-Payload |
-| `src/renderer/roam.ts` | `clampRoamStateToBounds` für sanfte Rückführung in neue WorkArea |
-| `src/main/tray.ts` | Plattformspezifische Icon-Auswahl (`loadTrayIcon`) |
-| `src/main/tray.test.ts` | +3 Tests für `loadTrayIcon` |
+| Build item | Status | Short description |
+|------------|--------|-------------------|
+| BL-WIN-3 | ✅ Completed | Overlay adapter for Windows: Z-order, work area, taskbar edge, bounds IPC |
+| BL-WIN-4 | ✅ Completed | Tray adapter for Windows: colored icon on Windows, template image on macOS |
 
 ---
 
-## Ergebnisse der Verifikation
+## Changed files
 
-| Befehl | Ergebnis |
-|--------|----------|
-| `npm run typecheck` | ✅ grün |
-| `npm run lint` | ✅ grün |
+| File | Change |
+|------|--------|
+| `src/main/overlay-adapter.ts` | New: platform adapter for AlwaysOnTop, work area, taskbar edge |
+| `src/main/overlay-adapter.test.ts` | New: 14 unit tests for the overlay adapter |
+| `src/main/preload.test.ts` | New: 3 tests for `onBoundsChanged` |
+| `src/main/main.ts` | Overlay adapter integration, bounds IPC, deduplication, smoke test extension |
+| `src/main/ipc-channels.ts` | New channel `BOUNDS_CHANGED_CHANNEL = 'state:bounds'` |
+| `src/main/preload.ts` | `onBoundsChanged` exposed via `contextBridge` |
+| `src/renderer/renderer.ts` | Bounds-change handler, canvas resize from IPC payload |
+| `src/renderer/roam.ts` | `clampRoamStateToBounds` for smooth clamping into the new work area |
+| `src/main/tray.ts` | Platform-specific icon selection (`loadTrayIcon`) |
+| `src/main/tray.test.ts` | +3 tests for `loadTrayIcon` |
+
+---
+
+## Verification results
+
+| Command | Result |
+|---------|--------|
+| `npm run typecheck` | ✅ green |
+| `npm run lint` | ✅ green |
 | `npm test` | ✅ 312 passed, 6 skipped |
-| `npm run build` | ✅ grün |
-| `npx electron-builder --win --publish never` | ✅ grün (NSIS + portable) |
+| `npm run build` | ✅ green |
+| `npx electron-builder --win --publish never` | ✅ green (NSIS + portable) |
 
-**Neue Testabdeckung:**
+**New test coverage:**
 
-- `src/main/overlay-adapter.test.ts`: 14 Tests
-- `src/main/preload.test.ts`: 3 Tests
-- `src/main/tray.test.ts`: +3 Tests für `loadTrayIcon`
-
----
-
-## Verbleibende offene Punkte / Warnungen
-
-1. **Auto-Hide-Limitation**
-   - `detectTaskbarEdge` vergleicht `display.bounds` mit `display.workArea`.
-   - Bei einer Auto-Hide-Taskleiste sind beide auf Windows oft identisch, sodass
-     die Taskleisten-Kante nicht erkannt wird.
-   - Das Overlay wird auf die volle Bildschirmgröße ausgerichtet; der Biber kann
-     kurzzeitig von der eingeblendeten Taskleiste verdeckt werden.
-   - Eine vollständige Lösung würde die native Windows AppBar-API erfordern, was
-     neue Dependencies bedeuten würde.
-
-2. **Z-Order-Hardware-Test ausstehend**
-   - `setAlwaysOnTop(true, 'normal')` ist die konservative Startwahl für Windows.
-   - Ob das Overlay über der sichtbaren Taskleiste bleibt, muss auf echter
-     Windows-Hardware verifiziert werden.
-   - Dokumentierter Fallback: `setAlwaysOnTop(true, 'pop-up-menu')`.
-
-3. **Tray-Icon-Kontrast**
-   - Das farbige `assets/tray-icon.png` wurde nicht visuell auf dunklen
-     Windows-Taskleisten-Hintergründen geprüft.
-   - Phase 4 (BL-WIN-10 / HiDPI) sollte ein Design-Gate für ein kontrastreiches
-     Icon vorsehen.
-
-4. **Multi-Monitor und HiDPI/Scaling**
-   - Aktuell nur primäres Display (`screen.getPrimaryDisplay()`).
-   - HiDPI/Scaling ist nicht Teil dieser Phase und ist für Phase 4 geplant.
+- `src/main/overlay-adapter.test.ts`: 14 tests
+- `src/main/preload.test.ts`: 3 tests
+- `src/main/tray.test.ts`: +3 tests for `loadTrayIcon`
 
 ---
 
-## Nächste Phase
+## Remaining open points / warnings
+
+1. **Auto-hide limitation**
+   - `detectTaskbarEdge` compares `display.bounds` with `display.workArea`.
+   - With an auto-hide taskbar both are often identical on Windows, so the
+     taskbar edge is not detected.
+   - The overlay is aligned to the full screen size; the beaver can
+     briefly be obscured by the taskbar when it slides in.
+   - A complete solution would require the native Windows AppBar API, which
+     would mean new dependencies.
+
+2. **Z-order hardware test pending**
+   - `setAlwaysOnTop(true, 'normal')` is the conservative starting choice for Windows.
+   - Whether the overlay stays above the visible taskbar must be verified on
+     real Windows hardware.
+   - Documented fallback: `setAlwaysOnTop(true, 'pop-up-menu')`.
+
+3. **Tray icon contrast**
+   - The colored `assets/tray-icon.png` was not visually checked against dark
+     Windows taskbar backgrounds.
+   - Phase 4 (BL-WIN-10 / HiDPI) should include a design gate for a
+     high-contrast icon.
+
+4. **Multi-monitor and HiDPI/scaling**
+   - Currently only the primary display (`screen.getPrimaryDisplay()`).
+   - HiDPI/scaling is not part of this phase and is planned for Phase 4.
+
+---
+
+## Next phase
 
 **Phase 3: Windows Integrations (BL-WIN-5)**
 
-- **Ziel:** Claude-Code-Usage-Tracking funktioniert auf Windows.
-- **Build-Item:** BL-WIN-5 — Claude-Usage-Log-Path-Windows-Adapter
-- **Akzeptanz:** App findet `%USERPROFILE%\.claude` und wertet Logs korrekt aus;
-  `CLAUDE_CONFIG_DIR`-Override bleibt erhalten; XDG-Pfad wird auf Windows
-  ignoriert; Codex-Tracking bleibt vorerst zurückgestellt.
+- **Goal:** Claude Code usage tracking works on Windows.
+- **Build item:** BL-WIN-5 — Claude usage log path Windows adapter
+- **Acceptance:** App finds `%USERPROFILE%\.claude` and parses logs correctly;
+  the `CLAUDE_CONFIG_DIR` override is preserved; the XDG path is ignored on
+  Windows; Codex tracking remains deferred for now.

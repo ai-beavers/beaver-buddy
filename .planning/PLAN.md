@@ -1,106 +1,127 @@
-# Plan — Umstieg Fork → Direktarbeit auf ai-beavers/beaver-buddy
+# Plan — Fork → upstream migration (COMPLETED 2026-07-22)
 
-> **Status 2026-07-22 (nach Ausführung Teil 1):**
-> - ✅ Schritt 1: Branch `docs/animation-authoring` auf ai-beavers gepusht, **PR #41** offen
-> - ✅ Schritt 2.0: Berechtigung geklärt — rodgi040 + jurij haben **`maintain`**;
->   Branch Protection erzwingt Review (REVIEW_REQUIRED), Auto-Merge ist repo-weit
->   deaktiviert, `--admin`-Bypass nicht möglich. Vlady = GitHub-Login **`Gw3i`**.
-> - ✅ Reviews angefragt: PR #40 + PR #41 → Reviewer **Gw3i** + **jurij**
-> - ⏸ **Blockiert:** Schritte 2 (Merge) bis 5 warten auf Approval von Gw3i/jurij.
->   Nach Approval kann rodgi040 (maintain) selbst mergen: erst #40, dann #41,
->   danach Schritte 3–6 ausführen.
+> **Status: fully implemented.** PR #41 (animation-authoring docs) and PR #40
+> (vendored skills + Cycle-1 planning, fully English) were merged by Gw3i.
+> Remote layout swapped: `origin` = ai-beavers/beaver-buddy (contributor workflow:
+> branch from `origin/main`, push to `origin`, PR against ai-beavers/main; rule
+> recorded in AGENTS.md). Fork `rodgi040/beaver-buddy` remains as read-only
+> backup remote `fork` (archiving in the GitHub UI is a pending owner action).
+> 15 stale upstream branches were closed with `archive/*` tags; tags `v0.1.0` +
+> `docs/animation-authoring` pushed upstream. Dependabot PRs #38/#39 remain for
+> owner merge. The full step-by-step plan lived in this file during execution;
+> see git history (2026-07-22) for details.
+
+---
+
+# Plan — Flightplan Re-Onboarding & Cycle-1 Planning
+
+> Context: The old Flightplan version did not sort `.flightplan/` cleanly; the meeting
+> of 2026-07-21 (`.fp-new-projekt/MEETINGS-TRANSCRIPTS/`) defines **Cycle 1** for the first time,
+> which is not reflected in any planning file. The ongoing M2/P3 parachute work
+> (WAVE-3 with Claude Code) is **paused** and will be continued later.
 >
-> **Update 2026-07-22 (Branch-Cleanup):** 15 bereits gemergte Upstream-Branches
-> (BL-1–BL-12, BL-11-fix-*, build-loop) mit Archiv-Tags (`archive/bl-item/BL-N`)
-> am Branch-Tip versehen und gelöscht; Tags `v0.1.0` + `docs/animation-authoring`
-> zu upstream gepusht. PR #38 (Dependabot) von rodgi040 approved — Merge trotzdem
-> BLOCKED: **Org-Level-Ruleset** verlangt Owner/Admin-Approval (nicht einsehbar ohne
-> admin:org-Scope). Verbleibende offene Branches = PRs #38–#41 → warten auf **Gw3i**.
+> **Team (3 contributors):**
+> - **Rodgi (Owner)** — involved everywhere; focus: building features together, helping
+>   with animations, **precise definition of the state logic**; overall review & owner decisions
+> - **Vlady** — **sprite animations** (drives Claude Code/ComfyUI generation, asset review)
+> - **Jurij** — **event logic & hard tech** (state machine, tracking, IPC, architecture)
+> - **Agent rule (binding): pi = Rodgi only** · **Claude Code = Vlady & Jurij, everywhere**
+>   (not just assets; still the only agent with Comfy Cloud MCP)
+>
+> Tasks are distributed so that work does not overlap:
+> exactly **one human Accountable per phase**, parallel work only on disjoint phases.
 
-> Ziel: Künftig Branches direkt auf `ai-beavers/beaver-buddy` (upstream) von `main`
-> erstellen und PRs dort öffnen — der Fork `rodgi040/beaver-buddy` wird nicht mehr
-> bearbeitet. Der Fork wird **nicht gelöscht/geschossen**, nur entkoppelt.
+## Step 0 — Pause the running phase cleanly (fp-pause)
 
-## Ausgangslage (geprüft 2026-07-22)
+- Rewrite `HANDOFF.md`: status „WAVE-3 PAUSED (owner decision)". Document the resume path
+  exactly: Claude Code later continues P1 (white artifacts) + P3a (struggle-b/c)
+  via `/fp-resume`; pi then P2/P4/P3b. Spec remains `WAVE-3.md`.
+- `STATE.md`: set Now/Next to „re-onboarding & Cycle-1 planning"; P3 as „paused".
+- `Planning/Milestone-2/Phase-3/PHASE.md`: status → `in-progress (paused)`.
 
-- **Push-Zugang zu upstream ist vorhanden:** `rodgi040` hat den Branch
-  `chore/zyklus1-planning` direkt auf `ai-beavers/beaver-buddy` gepusht (PR #40).
-- **Lokaler `main` = `upstream/main` + 18 Commits**, davon:
-  - 17 Commits stecken in **PR #40** (`chore/zyklus1-planning` @ `436ad67`,
-    CI grün, Status REVIEW_REQUIRED) — bereits auf upstream.
-  - **1 Commit (`1c86e57`, Merge „animation-authoring-docs") existiert nur auf dem Fork.**
-- Tag `docs/animation-authoring` → `1c86e57`, nur auf dem Fork gepusht.
-- `CONTRIBUTING.md` dokumentiert bereits den Upstream-Workflow
-  (clone ai-beavers, branch from main, PR) — **keine Doku-Änderung nötig**.
-- Offene upstream-PRs: #40 (Review), #38/#39 (Dependabot).
+## Step 1 — Cleanup & migration (re-onboarding)
 
-## Schritt 1 — Verbleibenden Commit zu upstream bringen
+Target structure (all local/gitignored, convention stays):
 
-- Branch `docs/animation-authoring` von `1c86e57` pushen:
-  `git push upstream 1c86e57:refs/heads/docs/animation-authoring`
-- PR gegen `ai-beavers/main` öffnen (`gh pr create --repo ai-beavers/beaver-buddy`).
-- *Verworfene Alternative:* Commit in PR #40 aufnehmen — PR ist in Review,
-  soll nicht nachträglich aufgebläht werden.
-
-## Schritt 2 — Offene PRs abschließen (Reihenfolge)
-
-0. **Merge-Berechtigung vorab klären (unsicher — früher durfte evtl. nur der Admin mergen):**
-   - `gh api repos/ai-beavers/beaver-buddy/collaborators/rodgi040/permission --jq .permission`
-     → `admin`/`maintain`/`write`?
-   - Zusätzlich kann **Branch Protection** auf `main` unabhängig von der Rolle
-     Reviews erzwingen (PR #40 zeigt bereits REVIEW_REQUIRED).
-   - **Fallback:** Wenn Rodgi nicht mergen darf, geht Schritt 1 (Branch pushen +
-     PR öffnen) trotzdem — das Mergen übernimmt dann der Admin (letzter
-     upstream/main-Commit stammt von Vlady → er ist der wahrscheinliche
-     Ansprechpartner). Remote-Umbau (Schritt 3/4) erst NACH dem Admin-Merge.
-1. PR #40 mergen, sobald Review durch (selbst oder durch Admin, siehe 0).
-2. PR aus Schritt 1 mergen (selbst oder durch Admin).
-3. Optional: Dependabot-PRs #38/#39 gleich mitnehmen (gleiche Berechtigungsfrage).
-
-## Schritt 3 — Remotes umbauen (Fork entkoppeln)
-
-```bash
-git remote rename origin fork        # Fork bleibt als Backup-Remote erhalten
-git remote rename upstream origin    # ai-beavers wird der Haupt-Remote
-git fetch origin
-git branch -u origin/main main       # main trackt künftig ai-beavers/main
+```
+.flightplan/
+  STATE.md · ROADMAP.md · HANDOFF.md · NOTE.md
+  Meetings/2026-07-21-planung/   ← raw transcript text + summary + animations raw text
+  Reference/windows-native-flight-plan.md   ← active item source #1–#64
+  Archive/                        ← .fp-new-projekt remainder (phase-*.md, plans/, …)
+  Planning/Milestone-N/Phase-N/…  (unchanged)
+  Reviews/ · Debugging/
 ```
 
-## Schritt 4 — Lokalen main synchronisieren
+- `MEETINGS-TRANSCRIPTS/` → `.flightplan/Meetings/2026-07-21-planung/` (normalize
+  filenames: `transcript-raw.md`, `summary.md`, `animations-rohtext.md`).
+- `windows-native-flight-plan.md` → `.flightplan/Reference/`.
+- Remainder of `.fp-new-projekt/` → `.flightplan/Archive/`; then delete `.fp-new-projekt/`.
+- **Update references:** ROADMAP.md, MILESTONE.md (M1–M4), NOTE.md; check `.gitignore`.
+- **Clean up NOTE.md:** mark F2 as done; remove inbox duplicates; add new
+  meeting items to the inbox (Level/XP, Recording Agent, naming, achievements,
+  prestige, safety mechanism, account linking later, cosmetic monetization).
+- **Fix Debugging/README.md** (reference to non-existent `Planning/Debugging/`).
 
-- `git merge --ff-only origin/main` — funktioniert, weil nach Schritt 2 alle
-  lokalen Commits in `origin/main` enthalten sind (kein Rewrite nötig).
-- Tag `docs/animation-authoring` zu origin pushen (`git push origin docs/animation-authoring`),
-  damit er im Haupt-Repo erhalten bleibt.
+## Step 2 — Anchor Cycle 1 in ROADMAP.md
 
-## Schritt 5 — Fork stilllegen
+- **Cycle-1 header** with exit criteria (meeting 2026-07-21):
+  1. Working, downloadable app (Windows installer)
+  2. 100 downloads
+  3. 7 additional contributors (currently: 3 — Owner, Vladi, Juri)
+- Every milestone gets a cycle marker + **owner field** (team responsible).
+- Reference block (source: `Meetings/…/summary.md`): XP = input+output tokens (excluding cache),
+  daily-aggregated per model, local config file (no auth in Z1), levels 1–32
+  (1–16 ≈ baby→teen), interactions from ~level 8, prestige post-Z1, character-map JSON,
+  separation of event logic ↔ character animation.
 
-- Auf GitHub: `rodgi040/beaver-buddy` → Settings → **Archive this repository**
-  (read-only, nichts geht verloren, alte PR-Links bleiben gültig).
-- *Alternativ:* Fork unangetastet lassen, nur nicht mehr pushen. Löschen ist
-  möglich (alle fork-basierten PRs sind gemerged), aber nicht empfohlen.
+## Step 3 — Define milestones together (team walkthrough)
 
-## Schritt 6 — Verifizieren
+**Order (option B, derived from meeting signals + dependencies — draft,
+finalized in the walkthrough) — with team assignment:**
 
-- `git remote -v` → origin = ai-beavers, fork = rodgi040
-- `git status -sb` → `## main...origin/main`, sauber
-- Neuer Standard-Workflow:
-  `git checkout -b bl-item/<slug>/BL-<i>` von `origin/main` →
-  `git push -u origin <branch>` → `gh pr create` (landet automatisch auf ai-beavers)
+| # | Milestone | Core | Accountable | Agent | Cycle |
+|---|---|---|---|---|---|
+| M1 | Windows-native app ✅ | done | Rodgi | pi | Z1 (done) |
+| M2 | Asset pipeline & animations | P1/P2 ✅ · **P3 parachute paused** | Vlady + Rodgi | Claude Code (+ pi) | ongoing |
+| M3 | Recording Agent & notifications | central Z1 feature: event detection (agent done/input needed), event↔animation strictly separated, safety mechanism; display initially via bubble/quip | **Jurij** | Claude Code | Z1 |
+| M4 | Level, XP & profile system | token tracking (aggregated/per model), XP prototype, level table 1–32, state logic of the stages, character-map JSON, local persistence, naming, achievements | **Rodgi** (Jurij advises on data model) | pi | Z1 |
+| M5 | Animations (rest) | formerly M2 P4–P15 — „one animation per phase"; WAVE-1 assets = Vlady + Claude Code, WAVE-2 runtime = Rodgi + pi | **Vlady** | Claude Code | Z1 (staggered) |
+| M6 | Contribution readiness & release | contributor/API/asset-builder docs, settings/tray, QA gates, release pipeline → **Z1 exit** | **Rodgi** (everyone reviews) | pi | Z1 |
+| — | Post-Cycle 1 | auth/account, prestige, monetization, MRR #26, quips/state machine extensions, owner decisions #3/#4b/#63/#64 | — | — | post |
 
-## Offene Entscheidungen (Rodgi)
+**Procedure in the walkthrough (interactive with the team):**
+1. Confirm/adjust milestone order (table above).
+2. Per milestone: define purpose in 2–3 sentences (team-comprehensible) + phase list.
+   Phases stay deliberately coarse; detailed definition as usual at phase start.
+3. **Time estimate:** rough size per phase (S/M/L + day estimate), milestone duration
+   aggregated from that; reality check against the Z1 time horizon (~2 months per meeting).
+4. **Team matrix (binding):** see table — Jurij = M3, Rodgi = M4 + M6,
+   Vlady = M5. Rules: exactly one Accountable per phase; Rodgi helps everywhere
+   but is never a hidden second owner. **Agent rule: only Rodgi uses pi;
+   Vlady & Jurij work with Claude Code in all milestones.** Agents
+   work only on instruction from the respective phase owner.
+5. **Blocker/dependency documentation (mandatory, directly in Flightplan):**
+   - Every `PHASE.md` gets a mandatory **`Blocked by:`** field (phase list or „none", with reason).
+   - Every `MILESTONE.md` gets a **Dependencies** section (blocked by / blocks).
+   - `ROADMAP.md` contains a compact **dependency overview** (table) so the
+     team sees at a glance what blocks whom.
+   - The `STATE.md` blockers field remains the short operational view.
+6. Write the result into `ROADMAP.md` + `Planning/Milestone-N/MILESTONE.md` (Why/Phases/Success/
+   Owner/Duration/Dependencies); dissolve old M3/M4 and reassign items.
 
-- **PR #40:** selbst mergen (falls Rechte) oder auf Review warten?
-- **Merge-Recht allgemein:** unklar, ob nur der Admin mergen darf (früher wohl so).
-  Vorab per API prüfen + ggf. Admin (vermutlich Vlady) einspannen — siehe Schritt 2.0.
-- **Dependabot #38/#39:** jetzt mitmergen oder liegen lassen?
-- **Fork:** archivieren (Empfehlung) oder einfach liegen lassen?
+## Step 4 — Verification & handoff
 
-## Risiken
+- Self-check: all `.fp-new-projekt` references resolved? ROADMAP lean? NOTE.md without
+  duplicates? STATE/HANDOFF consistent? Does every phase have exactly one owner?
+- `STATE.md` final: „re-onboarding done · Cycle 1 defined · M2/P3 paused" +
+  next = detail the first phase of the first new milestone.
+- No code changes, no git commits (planning files are gitignored).
 
-- Kein Force-Push, kein History-Rewrite nötig — alle Schritte sind additiv.
-- **Berechtigungsrisiko:** Falls Rodgi keine Merge-Berechtigung hat, hängt der
-  Umstieg am Admin-Review von PR #40 (+ dem neuen Docs-PR). Schritt 1 ist davon
-  nicht blockiert; Schritte 3–5 erst nach erfolgtem Admin-Merge ausführen.
-- Einzige Fehlerquelle: Schritt 3/4 vor dem Merge der PRs ausführen →
-  `main` wäre dann ahead von `origin/main`. Daher strikte Reihenfolge einhalten.
+## Execution
+
+- Steps 0–2: `worker` subagent + `reviewer` check, orchestrator verifies references.
+- Step 3: interactive with the team (no subagent — decisions belong to the humans);
+  the agent writes the results into the files after approval.
+- Step 4: `reviewer` subagent as final consistency check.
+

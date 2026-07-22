@@ -1,96 +1,90 @@
-# Merge-Verifikation `upstream/main` → `bl-item/windows-native/BL-WIN` (2026-07-17)
+# Merge verification `upstream/main` → `bl-item/windows-native/BL-WIN` (2026-07-17)
 
-Unabhängige Endprüfung des staged (nicht committeten) Merge-Stands durch den
-Verifikations-Sub-Agenten. Grundlage: .flightplan/Archive/plans/merge-upstream-main-2026-07-17.md.
+Independent final review of the staged (not committed) merge state by the verification
+sub-agent. Based on: `.flightplan/Archive/plans/merge-upstream-main-2026-07-17.md`.
 
-## Urteil: FREIGABE FÜR MERGE-COMMIT
+## Verdict: APPROVED FOR MERGE COMMIT
 
-Alle 12 Feature-Punkte im Code verifiziert, keine Konfliktmarker, Working Tree
-vollständig staged ohne Artefakte, Tests/Typecheck/Lint selbst ausgeführt und
-grün. Einziger Befund: ein [minor] UI-Text (Upstream-Erbe), kein Merge-Defekt.
+All 12 feature points verified in code, no conflict markers, working tree fully staged
+without artifacts, tests/typecheck/lint self-run and green. Only finding: one [minor] UI text
+(upstream legacy), no merge defect.
 
-## Checkliste der 12 Punkte
+## Checklist of the 12 points
 
-| # | Punkt | Status | Beleg (Datei:Zeile) |
-|---|-------|--------|---------------------|
-| 1 | secrets.ts win32 safeStorage/DPAPI, genutzt von mrr-engine + settings-window | ✓ | src/main/mrr/secrets.ts:25-35 (win32-Backend), src/main/mrr/mrr-engine.ts:11 (`import { getSecret } from './secrets'`), src/main/mrr/settings-window.ts:21,118,167 — kein direkter keychain.ts-Zugriff für Secret-I/O (main.ts:23 nutzt nur `isValidKeychainService`, reine Namensvalidierung) |
-| 2 | IPC `settings:reset-progress` in ipc-channels + settings-preload + settings-window | ✓ | src/main/ipc-channels.ts:21, src/main/mrr/settings-preload.ts:15+30, src/main/mrr/settings-window.ts:194-202 (async Handler, `{ ok: false, error: 'reset failed' }` bei Dep-Fehler), Drift-Guard src/main/ipc-channels.test.ts:62-65 |
-| 3 | tray.ts win32-Gate click → popUpContextMenu | ✓ | src/main/tray.ts:106-108 (einmal registriert, außerhalb rebuildMenu) |
-| 4 | effectiveWorkArea / getOverlayWindowBounds (Auto-Hide-Inset) | ✓ | src/main/overlay-adapter.ts:34-52 (AUTO_HIDE_INSET_DIP=2, win32-Gate), 74-76; Verwendung src/main/main.ts:128,184 |
-| 5 | renderer.ts `evolutionState = null` bei HATCH_START genau einmal | ✓ | src/renderer/renderer.ts:190 (einzige Stelle im onHatchStart; Vorkommen in :415 ist der normale Evolution-Abschluss im Tick, kein Duplikat) |
-| 6 | electron-builder.yml: win/nsis-Block + upstream mac.icns | ✓ | electron-builder.yml:14 (`mac.icon: assets/beaver-buddy-icon.icns`), 15-25 (win-Block inkl. signtoolOptions sha256 + rfc3161), 26-34 (nsis: Icons, Desktop-/Startmenü-Shortcuts, installerLanguages en_US+de_DE) |
-| 7 | settings.html Danger-Zone Zwei-Klick-Arming, kein window.confirm | ✓ | src/main/mrr/settings.html:114-123 (Pet-Fieldset), 244-271 (Arming-Script, 5s-Fenster, `api.resetProgress()`); `window.confirm` kommt in der Datei nicht vor |
-| 8 | main.ts onProgressReset-Ordering (persist → HATCH_START → reset, awaited) | ✓ | src/main/main.ts:284-295 (`await saveOnboardingState` → `send(HATCH_START_CHANNEL)` → `await xpEngine.resetProgress()`) |
-| 9 | Connect Claude Code / Codex komplett | ✓ | Tray-Eintrag src/main/tray.ts:66 + Callback :20, verdrahtet src/main/main.ts:330; Settings-Handler src/main/mrr/settings-window.ts:204-226 (`connectUsage`, validiert via settings-validate); IPC-Kanal src/main/ipc-channels.ts:24 + preload :16,31-32; tracker.ts parst erst nach Opt-in (s. F) |
-| 10 | Spend-Tier-Quips | ✓ | src/main/quips/detectors.ts:11 (SpendTier spendWeak/Ok/Crazy), 56-61 (classify), 92-105 (Tages-Reset + Tier-Crossing); src/main/quips/quips.ts:7 (lowercase-Voice-Invariante), 77-79 (Pools) |
-| 11 | Retina-Bubble / DPR (Superset applyDpr/logicalBounds) | ✓ | src/renderer/renderer.ts:94-100,205-218 (logicalBounds, currentDpr, applyDpr bei Bounds- und DPR-Wechsel); src/renderer/bubble.ts:116-118 (logische Koordinaten, Schärfe via DPR-Backing-Store); src/renderer/canvas-dpr.ts vorhanden + Test |
-| 12 | Pet-Reset vereinheitlicht (allowStageSnap, Cursor bleibt) | ✓ | src/main/xp/engine.ts:129-131 (`applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true })`), 137-151 (Snap-Update ohne `evolvingTo`); `lastSeenLifetimeTokens` nicht im Patch → Cursor bleibt (Begründung :125-128) |
+| # | Point | Status | Evidence (File:Line) |
+|---|-------|--------|----------------------|
+| 1 | secrets.ts win32 safeStorage/DPAPI, used by mrr-engine + settings-window | ✓ | src/main/mrr/secrets.ts:25-35 (win32 backend), src/main/mrr/mrr-engine.ts:11 (`import { getSecret } from './secrets'`), src/main/mrr/settings-window.ts:21,118,167 — no direct keychain.ts access for secret I/O (main.ts:23 only uses `isValidKeychainService`, pure name validation) |
+| 2 | IPC `settings:reset-progress` in ipc-channels + settings-preload + settings-window | ✓ | src/main/ipc-channels.ts:21, src/main/mrr/settings-preload.ts:15+30, src/main/mrr/settings-window.ts:194-202 (async handler, `{ ok: false, error: 'reset failed' }` on dep error), Drift-Guard src/main/ipc-channels.test.ts:62-65 |
+| 3 | tray.ts win32-gate click → popUpContextMenu | ✓ | src/main/tray.ts:106-108 (registered once, outside rebuildMenu) |
+| 4 | effectiveWorkArea / getOverlayWindowBounds (auto-hide inset) | ✓ | src/main/overlay-adapter.ts:34-52 (AUTO_HIDE_INSET_DIP=2, win32-gate), 74-76; Usage src/main/main.ts:128,184 |
+| 5 | renderer.ts `evolutionState = null` on HATCH_START exactly once | ✓ | src/renderer/renderer.ts:190 (only place in onHatchStart; occurrence in :415 is the normal evolution completion in the tick, not a duplicate) |
+| 6 | electron-builder.yml: win/nsis block + upstream mac.icns | ✓ | electron-builder.yml:14 (`mac.icon: assets/beaver-buddy-icon.icns`), 15-25 (win block incl. signtoolOptions sha256 + rfc3161), 26-34 (nsis: icons, desktop/start-menu shortcuts, installerLanguages en_US+de_DE) |
+| 7 | settings.html danger-zone two-click arming, no window.confirm | ✓ | src/main/mrr/settings.html:114-123 (Pet fieldset), 244-271 (arming script, 5s window, `api.resetProgress()`); `window.confirm` does not occur in the file |
+| 8 | main.ts onProgressReset ordering (persist → HATCH_START → reset, awaited) | ✓ | src/main/main.ts:284-295 (`await saveOnboardingState` → `send(HATCH_START_CHANNEL)` → `await xpEngine.resetProgress()`) |
+| 9 | Connect Claude Code / Codex complete | ✓ | Tray entry src/main/tray.ts:66 + callback :20, wired in src/main/main.ts:330; Settings handler src/main/mrr/settings-window.ts:204-226 (`connectUsage`, validated via settings-validate); IPC channel src/main/ipc-channels.ts:24 + preload :16,31-32; tracker.ts parses only after opt-in (s. F) |
+| 10 | Spend-tier quips | ✓ | src/main/quips/detectors.ts:11 (SpendTier spendWeak/Ok/Crazy), 56-61 (classify), 92-105 (daily reset + tier crossing); src/main/quips/quips.ts:7 (lowercase voice invariant), 77-79 (pools) |
+| 11 | Retina bubble / DPR (superset applyDpr/logicalBounds) | ✓ | src/renderer/renderer.ts:94-100,205-218 (logicalBounds, currentDpr, applyDpr on bounds and DPR change); src/renderer/bubble.ts:116-118 (logical coordinates, sharpness via DPR backing store); src/renderer/canvas-dpr.ts present + test |
+| 12 | Pet reset unified (allowStageSnap, cursor stays) | ✓ | src/main/xp/engine.ts:129-131 (`applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true })`), 137-151 (snap update without `evolvingTo`); `lastSeenLifetimeTokens` not in patch → cursor stays (rationale :125-128) |
 
-## Selbst ausgeführte Prüfungen
+## Self-run checks
 
-- `npx vitest run`: **43 Dateien, 434 passed / 6 skipped (440)** — exakt der im
-  Merge-Doku behauptete Stand. Keine unhandled errors.
+- `npx vitest run`: **43 files, 434 passed / 6 skipped (440)** — exactly the state claimed in
+  the merge doc. No unhandled errors.
 - `npm run typecheck` (tsc --noEmit, renderer-tsconfig, gen-sprites-tsconfig): **clean**.
-- `npm run lint` (eslint .): **clean** (zusätzlich zur geforderten Prüfung).
-- `git diff --cached --check`: sauber (keine Whitespace-/Marker-Reste).
+- `npm run lint` (eslint .): **clean** (in addition to the required check).
+- `git diff --cached --check`: clean (no whitespace/marker remnants).
 
-## A. Konfliktmarker
+## A. Conflict markers
 
-Keine. Grep nach `<<<<<<<` / `=======` / `>>>>>>>` über src/ sowie nach
-`<<<<<<< HEAD` / `>>>>>>> upstream|hash` über alle ts/html/yml/md/json im Repo
-(node_modules ausgenommen) ohne Treffer.
+None. Grep for `<<<<<<<` / `=======` / `>>>>>>>` across `src/` and for `<<<<<<< HEAD` /
+`>>>>>>> upstream|hash` across all ts/html/yml/md/json in the repo (node_modules excluded)
+without hits.
 
-## C. Git-Status
+## C. Git status
 
-"All conflicts fixed but you are still merging." — 39 Dateien, alle staged
-(`M`/`A`), keine unstaged Änderungen, keine untracked Dateien, keine
-`*.orig`- oder sonstigen Merge-Artefakte, keine unmerged paths.
+"All conflicts fixed but you are still merging." — 39 files, all staged (`M`/`A`), no unstaged
+changes, no untracked files, no `*.orig` or other merge artifacts, no unmerged paths.
 
-## E. Semantik-Stichprobe Reset
+## E. Semantics spot-check Reset
 
-Vereinheitlichung stimmt: Upstream-Mechanik (`applyState` + `allowStageSnap`,
-Snap trägt kein `evolvingTo` → kein Evolution-Quip/Sequenz, src/main/xp/engine.ts:146-148)
-auf unserem async Store (`await saveState`, :140) mit unserer IPC-Benennung.
-`lastSeenLifetimeTokens`-Cursor bleibt unangetastet (kein Re-Award der Historie),
-`lastMrrAwardDate` wird gelöscht. Kette in main.ts:284-295 vollständig awaited;
-settings-window.ts:194-202 mappt Fehler auf `{ ok:false, error:'reset failed' }`.
-settings-store.ts:78-80 enthält den dokumentierten Fix `void saveSettingsState(...).catch(...)`
-(kein Floating Promise bei Migration).
+Unification is correct: upstream mechanics (`applyState` + `allowStageSnap`, snap carries no
+`evolvingTo` → no evolution quip/sequence, src/main/xp/engine.ts:146-148) on our async store
+(`await saveState`, :140) with our IPC naming. `lastSeenLifetimeTokens` cursor remains untouched
+(no re-award of history), `lastMrrAwardDate` is deleted. Chain in main.ts:284-295 fully awaited;
+settings-window.ts:194-202 maps errors to `{ ok:false, error:'reset failed' }`.
+settings-store.ts:78-80 contains the documented fix `void saveSettingsState(...).catch(...)`
+(no floating promise during migration).
 
-## F. Semantik-Stichprobe Connect
+## F. Semantics spot-check Connect
 
-tracker.ts parst Dateiinhalte ausschließlich nach Opt-in: Discovery (logsFound)
-läuft immer, `processFile`/Parser nur unter `if (this.enabled.claude/codex)`
-(src/main/usage/tracker.ts:160-167, Header-Kommentar :11-13). `connected` ist
-nur `enabled && logsFound` (:79,86); Tokenzahlen werden bei disabled auf 0
-gemeldet (:80-81,87-88). Deaktivieren evictet Cache-Einträge (:169-177).
-Tray zeigt "Connect…"-Eintrag (tray.ts:66), verdrahtet in main.ts:330;
-Opt-in-Flags werden beim Start aus persistierten Settings gesetzt (main.ts:354-357)
-und bei Änderung via onUsageEnabledChanged nachgezogen (main.ts:305-307).
+tracker.ts parses file contents only after opt-in: discovery (logsFound) always runs,
+`processFile`/parser only under `if (this.enabled.claude/codex)`
+(src/main/usage/tracker.ts:160-167, header comment :11-13). `connected` is only
+`enabled && logsFound` (:79,86); token counts are reported as 0 when disabled (:80-81,87-88).
+Disabling evicts cache entries (:169-177). Tray shows "Connect…" entry (tray.ts:66), wired in
+main.ts:330; opt-in flags are set at startup from persisted settings (main.ts:354-357) and updated
+on change via onUsageEnabledChanged (main.ts:305-307).
 
 ## G. package.json / package-lock.json
 
-`git diff upstream/main -- package.json` zeigt nur legitime Branch-eigene
-Änderungen (description "macOS and Windows", author, build via
-scripts/build-assets.js, assets:*-Skripte) — nichts darüber hinaus.
-package-lock.json ist **identisch zu upstream/main** (leerer Diff); electron
-43.1.1 in package.json:27 und im Lockfile bestätigt.
+`git diff upstream/main -- package.json` shows only legitimate branch-specific changes
+(description "macOS and Windows", author, build via scripts/build-assets.js, assets:* scripts)
+— nothing beyond that. package-lock.json is **identical to upstream/main** (empty diff); electron
+43.1.1 in package.json:27 and in the lockfile confirmed.
 
-## Befunde
+## Findings
 
-- [minor] src/main/mrr/settings.html:63 — Connect-Hinweistext sagt wörtlich
-  "on this Mac" (Upstream-Text unverändert übernommen). Auf Windows-Builds
-  für Nutzer sichtbar; kein Merge-Defekt, kein Funktionsproblem. Empfehlung:
-  in einem Follow-up plattformneutral formulieren ("on this computer").
-- Hinweis (kein Befund): tray.ts:19-20 kommentiert "focused on Connect", aber
-  main.ts:329-330 verdrahtet `onOpenConnect` und `onOpenGrowthSettings` auf
-  dieselbe Funktion — "Fokus" ergibt sich aus dem Layout (Connect-Fieldset
-  steht oben). Entspricht dem Upstream-Design, keine Aktion nötig.
+- [minor] src/main/mrr/settings.html:63 — Connect hint text literally says "on this Mac"
+  (upstream text adopted unchanged). Visible to users on Windows builds; no merge defect, no
+  functional problem. Recommendation: formulate platform-neutrally in a follow-up ("on this
+  computer").
+- Note (no finding): tray.ts:19-20 comments "focused on Connect", but main.ts:329-330 wires
+  `onOpenConnect` and `onOpenGrowthSettings` to the same function — focus arises from the layout
+  (Connect fieldset is at the top). Matches the upstream design, no action needed.
 
-## Fazit
+## Conclusion
 
-Der staged Merge-Stand ist vollständig, konfliktfrei und verifiziert. Beide
-Feature-Sets (Windows-native + Upstream) sind intakt, die kritischen
-Semantik-Entscheidungen (Reset-Vereinheitlichung, Connect-Opt-in) stimmen im
-Code, und die behaupteten Metriken (434/6, typecheck/lint/build) lassen sich
-reproduzieren. **Merge-Commit kann erfolgen.**
+The staged merge state is complete, conflict-free and verified. Both feature sets (Windows-native
++ upstream) are intact, the critical semantic decisions (reset unification, connect opt-in) are
+correct in the code, and the claimed metrics (434/6, typecheck/lint/build) can be reproduced.
+**Merge commit can proceed.**

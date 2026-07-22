@@ -1,47 +1,47 @@
-# Kickoff — Beaver Buddy · Zyklus 1 (Team: Rodgi, Vlady, Jurij)
+# Kickoff — Beaver Buddy · Cycle 1 (Team: Rodgi, Vlady, Jurij)
 
-> Lies das zuerst. Danach: `ROADMAP.md` → dein `Planning/Milestone-N/MILESTONE.md` → deine Phase.
+> Read this first. Then: `ROADMAP.md` → your `Planning/Milestone-N/MILESTONE.md` → your phase.
 
-## 🎯 Zyklus 1 — Ziel
-**Exit-Kriterien:** ① App öffentlich downloadbar (Installer) ② 100 Downloads ③ 7 Contributors (wir sind 3)
-**Horizont:** ~6–8 Wochen · **Kernfeature:** Recording Agent — der Biber erkennt via **Herdr**,
-wenn ein Coding-Agent fertig ist oder Input braucht, und zeigt es an. Dazu Gamification:
-Token → XP → Level 1–32 → 5 Lebenszyklen.
+## 🎯 Cycle 1 — Goal
+**Exit criteria:** ① app publicly downloadable (installer) ② 100 downloads ③ 7 contributors (we are 3)
+**Horizon:** ~6–8 weeks · **Core feature:** Recording Agent — the beaver detects via **Herdr**
+when a coding agent is done or needs input, and shows it. Plus gamification:
+tokens → XP → level 1–32 → 5 life stages.
 
-## 👥 Wer macht was (verbindlich)
-| Person | Milestone | Agent | Erste Aufgabe |
+## 👥 Who does what (binding)
+| Person | Milestone | Agent | First task |
 |---|---|---|---|
-| **Jurij** (Event-Logik, Technik) | M3 Recording Agent | Claude Code | **M3/P1:** Herdr evaluieren + integrieren |
-| **Rodgi** (State-Logik, Features, Review) | M4 Level/XP/Profil + M6 Release | pi | **M4/P1:** Log-Reader (TokScale-Logik, nur echte Input/Output-Tokens) |
-| **Vlady** (Sprite-Animationen) | M5 Animationen | Claude Code | **M5/P1:** Baum-Assets (WAVE-1) |
+| **Jurij** (event logic, hard tech) | M3 Recording Agent | Claude Code | **M3/P1:** evaluate + integrate Herdr |
+| **Rodgi** (state logic, features, review) | M4 Level/XP/Profile + M6 Release | pi | **M4/P1:** log reader (TokScale logic, real input/output tokens only) |
+| **Vlady** (sprite animations) | M5 Animations | Claude Code | **M5/P1:** tree assets (WAVE-1) |
 
-Regeln: **Ein Accountable pro Phase.** pi nutzt nur Rodgi; Vlady & Jurij arbeiten überall mit
-Claude Code. Agenten arbeiten nur auf Anweisung des jeweiligen Phase-Owners.
+Rules: **One Accountable per phase.** Only Rodgi uses pi; Vlady & Jurij work everywhere with
+Claude Code. Agents work only on instruction from the respective phase owner.
 
-## 📁 Wo liegt was
-- **Diese Planung (`.planning/`, committed)** = eure Lese-Quelle. Struktur:
-  - `STATE.md` — aktueller Stand (Now/Next/Blockers)
-  - `ROADMAP.md` — Milestones, Phasen, **Dependency-Übersicht** (was blockiert wen)
-  - `Planning/Milestone-N/MILESTONE.md` — Why, Phasen, Success, Dependencies
-  - `Planning/Milestone-N/Phase-N/PHASE.md` — Done-when, Waves, **Accountable**, **Blocked by**, Dauer
-  - `Planning/Milestone-4/Phase-2/XP-LEVEL-MODEL.md` — **die XP-/Level-Spec** (Kurve, Gewichte, Stufen)
-  - `Meetings/2026-07-21-planung/` — Meeting-Quelle · `Reference/` — Item-Specs #1–#64 · `Archive/`
-- Master liegt lokal bei Rodgi (`.flightplan/`, gitignored); er synct hierher.
+## 📁 Where things live
+- **This planning (`.planning/`, committed)** = your reading source. Structure:
+  - `STATE.md` — current status (Now/Next/Blockers)
+  - `ROADMAP.md` — milestones, phases, **dependency overview** (what blocks whom)
+  - `Planning/Milestone-N/MILESTONE.md` — Why, phases, success, dependencies
+  - `Planning/Milestone-N/Phase-N/PHASE.md` — done-when, waves, **Accountable**, **Blocked by**, duration
+  - `Planning/Milestone-4/Phase-2/XP-LEVEL-MODEL.md` — **the XP/level spec** (curve, weights, stages)
+  - `Meetings/2026-07-21-planung/` — meeting source · `Reference/` — item specs #1–#64 · `Archive/`
+- Master lives locally with Rodgi (`.flightplan/`, gitignored); he syncs here.
 
-## 📐 Konventionen
-- Jede Phase: **Done-when** im Header, Waves als Checkboxen, `Blocked by:` prüfen, bevor gestartet wird.
-- **Eine Animation pro Phase** (M5): WAVE-1 = Assets (Claude Code/ComfyUI), WAVE-2 = Runtime (pi/Rodgi).
-- Design-Gate-Verdicts → `docs/design-reviews/` · Asset-Registrierung → `docs/asset-gallery.md`.
-- Code-Regeln: `CLAUDE.md` lesen (Electron-Hardening, Security, Style) — **nicht verhandelbar**.
+## 📐 Conventions
+- Every phase: **done-when** in the header, waves as checkboxes, check `Blocked by:` before starting.
+- **One animation per phase** (M5): WAVE-1 = assets (Claude Code/ComfyUI), WAVE-2 = runtime (pi/Rodgi).
+- Design gate verdicts → `docs/design-reviews/` · asset registration → `docs/asset-gallery.md`.
+- Code rules: read `CLAUDE.md` (Electron hardening, security, style) — **non-negotiable**.
 
-## 🔢 XP-/Level-System in 30 Sekunden
-Nur **echte Input+Output-Tokens** (kein Cache!) zählen → 5 XP pro 1.000 Tokens ×
-**Modell-Gewicht** (Intelligence Index artificialanalysis.ai, **γ=2**: Top-Modell 1,78×, Floor 0,5×)
-→ kumulativ quadratische Kurve, L32 = 120.000 XP ≈ Tag 60.
-**5 Lebenszyklen:** Baby L1–4 · junges Baby L5–8 · Jugendlicher L9–16 · älterer Jugendlicher
-L17–24 · Erwachsener L25–32. Interaktionen ab L8. Alles als Daten in der Character-Map (M4/P4).
+## 🔢 XP/level system in 30 seconds
+Only **real input+output tokens** (no cache!) count → 5 XP per 1,000 tokens ×
+**model weight** (Intelligence Index artificialanalysis.ai, **γ=2**: top model 1.78×, floor 0.5×)
+→ cumulative quadratic curve, L32 = 120,000 XP ≈ day 60.
+**5 life stages:** baby L1–4 · young baby L5–8 · teenager L9–16 · older teenager
+L17–24 · adult L25–32. Interactions from L8. Everything as data in the character map (M4/P4).
 
 ## 🚀 Start
-1. `ROADMAP.md` lesen, eigene Phase finden, `Blocked by:` prüfen (M3/P1, M4/P1, M5-Assets: **none** → sofort startbar)
-2. Detail-Definition der eigenen Phase mit Rodgi abstimmen (Konvention: zu Phasenbeginn)
-3. Arbeiten in Waves; STATE.md/PHASE.md-Checkboxen werden bei Abschluss aktualisiert (Rodgi synct)
+1. Read `ROADMAP.md`, find your phase, check `Blocked by:` (M3/P1, M4/P1, M5 assets: **none** → can start immediately)
+2. Align the detailed definition of your phase with Rodgi (convention: at phase start)
+3. Work in waves; STATE.md/PHASE.md checkboxes get updated on completion (Rodgi syncs)

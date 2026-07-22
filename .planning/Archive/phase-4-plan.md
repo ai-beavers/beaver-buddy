@@ -1,60 +1,60 @@
 # Beaver Buddy — Phase 4: Polish & Release-Readiness
 
-**Status:** Planungsdokument (keine Source-Änderungen enthalten).  
+**Status:** Planning document (contains no source changes).  
 **Build-Items:** BL-WIN-8, BL-WIN-10  
-**Ziel:** Visuelle Qualität auf Windows-HiDPI-Displays sicherstellen, Icons und Dokumentation für einen Release-Ready-Zustand bringen, Design-Gate für Windows abgeschlossen.
+**Goal:** Ensure visual quality on Windows HiDPI displays, bring icons and documentation to a release-ready state, complete the design gate for Windows.
 
 ---
 
-## 1. Zusammenfassung der Phase
+## 1. Phase Summary
 
-Phase 4 ist die letzte Umsetzungsphase vor den zurückgestellten Folgeaufgaben (BL-WIN-6, BL-WIN-7, Codex-Tracking). Sie behandelt zwei Build-Items:
+Phase 4 is the final implementation phase before the deferred follow-up tasks (BL-WIN-6, BL-WIN-7, Codex tracking). It covers two build items:
 
-1. **BL-WIN-8 — Renderer HiDPI / Scaling (optional):** Der transparente Canvas-Overlay soll auf Windows-Displays mit 125 %/150 %/200 %-Skalierung scharf bleiben, ohne dass die Pixel-Art durch bilineare Skalierung verschwimmt.
-2. **BL-WIN-10 — Dokumentation & Design-Gate:** README, PRD und CLAUDE.md werden auf den aktuellen Windows-Status geprüft und ergänzt. Ein visuelles Design-Gate bewertet Windows-Tray-Icon, Anwendungs-Icon und HiDPI-Rendering; Screenshots und Verdict landen in `docs/design-reviews/`.
+1. **BL-WIN-8 — Renderer HiDPI / Scaling (optional):** The transparent canvas overlay should stay sharp on Windows displays with 125 %/150 %/200 % scaling, without the pixel art being blurred by bilinear scaling.
+2. **BL-WIN-10 — Documentation & Design-Gate:** README, PRD and CLAUDE.md are reviewed against the current Windows status and updated. A visual design gate evaluates the Windows tray icon, application icon and HiDPI rendering; screenshots and the verdict are stored in `docs/design-reviews/`.
 
-Die Phase führt **keine neuen Features** ein, ändert keine Geschäftslogik und fügt **keine neuen Dependencies** hinzu.
+The phase introduces **no new features**, changes no business logic and adds **no new dependencies**.
 
 ---
 
-## 2. Abhängigkeiten zu vorherigen Phasen
+## 2. Dependencies on Previous Phases
 
-| Build-Item | Benötigt abgeschlossen | Begründung |
+| Build-Item | Requires completed | Rationale |
 |---|---|---|
-| BL-WIN-8 | BL-WIN-3 (Overlay-Adapter) | Die Canvas-Größe wird über `state:bounds` aus dem Main-Prozess gesteuert. HiDPI-Anpassungen müssen sich an diese Bounds-Schnittstelle halten, ohne die Taskleisten-Logik zu zerstören. |
-| BL-WIN-10 | BL-WIN-2 (Windows-Installer/Icon), BL-WIN-4 (Tray-Icon), BL-WIN-8 (HiDPI) | Design-Gate bewertet erst alle visuellen Endpunkte, wenn Packaging, Tray und HiDPI stehen. |
+| BL-WIN-8 | BL-WIN-3 (Overlay adapter) | The canvas size is controlled via `state:bounds` from the main process. HiDPI adjustments must conform to this bounds interface without breaking the taskbar logic. |
+| BL-WIN-10 | BL-WIN-2 (Windows installer/icon), BL-WIN-4 (Tray icon), BL-WIN-8 (HiDPI) | The design gate only evaluates all visual endpoints once packaging, tray and HiDPI are in place. |
 
-**Nicht blockierend, aber relevant:** BL-WIN-5 (Usage-Paths) ist bereits abgeschlossen; Windows-Codex-Tracking bleibt zurückgestellt und sollte in BL-WIN-10 dokumentiert bleiben.
+**Not blocking, but relevant:** BL-WIN-5 (Usage paths) is already completed; Windows Codex tracking remains deferred and should stay documented in BL-WIN-10.
 
 ---
 
 ## 3. BL-WIN-8: Renderer HiDPI / Scaling (optional)
 
-### 3.1 Kontext
+### 3.1 Context
 
-Aktueller Stand in `src/renderer/renderer.ts:82-83`:
+Current state in `src/renderer/renderer.ts:82-83`:
 
 ```ts
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 ```
 
-Das Canvas arbeitet in **logischen Pixeln**. Unter Windows mit 125 %/150 %/200 % Skalierung liefert `window.innerWidth/Height` weiterhin logische Pixel, während Chromium intern ein `devicePixelRatio` (DPR) von 1.25/1.5/2.0 verwendet. Wenn das Canvas-Element per CSS auf die Fenstergröße skaliert wird, wird der kleine logische Canvas auf den physischen Bereich hochskaliert → bilineare Weichzeichnung der Pixel-Art, obwohl `ctx.imageSmoothingEnabled = false` gesetzt ist.
+The canvas operates in **logical pixels**. On Windows with 125 %/150 %/200 % scaling, `window.innerWidth/Height` still returns logical pixels, while Chromium internally uses a `devicePixelRatio` (DPR) of 1.25/1.5/2.0. When the canvas element is scaled to the window size via CSS, the small logical canvas is upscaled to the physical area → bilinear blurring of the pixel art, even though `ctx.imageSmoothingEnabled = false` is set.
 
-### 3.2 Ziel
+### 3.2 Goal
 
-- Das Overlay bleibt bei Windows-Skalierungen von 125 %, 150 % und 200 % visuell scharf.
-- Pixel-Art wird mit nearest-neighbor gezeichnet (keine bilineare Interpolation).
-- Sprite-Skalierungen bleiben so integer wie möglich; keine halben Quellpixel.
-- Das Verhalten auf macOS und Linux darf nicht regressieren.
+- The overlay stays visually sharp at Windows scalings of 125 %, 150 % and 200 %.
+- Pixel art is drawn with nearest-neighbor (no bilinear interpolation).
+- Sprite scalings stay as integer as possible; no half source pixels.
+- Behavior on macOS and Linux must not regress.
 
-### 3.3 Konkrete Schritte
+### 3.3 Concrete Steps
 
-#### Schritt 1: Physische Canvas-Größe an DPR koppeln
+#### Step 1: Couple physical canvas size to DPR
 
-**Datei:** `src/renderer/renderer.ts`
+**File:** `src/renderer/renderer.ts`
 
-Einführen einer Hilfsfunktion, die das Canvas-Element an die physische Auflösung anpasst und den Kontext um den DPR skaliert. Logische Bounds für `roam.ts` werden separat geführt.
+Introduce a helper function that adapts the canvas element to the physical resolution and scales the context by the DPR. Logical bounds for `roam.ts` are tracked separately.
 
 ```ts
 function configureCanvasDpr(logicalWidth: number, logicalHeight: number): void {
@@ -68,13 +68,13 @@ function configureCanvasDpr(logicalWidth: number, logicalHeight: number): void {
 }
 ```
 
-Hinweis: `ctx.setTransform` statt `ctx.scale`, damit ein Wechsel des DPR (Monitor-Wechsel, Skalierungsänderung) nicht kumulativ wirkt.
+Note: `ctx.setTransform` instead of `ctx.scale`, so that a DPR change (monitor switch, scaling change) does not accumulate.
 
-#### Schritt 2: Bounds-Schnittstelle beibehalten
+#### Step 2: Keep the bounds interface
 
-**Datei:** `src/renderer/renderer.ts`
+**File:** `src/renderer/renderer.ts`
 
-`bounds()` muss weiterhin logische Pixel zurückgeben, damit `roam.ts`, `bubble.ts`, `hatch.ts` und die Dirty-Rect-Berechnungen unverändert bleiben können.
+`bounds()` must continue to return logical pixels so that `roam.ts`, `bubble.ts`, `hatch.ts` and the dirty-rect calculations can remain unchanged.
 
 ```ts
 let logicalBounds: Bounds = { width: window.innerWidth, height: window.innerHeight };
@@ -84,7 +84,7 @@ function bounds(): Bounds {
 }
 ```
 
-Im `onBoundsChanged`-Handler (Zeile 189 ff.) wird die logische Größe gespeichert und das Canvas neu konfiguriert:
+In the `onBoundsChanged` handler (line 189 ff.), the logical size is stored and the canvas is reconfigured:
 
 ```ts
 window.beaverBuddy.onBoundsChanged((next) => {
@@ -95,35 +95,35 @@ window.beaverBuddy.onBoundsChanged((next) => {
 });
 ```
 
-#### Schritt 3: Initialisierung anpassen
+#### Step 3: Adjust initialization
 
-**Datei:** `src/renderer/renderer.ts`
+**File:** `src/renderer/renderer.ts`
 
-Die direkte Zuweisung `canvas.width = window.innerWidth` entfällt. Stattdessen:
+The direct assignment `canvas.width = window.innerWidth` is removed. Instead:
 
 ```ts
 let logicalBounds: Bounds = { width: window.innerWidth, height: window.innerHeight };
 configureCanvasDpr(logicalBounds.width, logicalBounds.height);
 ```
 
-Die `createRoamState`-Initialisierung (`renderer.ts:99`) verwendet weiterhin `bounds()`.
+The `createRoamState` initialization (`renderer.ts:99`) continues to use `bounds()`.
 
-#### Schritt 4: Zeichenlogik nicht anfassen
+#### Step 4: Do not touch the drawing logic
 
-- `drawFrame` in `src/renderer/sprites.ts` bleibt unverändert.
-- `PET_SCALE` und `LODGE_SCALE` in `src/renderer/pet-config.ts` bleiben Integer.
-- Alle Koordinaten in `draw()`, `drawHatch()` und `bubble.ts` bleiben logische Pixel; die DPR-Skalierung erfolgt implizit durch den transformierten Kontext.
+- `drawFrame` in `src/renderer/sprites.ts` remains unchanged.
+- `PET_SCALE` and `LODGE_SCALE` in `src/renderer/pet-config.ts` remain integers.
+- All coordinates in `draw()`, `drawHatch()` and `bubble.ts` remain logical pixels; the DPR scaling happens implicitly through the transformed context.
 
-#### Schritt 5: Testabdeckung ergänzen
+#### Step 5: Add test coverage
 
-**Datei:** `src/renderer/renderer.test.ts` (neu anlegen, falls nicht vorhanden) oder Erweiterung eines bestehenden Renderer-Tests.
+**File:** `src/renderer/renderer.test.ts` (create new if not present) or extend an existing renderer test.
 
-Da `renderer.ts` stark auf DOM/API-Seiteneffekte angewiesen ist, wird ein klarer Unit-Test für die DPR-Mathematik bevorzugt, statt den gesamten Renderer zu mocken. Falls ein solcher Test nicht praktikabel ist, wird der HiDPI-Pfad manuell im Design-Gate verifiziert.
+Since `renderer.ts` relies heavily on DOM/API side effects, a clean unit test for the DPR math is preferred over mocking the entire renderer. If such a test is not practicable, the HiDPI path is verified manually in the design gate.
 
-Empfohlene Testidee (optional):
+Recommended test idea (optional):
 
 ```ts
-// Beispiel: Extrahiere configureCanvasDpr in eine rein funktionale Hilfsfunktion
+// Example: Extract configureCanvasDpr into a pure helper function
 // configureCanvas(logicalWidth, logicalHeight, dpr) -> { canvasWidth, canvasHeight, styleWidth, styleHeight }
 expect(configureCanvas(1920, 1080, 1.5)).toEqual({
   canvasWidth: 2880,
@@ -133,54 +133,54 @@ expect(configureCanvas(1920, 1080, 1.5)).toEqual({
 });
 ```
 
-Wenn keine Extraktion erfolgt, reicht ein manueller Verifikationsschritt im Design-Gate.
+If no extraction takes place, a manual verification step in the design gate is sufficient.
 
-### 3.4 Risiken und Degradation (optionaler Charakter)
+### 3.4 Risks and Degradation (optional character)
 
-| Risiko | Auswirkung | Mitigation |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| Nicht-integer DPR (1.25, 1.5) führt zu ungleichmäßigen Pixel-Verdopplungen. | Pixel-Art flackert leicht oder wirkt „wackelig". | Akzeptanzkriterium: bei 200 % (DPR=2) muss es perfekt integer sein; bei 125 %/150 % darf es nicht bilinear weichgezeichnet sein. Falls 125 %/150 % unbefriedigend aussehen, Dokumentation der Einschränkung und Vormerkung für Design-Gate/Assets. |
-| `window.devicePixelRatio` ändert sich während der Laufzeit (Monitor-Wechsel, Skalierungsänderung). | Canvas wird mit falschem DPR gezeichnet. | `configureCanvasDpr` bei jedem `onBoundsChanged`-Aufruf erneut aufrufen; ggf. zusätzlich auf `window.matchMedia` für DPR-Änderungen lauschen. |
-| Regression auf macOS/Linux. | Biber wird zu groß/zu klein oder unscharf. | Expliziter visueller Smoke-Test auf macOS; CI kann dies nicht ersetzen. |
-| Zusätzliche Komplexität überwiegt den Nutzen. | Zeitverlust, Code ist schwerer wartbar. | BL-WIN-8 ist optional. Falls die Implementierung nicht innerhalb eines kleinen, isolierten Diff umsetzbar ist, wird sie dokumentiert abgeschaltet (siehe 3.5). |
+| Non-integer DPR (1.25, 1.5) leads to uneven pixel doubling. | Pixel art flickers slightly or looks "wobbly". | Acceptance criterion: at 200 % (DPR=2) it must be perfectly integer; at 125 %/150 % it must not be bilinearly blurred. If 125 %/150 % look unsatisfactory, document the limitation and flag it for the design gate/assets. |
+| `window.devicePixelRatio` changes during runtime (monitor switch, scaling change). | Canvas is drawn with the wrong DPR. | Call `configureCanvasDpr` again on every `onBoundsChanged` invocation; optionally also listen to `window.matchMedia` for DPR changes. |
+| Regression on macOS/Linux. | Beaver becomes too large/too small or blurry. | Explicit visual smoke test on macOS; CI cannot replace this. |
+| Additional complexity outweighs the benefit. | Time loss, code becomes harder to maintain. | BL-WIN-8 is optional. If the implementation cannot be done within a small, isolated diff, it is documented as switched off (see 3.5). |
 
-### 3.5 Dokumentierte Abschaltung / Degradation
+### 3.5 Documented Deactivation / Degradation
 
-Falls BL-WIN-8 im Implementierungslauf als zu riskant oder zu aufwändig eingestuft wird, ist die **Degradation** zulässig:
+If BL-WIN-8 is judged too risky or too costly during the implementation run, **degradation** is permitted:
 
-1. Die Änderungen in `src/renderer/renderer.ts` werden rückgängig gemacht oder gar nicht erst committet.
-2. In `README.md` und `CLAUDE.md` wird ein Hinweis ergänzt:
-   > „On Windows displays with non-100 % scaling the beaver is rendered at the logical resolution. A future update will add per-display DPR scaling to keep pixel art perfectly crisp at 125 %/150 %/200 %."
-3. BL-WIN-8 wird in `.flightplan/Archive/WINDOWS_PORT_PLAN.md` als „optional — zurückgestellt" markiert.
-4. BL-WIN-10 Design-Gate dokumentiert den aktuellen Stand und bewertet die Akzeptanz der Unschärfe.
+1. The changes in `src/renderer/renderer.ts` are reverted or never committed.
+2. A note is added to `README.md` and `CLAUDE.md`:
+   > "On Windows displays with non-100 % scaling the beaver is rendered at the logical resolution. A future update will add per-display DPR scaling to keep pixel art perfectly crisp at 125 %/150 %/200 %."
+3. BL-WIN-8 is marked as "optional — deferred" in `.flightplan/Archive/WINDOWS_PORT_PLAN.md`.
+4. The BL-WIN-10 design gate documents the current state and evaluates the acceptance of the blurriness.
 
 ---
 
-## 4. BL-WIN-10: Dokumentation & Design-Gate
+## 4. BL-WIN-10: Documentation & Design-Gate
 
-### 4.1 Ziel
+### 4.1 Goal
 
-- README.md, PRD.md und CLAUDE.md spiegeln konsistent den Windows-Status wider.
-- Ein visuelles/manuelles Design-Gate bewertet Windows-Icons und HiDPI-Rendering.
-- Ergebnisse des Design-Gates (Screenshots + Verdict) werden in `docs/design-reviews/` abgelegt.
+- README.md, PRD.md and CLAUDE.md consistently reflect the Windows status.
+- A visual/manual design gate evaluates Windows icons and HiDPI rendering.
+- Design gate results (screenshots + verdict) are stored in `docs/design-reviews/`.
 
-### 4.2 Dateien und Änderungen
+### 4.2 Files and Changes
 
 #### `README.md`
 
-**Zu prüfende/abschließende Stellen:**
+**Sections to review/finalize:**
 
-- Zeile 37: „Supported on macOS 14+ and Windows 10/11." — bereits korrekt.
-- Zeile 39-41: Scope-Note zum Windows-Fokus — beibehalten.
-- Zeile 73-80: Windows overlay & tray behavior — beibehalten, ggf. nach BL-WIN-8 um HiDPI-Hinweis ergänzen.
-- Zeile 82-96: Windows usage tracking — beibehalten, Codex-Tracking-Status dokumentiert lassen.
-- Zeile 109-125: Troubleshooting — nach BL-WIN-8 aktualisieren:
-  - Auto-Hide-Limitation bleibt bestehen.
-  - Tray-Icon-Kontrast: Hinweis auf Design-Gate-Ergebnis.
-  - Falls BL-WIN-8 umgesetzt: HiDPI-Hinweis ergänzen.
-  - Falls BL-WIN-8 abgeschaltet: Hinweis auf bekannte Unschärfe bei Skalierung.
+- Line 37: "Supported on macOS 14+ and Windows 10/11." — already correct.
+- Line 39-41: Scope note on the Windows focus — keep.
+- Line 73-80: Windows overlay & tray behavior — keep, optionally add a HiDPI note after BL-WIN-8.
+- Line 82-96: Windows usage tracking — keep, leave Codex tracking status documented.
+- Line 109-125: Troubleshooting — update after BL-WIN-8:
+  - Auto-hide limitation remains.
+  - Tray icon contrast: reference the design gate result.
+  - If BL-WIN-8 is implemented: add a HiDPI note.
+  - If BL-WIN-8 is deactivated: note the known blurriness under scaling.
 
-**Mögliche Ergänzung nach BL-WIN-8:**
+**Possible addition after BL-WIN-8:**
 
 ```md
 ### HiDPI / display scaling
@@ -193,84 +193,84 @@ minor unevenness, but no bilinear blur.
 
 #### `PRD.md`
 
-- Scope-Note (Zeile 18-20) beibehalten.
-- R10 (Design QA gate, Zeile 108-115) um Windows-Tragfähigkeit ergänzen: Screenshots müssen auf Windows-Synthetic-Desktop erstellt werden.
-- Falls BL-WIN-8 abgeschaltet: HiDPI als bekannte Einschränkung unter „Explicitly OUT of scope (MVP)" oder als Fußnote zu R3/R10 eintragen.
+- Scope note (line 18-20) — keep.
+- Extend R10 (Design QA gate, line 108-115) with Windows coverage: screenshots must be taken on a Windows synthetic desktop.
+- If BL-WIN-8 is deactivated: record HiDPI as a known limitation under "Explicitly OUT of scope (MVP)" or as a footnote to R3/R10.
 
 #### `CLAUDE.md`
 
-- Usage-log-Pfad-Abschnitt (Zeile 59-70) ist bereits Windows-kompatibel; prüfen, ob Codex-Status aktuell bleibt.
-- Overlay etiquette (Zeile 72-83) beibehalten; ggf. Hinweis: „HiDPI scaling must not break click-through or pixel-grid discipline".
-- Definition of done (Zeile 103-107) ergänzen: Für sichtbare Windows-Änderungen gehört ein Design-Gate-Screenshot zu „demonstrably hold".
+- Usage log path section (line 59-70) is already Windows-compatible; check whether the Codex status is still current.
+- Overlay etiquette (line 72-83) — keep; optionally add a note: "HiDPI scaling must not break click-through or pixel-grid discipline".
+- Definition of done (line 103-107) — extend: for visible Windows changes, a design gate screenshot is part of "demonstrably hold".
 
-### 4.3 Design-Gate-Kriterien
+### 4.3 Design Gate Criteria
 
-Das Design-Gate ist **visuell/manuell**. Es gibt kein finales Master-Icon; die Bewertung erfolgt gegen die vorläufigen Assets.
+The design gate is **visual/manual**. There is no final master icon; the evaluation is made against the provisional assets.
 
-| Prüfpunkt | Kriterium | Bewertung |
+| Checkpoint | Criterion | Verdict |
 |---|---|---|
-| **App-Icon** (`assets/icon.ico`) | Wird im Explorer, Installer und Task-Manager korrekt angezeigt; keine sichtbaren Skalierungsartefakte bei 16×16 bis 256×256. | PASS / FAIL mit Größenangabe |
-| **Tray-Icon** (`assets/tray-icon.png`) | Auf hellem und dunklem Windows-Taskleisten-Hintergrund erkennbar; nicht zu klein oder zu groß; Kanten nicht ausgefranst. | PASS / FAIL |
-| **HiDPI-Rendering** | Bei 100 %, 125 %, 150 %, 200 % Skalierung: Sprite-Kanten sind scharf, keine bilineare Weichzeichnung; Pixel-Art wirkt nicht verschwommen. | PASS / FAIL pro Skalierung |
-| **Overlay-Rand** | Biber bleibt innerhalb der Work-Area; kein Abschneiden an Taskleiste (unten/oben/links/rechts). | PASS / FAIL pro Position |
-| **Konsistenz** | Farben und Stil von Icon und Sprite passen zusammen; kein visueller Bruch zwischen Sprite-Palette und App-Icon. | PASS / FAIL |
+| **App icon** (`assets/icon.ico`) | Displays correctly in Explorer, installer and Task Manager; no visible scaling artifacts from 16×16 to 256×256. | PASS / FAIL with size note |
+| **Tray icon** (`assets/tray-icon.png`) | Recognizable on light and dark Windows taskbar backgrounds; not too small or too large; edges not frayed. | PASS / FAIL |
+| **HiDPI rendering** | At 100 %, 125 %, 150 %, 200 % scaling: sprite edges are sharp, no bilinear blurring; pixel art does not look smeared. | PASS / FAIL per scaling |
+| **Overlay edge** | Beaver stays within the work area; no clipping at the taskbar (bottom/top/left/right). | PASS / FAIL per position |
+| **Consistency** | Colors and style of icon and sprite match; no visual break between sprite palette and app icon. | PASS / FAIL |
 
-### 4.4 Design-Gate-Prozess
+### 4.4 Design Gate Process
 
-1. **Vorbereitung:**
-   - Windows-Testmaschine mit mindestens zwei Skalierungsstufen (z. B. 100 % und 200 %).
-   - Sauberer/Synthetischer Desktop-Hintergrund (keine persönlichen Fenster, Dateinamen oder Benachrichtigungen).
-2. **Screenshots erstellen:**
-   - App-Icon im Explorer (Klein-/Mittel-/Großansicht).
-   - Installer-Fenster mit Icon.
-   - Task-Manager-Prozess-Icon.
-   - Tray-Icon auf hellem und dunklem Taskleisten-Hintergrund.
-   - Overlay mit Biber in Ruhe- und Walk-Animation bei 100 %, 125 %, 150 %, 200 %.
-3. **Ablage:**
-   - Screenshots unter `docs/design-reviews/phase-4-windows/`.
-   - Markdown-Verdict `docs/design-reviews/phase-4-windows/verdict.md` mit Tabelle aus 4.3.
-4. **Bei FAIL:**
-   - Blocker dokumentieren.
-   - Falls es sich um ein Minor-Problem handelt (z. B. Tray-Icon-Kontrast auf dunklem Hintergrund), kann ein kurzer Follow-up-Fix innerhalb von BL-WIN-10 erfolgen (z. B. Kontrast-Anpassung am vorläufigen PNG).
-   - Falls ein finales Master-Icon nötig ist, wird es als bekanntes Follow-up markiert (kein neues Build-Item in Phase 4).
+1. **Preparation:**
+   - Windows test machine with at least two scaling levels (e.g. 100 % and 200 %).
+   - Clean/synthetic desktop background (no personal windows, file names or notifications).
+2. **Take screenshots:**
+   - App icon in Explorer (small/medium/large view).
+   - Installer window with icon.
+   - Task Manager process icon.
+   - Tray icon on light and dark taskbar backgrounds.
+   - Overlay with beaver in idle and walk animation at 100 %, 125 %, 150 %, 200 %.
+3. **Storage:**
+   - Screenshots under `docs/design-reviews/phase-4-windows/`.
+   - Markdown verdict `docs/design-reviews/phase-4-windows/verdict.md` with the table from 4.3.
+4. **On FAIL:**
+   - Document the blocker.
+   - If it is a minor issue (e.g. tray icon contrast on a dark background), a short follow-up fix can happen within BL-WIN-10 (e.g. contrast adjustment on the provisional PNG).
+   - If a final master icon is needed, it is marked as a known follow-up (no new build item in Phase 4).
 
 ---
 
-## 5. Akzeptanzkriterien für die gesamte Phase
+## 5. Acceptance Criteria for the Entire Phase
 
 ### BL-WIN-8 (optional)
 
-- [ ] Bei 200 %-Windows-Skalierung ist das Overlay-Rendering scharf (integer Pixel-Verdopplung).
-- [ ] `ctx.imageSmoothingEnabled = false` bleibt aktiv.
-- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` bleiben grün.
-- [ ] Das Verhalten auf macOS/Linux ist visuell unverändert (keine Regression).
-- [ ] Falls abgeschaltet: Einschränkung ist in README.md, CLAUDE.md und WINDOWS_PORT_PLAN.md dokumentiert.
+- [ ] At 200 % Windows scaling, the overlay rendering is sharp (integer pixel doubling).
+- [ ] `ctx.imageSmoothingEnabled = false` remains active.
+- [ ] `npm run typecheck`, `npm run lint`, `npm test`, `npm run build` stay green.
+- [ ] Behavior on macOS/Linux is visually unchanged (no regression).
+- [ ] If deactivated: the limitation is documented in README.md, CLAUDE.md and WINDOWS_PORT_PLAN.md.
 
 ### BL-WIN-10
 
-- [ ] README.md, PRD.md und CLAUDE.md sind konsistent und reflektieren macOS + Windows.
-- [ ] Windows-Scope-Note, Usage-Tracking-Einschränkung und Codex-Status sind aktuell.
-- [ ] Design-Gate-Verdict liegt in `docs/design-reviews/phase-4-windows/verdict.md`.
-- [ ] Screenshots sind sauber/synthetisch und zeigen App-Icon, Tray-Icon und Overlay bei relevanten Skalierungen.
-- [ ] Alle FAILs sind entweder behoben oder als bekannte Einschränkung dokumentiert.
+- [ ] README.md, PRD.md and CLAUDE.md are consistent and reflect macOS + Windows.
+- [ ] Windows scope note, usage tracking limitation and Codex status are current.
+- [ ] Design gate verdict is stored in `docs/design-reviews/phase-4-windows/verdict.md`.
+- [ ] Screenshots are clean/synthetic and show app icon, tray icon and overlay at the relevant scalings.
+- [ ] All FAILs are either fixed or documented as known limitations.
 
 ---
 
-## 6. Risiken und Mitigation
+## 6. Risks and Mitigation
 
-| Risiko | Auswirkung | Mitigation |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| BL-WIN-8 führt zu Regressionen auf macOS/Linux. | Visuelle Qualität leidet auf nicht-Windows-Plattformen. | Änderungen minimal und hinter einer DPR-Hilfsfunktion kapseln; auf macOS visuell smoke-testen; bei Regressionsgefahr BL-WIN-8 abschalten. |
-| 125 %/150 %-DPR sieht trotz `imageSmoothingEnabled = false` nicht perfekt aus. | Design-Gate FAIL für HiDPI. | Akzeptanzkriterien differenzieren: 200 % muss perfekt sein; 125 %/150 % dürfen nur „keine Bilinear-Unschärfe" zeigen. |
-| Keine Windows-Hardware für Design-Gate verfügbar. | Design-Gate kann nicht durchgeführt werden. | CI-Windows-Runner kann Packaging prüfen, aber nicht visuell. Notfall: Design-Gate wird auf einem Windows-VM-Screenshot durchgeführt oder als „pending on real hardware" dokumentiert. |
-| Finales Master-Icon fehlt weiterhin. | Design-Gate kann nur vorläufige Assets bewerten. | Design-Gate dokumentiert, dass die Bewertung gegen Sprite-generierte Icons erfolgt; finales Icon als bekanntes Follow-up markieren. |
-| Dokumentation driftet auseinander (README/PRD/CLAUDE). | Inkonsistente Aussagen. | Gemeinsame Abschnitte (Usage-Tracking, Scope-Note, HiDPI) in allen drei Dateien synchron prüfen. |
+| BL-WIN-8 causes regressions on macOS/Linux. | Visual quality suffers on non-Windows platforms. | Keep changes minimal and encapsulated behind a DPR helper function; visually smoke-test on macOS; deactivate BL-WIN-8 if regression risk arises. |
+| 125 %/150 % DPR does not look perfect despite `imageSmoothingEnabled = false`. | Design gate FAIL for HiDPI. | Differentiate acceptance criteria: 200 % must be perfect; 125 %/150 % may only show "no bilinear blur". |
+| No Windows hardware available for the design gate. | Design gate cannot be performed. | A CI Windows runner can check packaging, but not visuals. Fallback: perform the design gate on a Windows VM screenshot or document it as "pending on real hardware". |
+| Final master icon still missing. | Design gate can only evaluate provisional assets. | Design gate documents that the evaluation is against sprite-generated icons; mark the final icon as a known follow-up. |
+| Documentation drifts apart (README/PRD/CLAUDE). | Inconsistent statements. | Review shared sections (usage tracking, scope note, HiDPI) in all three files in sync. |
 
 ---
 
-## 7. Test- und Verifikationsschritte
+## 7. Test and Verification Steps
 
-1. **Automatisierte Checks (lokal und CI):**
+1. **Automated checks (local and CI):**
    ```bash
    npm ci
    npm run typecheck
@@ -279,51 +279,51 @@ Das Design-Gate ist **visuell/manuell**. Es gibt kein finales Master-Icon; die B
    npm run build
    npx electron-builder --win --publish never
    ```
-2. **Manuelle HiDPI-Prüfung (Windows):**
-   - Display-Skalierung auf 100 %, 125 %, 150 %, 200 % setzen.
-   - App starten (`npm start`).
-   - Biber visuell auf Schärfe prüfen (Ruhe + Walk).
-   - Screenshot pro Skalierung anfertigen.
-3. **Manuelle Overlay-Prüfung (Windows):**
-   - Taskleiste an allen vier Kanten positionieren; Biber darf nicht verdeckt werden.
-   - Klick-Through testen: Klicks auf den Biber gehen durch ans darunterliegende Fenster.
-4. **Icon-Prüfung (Windows):**
-   - `release/Beaver Buddy Setup 0.1.0.exe` ausführen; Installer-Icon prüfen.
-   - Installierte App im Startmenü/Explorer prüfen.
-   - Tray-Icon auf hellem und dunklem Taskleisten-Hintergrund prüfen.
-5. **Design-Gate:**
-   - Screenshots in `docs/design-reviews/phase-4-windows/` ablegen.
-   - `verdict.md` mit PASS/FAIL-Tabelle erstellen.
-6. **Regressions-Check (macOS, falls Hardware verfügbar):**
-   - `npm run build` und App-Start; visueller Smoke-Test für Overlay-Schärfe und Tray.
+2. **Manual HiDPI check (Windows):**
+   - Set display scaling to 100 %, 125 %, 150 %, 200 %.
+   - Start the app (`npm start`).
+   - Visually check the beaver for sharpness (idle + walk).
+   - Take one screenshot per scaling.
+3. **Manual overlay check (Windows):**
+   - Position the taskbar on all four edges; the beaver must not be covered.
+   - Test click-through: clicks on the beaver pass through to the window underneath.
+4. **Icon check (Windows):**
+   - Run `release/Beaver Buddy Setup 0.1.0.exe`; check the installer icon.
+   - Check the installed app in the Start menu/Explorer.
+   - Check the tray icon on light and dark taskbar backgrounds.
+5. **Design gate:**
+   - Store screenshots in `docs/design-reviews/phase-4-windows/`.
+   - Create `verdict.md` with a PASS/FAIL table.
+6. **Regression check (macOS, if hardware available):**
+   - `npm run build` and app start; visual smoke test for overlay sharpness and tray.
 
 ---
 
-## 8. Keine neuen Dependencies
+## 8. No New Dependencies
 
-- BL-WIN-8 verwendet ausschließlich Browser-APIs (`devicePixelRatio`, `CanvasRenderingContext2D.setTransform`).
-- BL-WIN-10 verwendet keine neuen Tools; Screenshots können mit nativem Windows-Screenshot-Tool oder Snipping Tool erstellt werden.
-- Falls für das Design-Gate spezielle Bildvergleichs-Tools gewünscht werden, sind diese **außerhalb des Repos** zu verwenden.
-
----
-
-## 9. Offene Punkte und Follow-ups
-
-- **Finales Master-Icon:** Nicht Teil von Phase 4. Design-Gate liefert ein Verdict gegen die vorläufigen Sprite-generierten Icons. Ein echtes Master-Icon ist ein separates Design-Follow-up.
-- **BL-WIN-6 (Keychain/MRR) und BL-WIN-7 (atomares Schreiben):** Bleiben zurückgestellt und werden nicht in Phase 4 berührt.
-- **Codex-Tracking auf Windows:** Bleibt zurückgestellt; README/CLAUDE-Dokumentation aktualisieren, falls sich der Status ändert.
+- BL-WIN-8 uses only browser APIs (`devicePixelRatio`, `CanvasRenderingContext2D.setTransform`).
+- BL-WIN-10 uses no new tools; screenshots can be taken with the native Windows screenshot tool or Snipping Tool.
+- If special image-comparison tools are desired for the design gate, they must be used **outside the repo**.
 
 ---
 
-## 10. Zusammenfassung der anzufassenden Dateien
+## 9. Open Points and Follow-ups
 
-| Build-Item | Datei | Art der Änderung |
+- **Final master icon:** Not part of Phase 4. The design gate delivers a verdict against the provisional sprite-generated icons. A real master icon is a separate design follow-up.
+- **BL-WIN-6 (Keychain/MRR) and BL-WIN-7 (atomic writes):** Remain deferred and are not touched in Phase 4.
+- **Codex tracking on Windows:** Remains deferred; update the README/CLAUDE documentation if the status changes.
+
+---
+
+## 10. Summary of Files to Touch
+
+| Build-Item | File | Type of change |
 |---|---|---|
-| BL-WIN-8 | `src/renderer/renderer.ts` | Canvas-DPR-Konfiguration, logische Bounds trennen |
-| BL-WIN-8 | `src/renderer/renderer.test.ts` (optional/neu) | Unit-Test für DPR-Mathematik, falls extrahiert |
-| BL-WIN-10 | `README.md` | HiDPI-Hinweis, Troubleshooting aktualisieren |
-| BL-WIN-10 | `PRD.md` | R10-Windows-Hinweis, ggf. HiDPI-Einschränkung |
-| BL-WIN-10 | `CLAUDE.md` | Definition of done um Design-Gate ergänzen, HiDPI-Hinweis |
-| BL-WIN-10 | `docs/design-reviews/phase-4-windows/verdict.md` (neu) | Design-Gate-Verdict |
-| BL-WIN-10 | `docs/design-reviews/phase-4-windows/*.png` (neu) | Screenshots |
-| Beide | `.flightplan/Archive/WINDOWS_PORT_PLAN.md` | Status von BL-WIN-8/BL-WIN-10 aktualisieren |
+| BL-WIN-8 | `src/renderer/renderer.ts` | Canvas DPR configuration, separate logical bounds |
+| BL-WIN-8 | `src/renderer/renderer.test.ts` (optional/new) | Unit test for DPR math, if extracted |
+| BL-WIN-10 | `README.md` | HiDPI note, update troubleshooting |
+| BL-WIN-10 | `PRD.md` | R10 Windows note, possibly HiDPI limitation |
+| BL-WIN-10 | `CLAUDE.md` | Extend definition of done with design gate, HiDPI note |
+| BL-WIN-10 | `docs/design-reviews/phase-4-windows/verdict.md` (new) | Design gate verdict |
+| BL-WIN-10 | `docs/design-reviews/phase-4-windows/*.png` (new) | Screenshots |
+| Both | `.flightplan/Archive/WINDOWS_PORT_PLAN.md` | Update status of BL-WIN-8/BL-WIN-10 |

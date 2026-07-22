@@ -1,54 +1,54 @@
-# Code-Verifikation #47 — Tray-Linksklick öffnet Kontextmenü (Windows)
+# Code Verification #47 — Tray left-click opens the context menu (Windows)
 
-Geprüft: ausschließlich die #47-Hunks in `src/main/tray.ts` und `src/main/tray.test.ts` (`git diff`), dagegen die gepinnte Electron-API (`node_modules/electron/electron.d.ts`, electron **43.1.0**), `src/main/main.ts`, `package.json`/`package-lock.json`. Plan: `47-tray-single-click-plan.md`, Plan-Verifikation: `47-tray-single-click-verification.md`.
+Reviewed: only the #47 hunks in `src/main/tray.ts` and `src/main/tray.test.ts` (`git diff`), against the pinned Electron API (`node_modules/electron/electron.d.ts`, electron **43.1.0**), `src/main/main.ts`, `package.json`/`package-lock.json`. Plan: `47-tray-single-click-plan.md`, plan verification: `47-tray-single-click-verification.md`.
 
-## Urteil: FREIGABE
+## Verdict: APPROVED
 
-Keine Blocker, keine Minor-Befunde mit Handlungsbedarf. Die Umsetzung entspricht exakt dem Plan (§3-Skizze wortgleich übernommen) und ist fachlich korrekt.
+No blockers, no minor findings requiring action. The implementation matches the plan exactly (the §3 sketch was adopted verbatim) and is technically correct.
 
-## Verifizierte Punkte
+## Verified points
 
-### 1. Korrektheit der Produktionsänderung (`tray.ts:96-105`)
+### 1. Correctness of the production change (`tray.ts:96-105`)
 
-- **Einmalige Registrierung:** Der `click`-Handler steht in `createTray()` direkt nach `tray.setToolTip()` (`tray.ts:94`) und **außerhalb** von `rebuildMenu()` (`tray.ts:107-115`). `createTray()` läuft exakt einmal (`main.ts:279`, einziger Aufruf) → kein Handler-Stacking möglich. ✔
-- **Gate:** `process.platform === 'win32'` (`tray.ts:103`), Laufzeit-Check wie in `loadTrayIcon()` (`tray.ts:82-85`) — gleiches Muster, gleiche Testbarkeit. ✔
-- **`popUpContextMenu()` argumentlos:** d.ts:15382 bestätigt Signatur `popUpContextMenu(menu?: Menu, position?: Point)` mit Doc „Pops up the context menu of the tray icon. When `menu` is passed, the `menu` will be shown instead…" → ohne Argument öffnet er das zuletzt per `setContextMenu()` gesetzte Menü. Closure captured nur `tray`, nie ein `Menu`-Objekt → rebuild-sicher. ✔
-- **Kommentar fachlich korrekt:** „popUpContextMenu() exists only on darwin/win32 (not Linux)" — bestätigt durch `@platform darwin,win32` (d.ts:15380). „Electron only shows a setContextMenu() menu on right-click there [Windows]" — korrekt (Rechtsklick-Default; `click` feuert unter Windows nur für Linksklick, Rechtsklick feuert `right-click` → kein Doppel-Popup mit dem Default-Menü). Keine falschen Electron-Behauptungen; die aus der Plan-Verifikation angemerkte darwin-Emissions-Behauptung (M1) wurde im Kommentar vermieden. ✔
+- **One-time registration:** the `click` handler sits in `createTray()` right after `tray.setToolTip()` (`tray.ts:94`) and **outside** `rebuildMenu()` (`tray.ts:107-115`). `createTray()` runs exactly once (`main.ts:279`, only call site) → no handler stacking possible. ✔
+- **Gate:** `process.platform === 'win32'` (`tray.ts:103`), a runtime check as in `loadTrayIcon()` (`tray.ts:82-85`) — same pattern, same testability. ✔
+- **`popUpContextMenu()` without arguments:** d.ts:15382 confirms the signature `popUpContextMenu(menu?: Menu, position?: Point)` with the doc "Pops up the context menu of the tray icon. When `menu` is passed, the `menu` will be shown instead…" → without an argument it opens the menu most recently set via `setContextMenu()`. The closure captures only `tray`, never a `Menu` object → rebuild-safe. ✔
+- **Comment technically correct:** "popUpContextMenu() exists only on darwin/win32 (not Linux)" — confirmed by `@platform darwin,win32` (d.ts:15380). "Electron only shows a setContextMenu() menu on right-click there [Windows]" — correct (right-click default; `click` fires on Windows only for left-click, right-click fires `right-click` → no double popup with the default menu). No false Electron claims; the darwin-emission claim noted in the plan verification (M1) was avoided in the comment. ✔
 
 ### 2. Tests (`tray.test.ts`)
 
-- **Echte Asserts, kein Smoke:** Listener-Anzahl (`toHaveLength(1)`), Argumentlosigkeit (`popUpContextMenuCalls` `toEqual([[]])` — leere Arg-Liste), Stacking-Test nach 2× `refresh()` (3× `setContextMenu`, weiterhin 1 Listener, Listener funktioniert danach), darwin/linux-Negativtests inkl. Menü-Bau-Kontrolle (`setContextMenuCalls` `toHaveLength(1)`). ✔
-- **Mock ehrlich:** `FakeTray` deckt alle von `createTray()` genutzten APIs ab (`on` mit Listener-Map pro Event, `popUpContextMenu` mit Arg-Protokoll, `setContextMenu`-Zähler, `setToolTip`); Instanzen statisch gesammelt, Zugriff über `FakeTray.instances` statt `handle.tray` (vermeidet Casts, wie in M4 der Plan-Verifikation empfohlen). ✔
-- **`process.platform` sauber gemockt und wiederhergestellt:** `withPlatform` (`tray.test.ts:79-87`) sichert den Original-Deskriptor und stellt ihn im `finally` wieder her — kein Leak, auch nicht bei Throw. Der Helper wurde unverändert von `loadTrayIcon`-Describe auf Modulebene gehoben (Plan §3). Funktioniert, weil `defineProperty` auf einer existierenden Property nur die angegebenen Attribute ändert (configurable bleibt erhalten). Gesamtsuite grün → kein Cross-Test-Leak nachweisbar. ✔
-- **`vi.hoisted` korrekt:** Die `vi.mock`-Factory referenziert `FakeTray` zum Mock-Auswertungszeitpunkt, der vor modulweiten `const`-Initialisierungen liegt — ohne Hoisting TDZ-Fehler. Begründung im Kommentar (`tray.test.ts:8-11`) korrekt; Testlauf bestätigt es. ✔
-- **Isoliert + Gesamtsuite stabil:** `npx vitest run src/main/tray.test.ts` → 18/18 grün; volle Suite siehe unten. ✔
+- **Real asserts, not smoke:** listener count (`toHaveLength(1)`), argument-lessness (`popUpContextMenuCalls` `toEqual([[]])` — empty arg list), stacking test after 2× `refresh()` (3× `setContextMenu`, still 1 listener, listener works afterwards), darwin/linux negative tests incl. menu-build check (`setContextMenuCalls` `toHaveLength(1)`). ✔
+- **Honest mock:** `FakeTray` covers all APIs used by `createTray()` (`on` with a listener map per event, `popUpContextMenu` with an arg log, `setContextMenu` counter, `setToolTip`); instances collected statically, accessed via `FakeTray.instances` instead of `handle.tray` (avoids casts, as recommended in M4 of the plan verification). ✔
+- **`process.platform` mocked and restored cleanly:** `withPlatform` (`tray.test.ts:79-87`) saves the original descriptor and restores it in the `finally` — no leak, not even on a throw. The helper was lifted unchanged from the `loadTrayIcon` describe to module level (plan §3). Works because `defineProperty` on an existing property only changes the given attributes (configurable is preserved). The full suite is green → no cross-test leak detectable. ✔
+- **`vi.hoisted` correct:** the `vi.mock` factory references `FakeTray` at mock evaluation time, which precedes module-wide `const` initializations — a TDZ error without hoisting. The rationale in the comment (`tray.test.ts:8-11`) is correct; the test run confirms it. ✔
+- **Isolated + full suite stable:** `npx vitest run src/main/tray.test.ts` → 18/18 green; full suite see below. ✔
 
-### 3. Nebenwirkungen
+### 3. Side effects
 
-- Bestehende Suites (`formatPetLabel`, `buildMenuTemplate` ×2, `loadTrayIcon`) inhaltlich unverändert; einzige Berührung: `withPlatform`-Verschiebung und präzisierter Mock-Erklärkommentar. ✔
-- `main.ts`: kein Eingriff nötig und im #47-Scope keiner geschehen (Handler-Registrierung komplett innerhalb `createTray()`). ✔
-- `package.json`: Diff enthält nur zwei Asset-Skript-Zeilen aus älteren Runden, **keine** #47-bezogene Änderung, keine neue Dependency. `package-lock.json`: unverändert. ✔
-- Electron bleibt gepinnt auf 43.1.0 (`package.json:27`). ✔
+- Existing suites (`formatPetLabel`, `buildMenuTemplate` ×2, `loadTrayIcon`) content-wise unchanged; the only touch: the `withPlatform` move and a more precise mock explanation comment. ✔
+- `main.ts`: no intervention needed and none happened in the #47 scope (handler registration entirely within `createTray()`). ✔
+- `package.json`: the diff contains only two asset-script lines from older rounds, **no** #47-related change, no new dependency. `package-lock.json`: unchanged. ✔
+- Electron stays pinned at 43.1.0 (`package.json:27`). ✔
 
-### 4. Ausgeführte Checks
+### 4. Executed checks
 
-- `npx vitest run` → **42 Dateien passed, 393 passed | 6 skipped (399)** — exakt die behauptete Zahl (Baseline 389 + 4 neue). ✔
-- `npx vitest run src/main/tray.test.ts` → 18/18 passed (isoliert stabil). ✔
-- `npx eslint src/main/tray.ts src/main/tray.test.ts` → sauber, keine Meldungen. ✔
+- `npx vitest run` → **42 files passed, 393 passed | 6 skipped (399)** — exactly the claimed number (baseline 389 + 4 new). ✔
+- `npx vitest run src/main/tray.test.ts` → 18/18 passed (stable in isolation). ✔
+- `npx eslint src/main/tray.ts src/main/tray.test.ts` → clean, no messages. ✔
 
-### 5. Fachliche Risikobewertung (click-Handler-Szenarien)
+### 5. Technical risk assessment (click-handler scenarios)
 
-- **Doppelklick (win32):** `double-click` feuert zusätzlich zu zwei `click`-Events → zwei `popUpContextMenu()`-Aufrufe (Menü schließt/öffnet sich erneut). Kosmetisch, vom Plan §5 bewusst ohne Code akzeptiert (KISS). **akzeptabel.**
-- **Menü offen + erneuter Linksklick:** Fokusverlust schließt das Menü, der Handler öffnet es sofort wieder (kurzes Flackern möglich). Standardverhalten von `popUpContextMenu`, kosmetisch. **akzeptabel.**
-- **Schnelles Mehrfachklicken:** Nur ein Listener registriert → keine kumulierenden Pop-ups; wiederholtes `popUpContextMenu()` ist idempotent-artig (re-popup). **akzeptabel.**
-- **Tray im Pause-Zustand:** Der Handler captured keinen Zustand und hält kein `Menu`-Objekt; Pause-Toggle läuft über Menu-Item-`click` → `onTogglePause` → `rebuildMenu()` → `setContextMenu()`. Der Linksklick-Handler zeigt danach automatisch das frische Menü (durch den Stacking-Test mit `refresh()` abgesichert). **kein Risiko.**
-- **Rechtsklick unverändert:** `click` feuert unter Windows nur für Linksklick; das `setContextMenu()`-Defaultverhalten (Rechtsklick) wird nicht angefasst. **kein Risiko.**
-- **darwin/linux:** Gate hält beide Pfade byte-identisch; auf Linux wäre `popUpContextMenu` ohne Gate nicht vorhanden (`@platform darwin,win32`) — Gate ist zwingend und korrekt gesetzt. **kein Risiko.**
+- **Double-click (win32):** `double-click` fires in addition to two `click` events → two `popUpContextMenu()` calls (menu closes/reopens). Cosmetic, deliberately accepted without code in plan §5 (KISS). **acceptable.**
+- **Menu open + another left-click:** focus loss closes the menu, the handler reopens it immediately (brief flicker possible). Standard behavior of `popUpContextMenu`, cosmetic. **acceptable.**
+- **Rapid repeated clicking:** only one listener registered → no accumulating pop-ups; repeated `popUpContextMenu()` is idempotent-like (re-popup). **acceptable.**
+- **Tray in pause state:** the handler captures no state and holds no `Menu` object; pause toggling runs via menu-item `click` → `onTogglePause` → `rebuildMenu()` → `setContextMenu()`. The left-click handler then automatically shows the fresh menu (covered by the stacking test with `refresh()`). **no risk.**
+- **Right-click unchanged:** `click` fires on Windows only for left-click; the `setContextMenu()` default behavior (right-click) is not touched. **no risk.**
+- **darwin/linux:** the gate keeps both paths byte-identical; on Linux `popUpContextMenu` without the gate would not exist (`@platform darwin,win32`) — the gate is mandatory and correctly set. **no risk.**
 
-## Befunde
+## Findings
 
-Keine (weder blocker noch minor). Die aus der Plan-Verifikation offenen Punkte M1 (darwin-Kommentar-Behauptung), M2 (Linux-Begründung im Kommentar) und M4 (statischer FakeTray-Zugriff) sind in der Umsetzung alle adressiert: der Kommentar nennt die Linux-Plattform-Einschränkung explizit und vermeidet die nicht hart belegbare darwin-Emissions-Behauptung; die Tests greifen über `FakeTray.instances` zu.
+None (neither blocker nor minor). The points left open by the plan verification — M1 (darwin comment claim), M2 (Linux rationale in the comment), and M4 (static FakeTray access) — are all addressed in the implementation: the comment names the Linux platform restriction explicitly and avoids the darwin-emission claim that is not provable from the repo alone; the tests access via `FakeTray.instances`.
 
-## Bewusste Nicht-Verifikation
+## Deliberate non-verification
 
-Natives Windows-Laufzeitverhalten (tatsächliches Menü-Popup bei Linksklick) ist per Unit-Test nicht prüfbar — die Tests verifizieren das Wiring gegen eine Fake-`Tray`-Klasse. Laut Plan §4 ist dafür eine manuelle Live-Verifikation auf Windows vorgesehen; diese liegt außerhalb dieser Code-Verifikation.
+Native Windows runtime behavior (the actual menu popup on left-click) cannot be checked by unit test — the tests verify the wiring against a fake `Tray` class. Per plan §4, a manual live verification on Windows is planned for that; it lies outside this code verification.

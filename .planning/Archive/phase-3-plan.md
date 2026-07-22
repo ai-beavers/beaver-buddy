@@ -1,42 +1,42 @@
 # Beaver Buddy — Phase 3: Windows Integrations (BL-WIN-5)
 
-**Status:** Planungsdokument — noch nicht umgesetzt.  
-**Ziel:** Claude-Code-Usage-Log-Pfade auf Windows korrekt auflösen, ohne bestehende macOS-/Linux-Verhaltensweisen zu beschädigen.  
-**Scope:** ausschließlich Build-Item **BL-WIN-5** (Claude-Usage-Log-Pfade Windows-kompatibel machen). Codex-Tracking bleibt vorerst außerhalb des Windows-Scopes.
+**Status:** Planning document — not yet implemented.  
+**Goal:** Correctly resolve Claude Code usage log paths on Windows without breaking existing macOS/Linux behavior.  
+**Scope:** exclusively build item **BL-WIN-5** (make Claude usage log paths Windows-compatible). Codex tracking remains outside the Windows scope for now.
 
 ---
 
-## 1. Zusammenfassung der Phase
+## 1. Phase Summary
 
-Phase 3 ist die kleinste Phase des Windows-Ports. Sie besteht nur aus dem Build-Item **BL-WIN-5** und fokussiert sich auf die Pfad-Auflösung für Claude-Code-Usage-Logs in `src/main/usage/paths.ts`.
+Phase 3 is the smallest phase of the Windows port. It consists only of build item **BL-WIN-5** and focuses on path resolution for Claude Code usage logs in `src/main/usage/paths.ts`.
 
-Die derzeitige Implementierung prüft zwei mögliche Claude-Code-Konfigurationsverzeichnisse:
+The current implementation checks two possible Claude Code configuration directories:
 
-1. **XDG-Pfad:** `~/.config/claude`
-2. **Legacy-Pfad:** `~/.claude`
+1. **XDG path:** `~/.config/claude`
+2. **Legacy path:** `~/.claude`
 
-Auf Windows existiert der XDG-Pfad nicht in dokumentierter Form. Der Legacy-Pfad `~/.claude` wird jedoch von Claude Code auf Windows genutzt und liegt unter `%USERPROFILE%\.claude`. Node.js löst `os.homedir()` auf Windows automatisch zu `%USERPROFILE%` auf, sodass `path.join(home, '.claude')` bereits korrekt funktioniert.
+On Windows, the XDG path does not exist in documented form. The legacy path `~/.claude` is, however, used by Claude Code on Windows and resides at `%USERPROFILE%\.claude`. Node.js automatically resolves `os.homedir()` to `%USERPROFILE%` on Windows, so `path.join(home, '.claude')` already works correctly.
 
-**Kernänderung:** Auf Windows (`process.platform === 'win32'`) wird nur noch der Legacy-Pfad `~/.claude` geprüft. Auf macOS und Linux bleibt das bisherige Verhalten (XDG + Legacy) erhalten. `CLAUDE_CONFIG_DIR` bleibt auf allen Plattformen der Override mit höchster Priorität.
+**Core change:** On Windows (`process.platform === 'win32'`), only the legacy path `~/.claude` is checked. On macOS and Linux, the previous behavior (XDG + legacy) is preserved. `CLAUDE_CONFIG_DIR` remains the highest-priority override on all platforms.
 
-Codex-Log-Pfade werden in dieser Phase auf Windows nicht aktiviert, da der offizielle Windows-Pfad der Codex-CLI noch nicht geklärt ist (siehe „Risiken“).
+Codex log paths are not enabled on Windows in this phase, since the official Windows path of the Codex CLI has not yet been clarified (see "Risks").
 
 ---
 
-## 2. Konkrete Schritte für BL-WIN-5
+## 2. Concrete Steps for BL-WIN-5
 
-### 2.1 Dateiänderungen
+### 2.1 File Changes
 
-| Datei | Art der Änderung | Begründung |
-|-------|------------------|------------|
-| `src/main/usage/paths.ts` | Funktionale Anpassung | Plattformspezifische Auswahl der Claude-Code-Config-Verzeichnisse. |
-| `src/main/usage/paths.test.ts` | Testanpassung + Ergänzung | Plattformneutrale Tests beibehalten, plattformspezifische Tests für Windows und Unix hinzufügen. |
+| File | Type of change | Rationale |
+|------|----------------|-----------|
+| `src/main/usage/paths.ts` | Functional adjustment | Platform-specific selection of the Claude Code config directories. |
+| `src/main/usage/paths.test.ts` | Test adjustment + addition | Keep platform-neutral tests, add platform-specific tests for Windows and Unix. |
 
-### 2.2 Geplante Code-Änderung in `src/main/usage/paths.ts`
+### 2.2 Planned Code Change in `src/main/usage/paths.ts`
 
-Die Funktion `claudeConfigDirs(env, home)` soll um eine Plattformunterscheidung erweitert werden.
+The function `claudeConfigDirs(env, home)` is to be extended with a platform distinction.
 
-#### Variante A: `process.platform` direkt verwenden (einfach, aber schwerer testbar)
+#### Variant A: Use `process.platform` directly (simple, but harder to test)
 
 ```ts
 import os from 'node:os';
@@ -61,9 +61,9 @@ function claudeConfigDirs(env: PathEnv, home: string): string[] {
 }
 ```
 
-#### Variante B: Plattform als Parameter injizieren (bevorzugt, testbar)
+#### Variant B: Inject the platform as a parameter (preferred, testable)
 
-Da `paths.ts` bereits `env` und `home` als Parameter akzeptiert, um Tests unabhängig vom echten System zu machen, sollte auch die Plattform injizierbar sein.
+Since `paths.ts` already accepts `env` and `home` as parameters to make tests independent of the real system, the platform should also be injectable.
 
 ```ts
 export interface PathEnv {
@@ -102,15 +102,15 @@ export function discoverPaths(
 }
 ```
 
-**Empfehlung:** Variante B verwenden, da sie konsistent mit der bestehenden Teststrategie ist (kein `process.platform`-Mock nötig) und keine zusätzlichen Dependencies erfordert.
+**Recommendation:** Use Variant B, since it is consistent with the existing test strategy (no `process.platform` mock needed) and requires no additional dependencies.
 
-### 2.3 Geplante Teständerungen in `src/main/usage/paths.test.ts`
+### 2.3 Planned Test Changes in `src/main/usage/paths.test.ts`
 
-#### a) Bestehende Tests anpassen
+#### a) Adjust existing tests
 
-Der Test „prefers XDG (~/.config/claude) and legacy (~/.claude) together when both exist“ muss explizit auf Nicht-Windows-Plattformen laufen oder für Windows umformuliert werden.
+The test "prefers XDG (~/.config/claude) and legacy (~/.claude) together when both exist" must explicitly run on non-Windows platforms or be reformulated for Windows.
 
-**Option 1:** Test erhält einen dritten Parameter `platform` und wird nur für `darwin`/`linux` ausgeführt.
+**Option 1:** The test receives a third parameter `platform` and runs only for `darwin`/`linux`.
 
 ```ts
 it('prefers XDG and legacy together when both exist on non-Windows', () => {
@@ -122,11 +122,11 @@ it('prefers XDG and legacy together when both exist on non-Windows', () => {
 });
 ```
 
-**Option 2:** Test bleibt plattformneutral, indem er nur `legacy` prüft, wenn `xdg` nicht existiert. Dies ist weniger präzise, aber einfacher.
+**Option 2:** The test stays platform-neutral by only checking `legacy` when `xdg` does not exist. This is less precise but simpler.
 
-**Empfehlung:** Option 1 wählen, da sie das tatsächliche Verhalten dokumentiert.
+**Recommendation:** Choose Option 1, since it documents the actual behavior.
 
-#### b) Neue plattformspezifische Tests hinzufügen
+#### b) Add new platform-specific tests
 
 ```ts
 describe('discoverPaths — Claude on Windows', () => {
@@ -156,139 +156,139 @@ describe('discoverPaths — Claude on Windows', () => {
 });
 ```
 
-#### c) Plattformneutrale Tests beibehalten
+#### c) Keep platform-neutral tests
 
-Folgende Tests funktionieren unverändert auf allen Plattformen, wenn `discoverPaths` einen `platform`-Parameter erhält:
+The following tests work unchanged on all platforms once `discoverPaths` receives a `platform` parameter:
 
-- „finds top-level session files and subagent files, ignores non-jsonl entries“ → muss lediglich `platform` übergeben.
-- „honors a comma-separated CLAUDE_CONFIG_DIR override“ → funktioniert unabhängig von der Plattform.
-- „returns an empty array when nothing exists“ → funktioniert unabhängig von der Plattform.
+- "finds top-level session files and subagent files, ignores non-jsonl entries" → only needs `platform` passed.
+- "honors a comma-separated CLAUDE_CONFIG_DIR override" → works independently of the platform.
+- "returns an empty array when nothing exists" → works independently of the platform.
 
-Alle Codex-Tests bleiben unverändert, da Codex in dieser Phase nicht auf Windows aktiviert wird.
+All Codex tests remain unchanged, since Codex is not enabled on Windows in this phase.
 
-### 2.4 Keine Änderungen an `tracker.ts`
+### 2.4 No Changes to `tracker.ts`
 
-`src/main/usage/tracker.ts` verwendet `discoverPaths()` als black box. Solange die Signatur von `discoverPaths` rückwärtskompatibel bleibt (z. B. durch einen optionalen `platform`-Parameter mit Default `process.platform`), ist keine Änderung nötig.
+`src/main/usage/tracker.ts` uses `discoverPaths()` as a black box. As long as the signature of `discoverPaths` remains backward-compatible (e.g. via an optional `platform` parameter with default `process.platform`), no change is needed.
 
-### 2.5 Erwartete Ergebnisse
+### 2.5 Expected Results
 
-- Auf Windows findet `discoverPaths()` Claude-Code-Logs nur unter `%USERPROFILE%\.claude`.
-- Auf Windows wird `~/.config/claude` ignoriert.
-- Auf macOS und Linux bleibt das bestehende Verhalten erhalten.
-- `CLAUDE_CONFIG_DIR` funktioniert auf allen Plattformen als Override.
-- Alle bestehenden Tests bleiben grün.
-- Neue Tests decken das Windows-Verhalten explizit ab.
-
----
-
-## 3. Abhängigkeiten zu Phase 1 und Phase 2
-
-| Phase | Build-Items | Relevanz für BL-WIN-5 |
-|-------|-------------|-----------------------|
-| **Phase 1: Foundation** | BL-WIN-1, BL-WIN-2, BL-WIN-9 | Voraussetzung, damit der Code überhaupt auf Windows gebaut und getestet werden kann (plattformunabhängige Build-Scripts, Windows-CI-Runner). Ohne Phase 1 kann BL-WIN-5 nicht verifiziert werden. |
-| **Phase 2: Core Windows Experience** | BL-WIN-3, BL-WIN-4 | Nicht direkt blockierend für BL-WIN-5, aber Teil des gleichen Windows-Port-Themas. Stellt sicher, dass die App auf Windows läuft und somit der Usage-Tracker in der realen Windows-Umgebung getestet werden kann. |
-
-**Abhängigkeiten zu anderen Modulen:**
-
-- `src/main/usage/tracker.ts`: Keine direkte Abhängigkeit, da `discoverPaths` rückwärtskompatibel bleibt.
-- `src/main/usage/config.ts`: Nicht betroffen.
-- `src/main/usage/claude-parser.ts`, `codex-parser.ts`, `totals.ts`: Nicht betroffen.
+- On Windows, `discoverPaths()` finds Claude Code logs only under `%USERPROFILE%\.claude`.
+- On Windows, `~/.config/claude` is ignored.
+- On macOS and Linux, the existing behavior is preserved.
+- `CLAUDE_CONFIG_DIR` works as an override on all platforms.
+- All existing tests stay green.
+- New tests explicitly cover the Windows behavior.
 
 ---
 
-## 4. Akzeptanzkriterien für die gesamte Phase
+## 3. Dependencies on Phase 1 and Phase 2
 
-1. `discoverPaths()` löst auf Windows (`win32`) Claude-Code-Logs ausschließlich aus `%USERPROFILE%\.claude` auf.
-2. `discoverPaths()` prüft auf Windows nicht mehr den XDG-Pfad `~/.config/claude`.
-3. Auf macOS (`darwin`) und Linux (`linux`) bleibt die bisherige Logik mit XDG + Legacy erhalten.
-4. `CLAUDE_CONFIG_DIR` hat auf allen Plattformen weiterhin höchste Priorität und funktioniert komma-separiert.
-5. `src/main/usage/paths.test.ts` enthält:
-   - Plattformneutrale Tests für allgemeine Logik (Dateifindung, Override, leere Ergebnisse).
-   - Plattformspezifische Tests für Windows (`win32`), die belegen, dass XDG ignoriert wird.
-   - Plattformspezifische Tests für Nicht-Windows-Plattformen (`darwin`/`linux`), die belegen, dass XDG weiterhin verwendet wird.
-6. `npm run typecheck`, `npm run lint`, `npm run test` und `npm run build` sind lokal und in der CI auf Windows und Nicht-Windows-Plattformen grün.
-7. Keine neuen Dependencies werden eingeführt.
-8. Keine Änderungen an `tracker.ts`, Parsern oder Aggregationslogik sind nötig.
-9. Codex-Tracking wird auf Windows in dieser Phase nicht aktiviert oder dokumentiert als unterstützt.
+| Phase | Build items | Relevance for BL-WIN-5 |
+|-------|-------------|------------------------|
+| **Phase 1: Foundation** | BL-WIN-1, BL-WIN-2, BL-WIN-9 | Prerequisite for the code to be built and tested on Windows at all (platform-independent build scripts, Windows CI runner). Without Phase 1, BL-WIN-5 cannot be verified. |
+| **Phase 2: Core Windows Experience** | BL-WIN-3, BL-WIN-4 | Not directly blocking for BL-WIN-5, but part of the same Windows port theme. Ensures the app runs on Windows so the usage tracker can be tested in the real Windows environment. |
+
+**Dependencies on other modules:**
+
+- `src/main/usage/tracker.ts`: No direct dependency, since `discoverPaths` remains backward-compatible.
+- `src/main/usage/config.ts`: Not affected.
+- `src/main/usage/claude-parser.ts`, `codex-parser.ts`, `totals.ts`: Not affected.
 
 ---
 
-## 5. Risiken und wie sie gemindert werden
+## 4. Acceptance Criteria for the Entire Phase
 
-| Risiko | Auswirkung | Wahrscheinlichkeit | Mitigation |
-|--------|------------|-------------------|------------|
-| **Falsche Annahme über den Windows-Claude-Code-Pfad.** Falls Claude Code unter Windows doch `%LOCALAPPDATA%\Claude` oder einen anderen Pfad verwendet, findet der Tracker keine Logs. | Hoch | Mittel | Dokumentierte Entscheidung aus dem Hauptplan beibehalten: Legacy-Pfad `~/.claude` bleibt primär. Falls neue Erkenntnisse auftauchen, wird ein Follow-up-Build-Item erstellt. |
-| **Tests sind auf der aktuellen CI-Plattform nicht aussagekräftig.** CI läuft auf `ubuntu-latest` und `windows-latest`. Windows-Tests würden `process.platform === 'win32'` automatisch treffen; Unix-Tests nutzen den injizierten Parameter. | Mittel | Niedrig | Injektion des `platform`-Parameters in `discoverPaths` ermöglicht explizite Tests für `win32`, `darwin` und `linux` unabhängig von der realen CI-Plattform. |
-| **Rückwärtskompatibilität von `discoverPaths` wird gebrochen.** Falls ein externer Aufrufer `discoverPaths()` ohne `platform`-Parameter aufruft und der Default nicht `process.platform` ist, verhält sich die App falsch. | Hoch | Niedrig | `platform` als optionaler Parameter mit Default `process.platform` implementieren. Keine externen Aufrufer außerhalb von `tracker.ts` bekannt. |
-| **Codex-Tracking wird versehentlich auf Windows aktiviert.** | Niedrig | Niedrig | Keine Code-Änderungen an Codex-Pfaden vornehmen. Im Plan und in der Doku explizit dokumentieren, dass Codex auf Windows nicht unterstützt wird. |
-| **Unterschiedliche Pfad-Trenner auf Windows führen zu Test-Fehlvergleichen.** | Niedrig | Niedrig | `path.join` verwenden, keine hartcodierten Slashes in Tests oder Produktivcode. |
+1. On Windows (`win32`), `discoverPaths()` resolves Claude Code logs exclusively from `%USERPROFILE%\.claude`.
+2. On Windows, `discoverPaths()` no longer checks the XDG path `~/.config/claude`.
+3. On macOS (`darwin`) and Linux (`linux`), the previous logic with XDG + legacy is preserved.
+4. `CLAUDE_CONFIG_DIR` retains the highest priority on all platforms and works comma-separated.
+5. `src/main/usage/paths.test.ts` contains:
+   - Platform-neutral tests for general logic (file discovery, override, empty results).
+   - Platform-specific tests for Windows (`win32`) proving that XDG is ignored.
+   - Platform-specific tests for non-Windows platforms (`darwin`/`linux`) proving that XDG is still used.
+6. `npm run typecheck`, `npm run lint`, `npm run test`, and `npm run build` are green locally and in CI on Windows and non-Windows platforms.
+7. No new dependencies are introduced.
+8. No changes to `tracker.ts`, parsers, or aggregation logic are needed.
+9. Codex tracking is not enabled on Windows in this phase or documented as supported.
 
 ---
 
-## 6. Test- und Verifikationsschritte
+## 5. Risks and How They Are Mitigated
 
-### 6.1 Lokale Verifikation
+| Risk | Impact | Likelihood | Mitigation |
+|------|--------|------------|------------|
+| **Wrong assumption about the Windows Claude Code path.** If Claude Code on Windows actually uses `%LOCALAPPDATA%\Claude` or another path, the tracker finds no logs. | High | Medium | Keep the documented decision from the master plan: the legacy path `~/.claude` remains primary. If new findings emerge, a follow-up build item will be created. |
+| **Tests are not meaningful on the current CI platform.** CI runs on `ubuntu-latest` and `windows-latest`. Windows tests would automatically hit `process.platform === 'win32'`; Unix tests use the injected parameter. | Medium | Low | Injecting the `platform` parameter into `discoverPaths` enables explicit tests for `win32`, `darwin`, and `linux` independent of the actual CI platform. |
+| **Backward compatibility of `discoverPaths` is broken.** If an external caller invokes `discoverPaths()` without a `platform` parameter and the default is not `process.platform`, the app behaves incorrectly. | High | Low | Implement `platform` as an optional parameter with default `process.platform`. No external callers outside `tracker.ts` are known. |
+| **Codex tracking is accidentally enabled on Windows.** | Low | Low | Make no code changes to Codex paths. Explicitly document in the plan and docs that Codex is not supported on Windows. |
+| **Different path separators on Windows cause test comparison failures.** | Low | Low | Use `path.join`; no hardcoded slashes in tests or production code. |
+
+---
+
+## 6. Test and Verification Steps
+
+### 6.1 Local Verification
 
 ```bash
-# TypeScript-Prüfung
+# TypeScript check
 npm run typecheck
 
 # Linter
 npm run lint
 
-# Unit-Tests (alle Plattformen)
+# Unit tests (all platforms)
 npm test
 
 # Build
 npm run build
 ```
 
-### 6.2 Manuelle Verifikation auf Windows
+### 6.2 Manual Verification on Windows
 
-1. Auf einem Windows-Rechner mit installiertem Claude Code prüfen, ob `%USERPROFILE%\.claude\projects\*` existiert.
-2. Beaver Buddy starten.
-3. Sicherstellen, dass der Token-Burn-Tracker Daten ausgibt.
-4. Sicherstellen, dass kein Fehler auftritt, wenn `%USERPROFILE%\.config\claude` nicht existiert.
+1. On a Windows machine with Claude Code installed, check whether `%USERPROFILE%\.claude\projects\*` exists.
+2. Start Beaver Buddy.
+3. Ensure the token burn tracker outputs data.
+4. Ensure no error occurs when `%USERPROFILE%\.config\claude` does not exist.
 
-### 6.3 CI-Verifikation
+### 6.3 CI Verification
 
-- GitHub Actions Matrix (`ubuntu-latest`, `windows-latest`) muss für `npm run test` grün sein.
-- Windows-Runner deckt automatisch das Verhalten bei `process.platform === 'win32'` ab.
-- Injizierte Plattform-Parameter in Tests ermöglichen es, Windows-Verhalten auch auf Linux-CI-Knoten explizit zu testen.
+- The GitHub Actions matrix (`ubuntu-latest`, `windows-latest`) must be green for `npm run test`.
+- The Windows runner automatically covers the behavior at `process.platform === 'win32'`.
+- Injected platform parameters in tests make it possible to test Windows behavior explicitly on Linux CI nodes as well.
 
-### 6.4 Test-Coverage-Ziele
+### 6.4 Test Coverage Goals
 
-- `claudeConfigDirs` wird für `win32`, `darwin` und `linux` getestet.
-- Override `CLAUDE_CONFIG_DIR` wird für mindestens zwei Plattformen getestet.
-- Edge-Cases abgedeckt:
-  - Nur XDG existiert auf Windows → leeres Ergebnis.
-  - Weder XDG noch Legacy existieren → leeres Ergebnis.
-  - Beide Verzeichnisse existieren auf Nicht-Windows → beide werden gefunden.
-
----
-
-## 7. Nicht-Ziele dieser Phase
-
-- Keine Unterstützung für Codex-Logs auf Windows.
-- Keine neuen Features im Usage-Tracking (z. B. neue Parser, neue Metriken).
-- Keine Änderungen am Secret-Store (BL-WIN-6), Overlay (BL-WIN-3) oder Tray (BL-WIN-4).
-- Keine neuen Dependencies.
-- Keine Änderungen an der Build- oder Packaging-Infrastruktur.
+- `claudeConfigDirs` is tested for `win32`, `darwin`, and `linux`.
+- The `CLAUDE_CONFIG_DIR` override is tested for at least two platforms.
+- Edge cases covered:
+  - Only XDG exists on Windows → empty result.
+  - Neither XDG nor legacy exists → empty result.
+  - Both directories exist on non-Windows → both are found.
 
 ---
 
-## 8. Nächste Schritte nach Phase 3
+## 7. Non-Goals of This Phase
 
-1. **Phase 4: Polish & Release-Readiness** (BL-WIN-8, BL-WIN-10) umsetzen.
-2. **Codex-Tracking auf Windows** recherchieren und ggf. als separates Build-Item planen.
-3. **BL-WIN-6 (Keychain/Secret-Store)** mit dem Projekt-Administrator abstimmen.
-4. **BL-WIN-7 (Atomares Schreiben)** recherchieren.
+- No support for Codex logs on Windows.
+- No new features in usage tracking (e.g. new parsers, new metrics).
+- No changes to the secret store (BL-WIN-6), overlay (BL-WIN-3), or tray (BL-WIN-4).
+- No new dependencies.
+- No changes to the build or packaging infrastructure.
 
 ---
 
-## 9. Änderungsübersicht
+## 8. Next Steps After Phase 3
 
-| Datei | Änderung |
-|-------|----------|
-| `src/main/usage/paths.ts` | `claudeConfigDirs` erhält Plattform-Parameter; auf `win32` wird nur `~/.claude` geprüft. |
-| `src/main/usage/paths.test.ts` | Plattformspezifische Tests für Windows und Nicht-Windows hinzugefügt; bestehende Tests bleiben plattformneutral. |
+1. Implement **Phase 4: Polish & Release Readiness** (BL-WIN-8, BL-WIN-10).
+2. Research **Codex tracking on Windows** and, if needed, plan it as a separate build item.
+3. Coordinate **BL-WIN-6 (Keychain/secret store)** with the project administrator.
+4. Research **BL-WIN-7 (atomic writes)**.
+
+---
+
+## 9. Change Overview
+
+| File | Change |
+|------|--------|
+| `src/main/usage/paths.ts` | `claudeConfigDirs` receives a platform parameter; on `win32` only `~/.claude` is checked. |
+| `src/main/usage/paths.test.ts` | Platform-specific tests added for Windows and non-Windows; existing tests remain platform-neutral. |
