@@ -151,3 +151,31 @@ describe('UsageTracker', () => {
     expect(refreshSpy).toHaveBeenCalledTimes(4); // stopped — no further ticks
   });
 });
+
+describe('UsageTracker — additional coding harnesses', () => {
+  it('parses Kimi, Pi, and OpenCode only after explicit opt-in', () => {
+    const timestamp = '2026-07-22T12:00:00.000Z';
+    const kimi = path.join(home, '.kimi', 'sessions', 'group-a', 'session-a', 'wire.jsonl');
+    const pi = path.join(home, '.pi', 'agent', 'sessions', 'session-a', 'usage.jsonl');
+    const opencode = path.join(home, '.local', 'share', 'opencode', 'session', 'session-a', 'message.json');
+    fs.mkdirSync(path.dirname(kimi), { recursive: true });
+    fs.mkdirSync(path.dirname(pi), { recursive: true });
+    fs.mkdirSync(path.dirname(opencode), { recursive: true });
+    fs.writeFileSync(kimi, `${JSON.stringify({ timestamp, token_usage: { input_other: 10, output: 5 } })}\n`);
+    fs.writeFileSync(pi, `${JSON.stringify({ timestamp, usage: { inputTokens: 20, outputTokens: 6 } })}\n`);
+    fs.writeFileSync(opencode, JSON.stringify({ timestamp, usage: { inputTokens: 30, outputTokens: 7 } }, null, 2));
+
+    const tracker = new UsageTracker({}, home);
+    tracker.refresh();
+    expect(tracker.getTotals().lifetime.totalTokens).toBe(0);
+    expect(tracker.getSourcesSnapshot().kimi?.logsFound).toBe(true);
+    expect(tracker.getSourcesSnapshot().pi?.logsFound).toBe(true);
+    expect(tracker.getSourcesSnapshot().opencode?.logsFound).toBe(true);
+
+    tracker.setEnabledSources({ pi: true, kimi: true, opencode: true });
+    expect(tracker.getTotals().lifetime.totalTokens).toBe(78);
+    expect(tracker.getSourcesSnapshot().kimi?.lifetimeTokens).toBe(15);
+    expect(tracker.getSourcesSnapshot().pi?.lifetimeTokens).toBe(26);
+    expect(tracker.getSourcesSnapshot().opencode?.lifetimeTokens).toBe(37);
+  });
+});

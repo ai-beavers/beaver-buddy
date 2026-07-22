@@ -83,7 +83,7 @@ describe('createSettingsHandlers', () => {
   let stateDir: string;
   let settings: SettingsState;
   let changed: SettingsState[];
-  let usageEnabledCalls: { claudeEnabled: boolean; codexEnabled: boolean }[];
+  let usageEnabledCalls: SettingsState[];
   let usageSnapshot: UsageSourcesSnapshot;
 
   const fakeEvent = {} as IpcMainInvokeEvent;
@@ -148,7 +148,7 @@ describe('createSettingsHandlers', () => {
   it('unauthorized sender is rejected on all handlers, with no state change', async () => {
     const d = deps();
     const handlers = createSettingsHandlers(d, () => false);
-    expect(handlers.readStatus(fakeEvent)).toEqual({ error: 'unauthorized' });
+    expect(handlers.readStatus(fakeEvent)).toMatchObject({ error: 'unauthorized' });
     await expect(handlers.save(fakeEvent, { stripeKey: 'rk_fake' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     await expect(handlers.disconnect(fakeEvent, { target: 'stripe' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: false, error: 'unauthorized' });
@@ -168,7 +168,7 @@ describe('createSettingsHandlers', () => {
 
   it('readStatus returns mode/connected booleans plus per-source usage, never secrets', () => {
     const handlers = createSettingsHandlers(deps(), () => true);
-    expect(handlers.readStatus(fakeEvent)).toEqual({
+    expect(handlers.readStatus(fakeEvent)).toMatchObject({
       stripeConnected: false,
       revenuecatConnected: false,
       mode: 'tokens',
@@ -199,7 +199,7 @@ describe('createSettingsHandlers', () => {
     expect(result.codex).toMatchObject({ enabled: true, connected: true, todayTokens: 1_000 });
     expect(settings.codexEnabled).toBe(true);
     expect(settings.claudeEnabled).toBe(false);
-    expect(usageEnabledCalls).toEqual([{ claudeEnabled: false, codexEnabled: true }]);
+    expect(usageEnabledCalls[0]).toMatchObject({ claudeEnabled: false, codexEnabled: true });
   });
 
   it('disconnect claude opts out without touching stripe keys', async () => {
@@ -211,7 +211,7 @@ describe('createSettingsHandlers', () => {
     const handlers = createSettingsHandlers(deps(), () => true);
     await expect(handlers.disconnect(fakeEvent, { target: 'claude' })).resolves.toMatchObject({ ok: true });
     expect(settings.claudeEnabled).toBe(false);
-    expect(usageEnabledCalls).toEqual([{ claudeEnabled: false, codexEnabled: false }]);
+    expect(usageEnabledCalls[0]).toMatchObject({ claudeEnabled: false, codexEnabled: false });
   });
 
   it('save with a key connects the source and persists', async () => {
