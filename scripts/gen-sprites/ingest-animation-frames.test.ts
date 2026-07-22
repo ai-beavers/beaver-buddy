@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, BABY, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_WATERING, BABY, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -13,6 +13,7 @@ const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
 const hasBabyComfyui = fs.existsSync(new URL(`../../assets-src/comfyui/${BABY.animations[0].run}`, import.meta.url));
 const hasAdultComfyui = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT.animations[0].run}`, import.meta.url));
 const hasSourceBeaver = fs.existsSync(new URL('../../assets-src/beaver', import.meta.url));
+const hasWateringSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WATERING.run}/sheet.png`, import.meta.url));
 
 function extractTile(sheet: { width: number; height: number; data: Uint8ClampedArray }, col: number, row: number, tile: number): Uint8ClampedArray {
   const out = new Uint8ClampedArray(tile * tile * 4);
@@ -104,8 +105,9 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
       rows: readonly { name: string; frames: number; height?: number }[];
     };
-    // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; the
-    // trailing `type` row is appended by ingest-typing.mjs (see ingest-typing).
+    // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
+    // is appended by ingest-typing.mjs (see ingest-typing); `watering` is
+    // appended by buildAdultWateringSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -113,19 +115,21 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'parachute-wind', frames: 8, height: 128 },
       { name: 'land', frames: 8 },
       { name: 'type', frames: 8 },
+      { name: 'watering', frames: 8 },
     ]);
   });
 
   // Golden rows: 96*4 + 128(parachute-wind) = 512; ingest-typing appends a
-  // 96px `type` row → 608. Width stays a flat 8-col grid at the 96px tile —
-  // only row height varies, never column width.
-  it('is a 768x608 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96)', () => {
+  // 96px `type` row → 608; buildAdultWateringSheet appends a 96px `watering`
+  // row → 704. Width stays a flat 8-col grid at the 96px tile — only row
+  // height varies, never column width.
+  it('is a 768x704 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(608);
+    expect(decoded.height).toBe(704);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(608);
+    expect(meta.sheetHeight).toBe(704);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -162,16 +166,18 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
     expect(a.meta).toEqual(b.meta);
   }, 15_000);
 
-  // The committed sheet is the golden build (this) with a `type` row appended
-  // by ingest-typing.mjs, so the golden block must match byte-for-byte at the
+  // The committed sheet is the golden build (this) with a `type` row (by
+  // ingest-typing.mjs) and a `watering` row (by buildAdultWateringSheet)
+  // appended after it, so the golden block must match byte-for-byte at the
   // top of the committed sheet and its rows must be the committed sheet's
-  // leading rows. The appended type row itself is covered by ingest-typing.test.
+  // leading rows. The appended rows themselves are covered by
+  // ingest-typing.test and the watering block below.
   it('committed adult sheet (golden block) matches the build output byte-for-byte and matches its JSON', () => {
     const { png, meta } = buildStageSheet(repoRoot, ADULT);
     const golden = decodePng(png);
     const committed = decodePng(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)));
     const committedMeta = JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8')) as {
-      rows: readonly unknown[];
+      rows: readonly { name: string; frames: number }[];
     };
 
     // Golden block is the top of the committed sheet (same width).
@@ -184,7 +190,8 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
     );
     expect(committedBlock.equals(goldenBytes)).toBe(true);
     expect(committedMeta.rows.slice(0, meta.rows.length)).toEqual(meta.rows);
-    expect(committedMeta.rows[committedMeta.rows.length - 1]).toMatchObject({ name: 'type', frames: 8 });
+    expect(committedMeta.rows.find((row) => row.name === 'type')).toMatchObject({ name: 'type', frames: 8 });
+    expect(committedMeta.rows[committedMeta.rows.length - 1]).toMatchObject({ name: 'watering', frames: 8 });
   }, 15_000);
 });
 
@@ -223,4 +230,66 @@ describe.skipIf(!hasSourceBeaver || !hasBabyComfyui)('ingest-animation-frames id
     const oldWalk1 = extractTile(oldSheet, 1, 1, 96);
     expect(Buffer.from(newWalk1).equals(Buffer.from(oldWalk1))).toBe(true);
   }, 15_000);
+});
+
+// Watering row: committed-sheet assertions run on every checkout; the
+// byte-for-byte regeneration check needs the gitignored raw grid dump and
+// skips gracefully without it (same convention as the other pipeline
+// blocks above and ingest-typing.test.ts).
+describe('ingest-animation-frames watering row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('is the last row, 8 frames, 96px tall (no over-tile pose)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const last = meta.rows[meta.rows.length - 1];
+    expect(last).toEqual({ name: 'watering', frames: 8 });
+  });
+
+  it('every watering frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = meta.rows.slice(0, meta.rows.length - 1).reduce((sum, row) => sum + (row.height ?? meta.tile), 0);
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at watering[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `watering[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `watering[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasWateringSource)('ingest-animation-frames watering regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultWateringSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultWateringSheet(repoRoot).png.equals(buildAdultWateringSheet(repoRoot).png)).toBe(true);
+  });
 });

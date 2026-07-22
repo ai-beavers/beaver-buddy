@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 608,
+  "sheetHeight": 704,
   "rows": [
     {
       "name": "idle",
@@ -27,6 +27,10 @@
     },
     {
       "name": "type",
+      "frames": 8
+    },
+    {
+      "name": "watering",
       "frames": 8
     }
   ]

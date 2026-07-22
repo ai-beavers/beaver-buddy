@@ -41,6 +41,8 @@ export const STAGE_SPECS: readonly StageSpec[];
 
 export function decodePng(buf: Buffer): DecodedImage;
 export function removeBackground(img: DecodedImage): DecodedImage;
+export function chromaKeyGreen(img: DecodedImage): DecodedImage;
+export function extractGridCell(img: DecodedImage, col: number, row: number, gridCols: number, gridRows: number): DecodedImage;
 export function cropToBbox(img: DecodedImage): DecodedImage;
 export function resizeAreaAverage(img: DecodedImage, destW: number, destH: number): DecodedImage;
 export function placeOnTile(img: DecodedImage, tileW: number, tileH?: number): DecodedImage;
@@ -50,3 +52,18 @@ export function computeStageScale(
   targetContentHeightPx: number,
 ): number;
 export function ingestStage(stageSpec: StageSpec, srcDir: string): IngestResult;
+
+export interface SplicedSheet {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+  readonly meta: SheetMeta;
+}
+
+export function spliceRow(
+  sheet: DecodedImage,
+  meta: SheetMeta,
+  rowName: string,
+  tiles: readonly DecodedImage[],
+  tileHeight?: number,
+): SplicedSheet;
