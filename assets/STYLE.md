@@ -92,8 +92,9 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
 - **Beaver stages**: `idle(1), walk(N)` for teen; baby/adult additionally
   carry `struggle(8), parachute-wind(8), land(8)` for the parachute-drop
   sequence (BL-17/BL-18). Adult also carries `type(8)` — the "sit and type on a
-  laptop" loop for `roam.ts`'s `working` state — and `watering(8)`/`drink(8)`/
-  `sleep(8)` loops. `beaver-baby.png`/`beaver-teen.png`/`beaver-adult.png`:
+  laptop" loop for `roam.ts`'s `working` state — `watering(8)`/`drink(8)`/
+  `sleep(8)` loops, and `stretch(8)` — a ONE-SHOT wake-up transition (not a
+  loop), matching `land`. `beaver-baby.png`/`beaver-teen.png`/`beaver-adult.png`:
   walk×2. fps hint: 8. The idle pose never appears in a walk row — walk cycles
   are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
@@ -123,7 +124,11 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   settle/lie-down transition frame — is appended on top of that by
   `scripts/gen-sprites/ingest-animation-frames.mjs adult-sleep` (`npm run
   assets:adult-sleep`, BL-4) via the same `buildAdultRowSheet` helper,
-  growing the sheet to 768×896; see Provenance.
+  growing the sheet to 768×896; see Provenance. `stretch(8)` — a ONE-SHOT
+  wake-up/stretch transition, not a loop — is appended on top of that by
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-stretch` (`npm run
+  assets:adult-stretch`, BL-5) via the same `buildAdultRowSheet` helper,
+  growing the sheet to 768×992; see Provenance.
 - **Tree growth stages** (`tree-stage-1.png`/`tree-stage-2.png`/`tree-stage-3.png`,
   BL-1/T1): one row each, `sway(12)`, baked at fps 8 by the puppet studio
   (`tools/puppet-studio/`) — 96×96 tile, sheet 1152×96. Not a multi-row sheet
@@ -222,6 +227,41 @@ BL-4): a committed, post-ingest 96×96 copy of the sleep row's frame index 7
 wake-up/stretch generation conditions on the sleeping beaver's pose, not on
 transient particle art), verified pixel-identical to that frame in the
 committed sheet by a dedicated test (`ingest-animation-frames.test.ts`).
+
+`stretch(8)` (BL-5, 2026-07-22): a 4×2 grid (8 frames) of a ONE-SHOT wake-up
+sequence — matching `land`, not a loop, since waking up is a transition by
+nature: curled-up sleep (frame 1, continuous with the committed sleep pose)
+→ eyes opening → sitting up rubbing an eye → standing up → both arms thrown
+straight up overhead in a big stretch with a wide yawn → arms lowered back
+down to a calm neutral standing pose (frame 8, continuous with the idle
+stance). Generated via Comfy Cloud Nano Banana 2 (`GeminiNanoBanana2`,
+`vertexai/nano-banana-2` family — a distinct node from the `GeminiImage2Node`
+used elsewhere in this doc), DUAL reference-conditioned (BL-5's own new
+requirement, not a single reference like watering/drink/sleep): the committed
+adult idle tile AND the committed
+`assets-src/reference/adult-sleep-pose.png` sleep-pose tile, batched into one
+`images` input via a `Batch Images` node so the model sees both the character
+design and the exact pose to wake from, on a green (`#00FF00`) chroma-key
+background. **Scale-trap check** (BL-19 parachute-wind precedent considered but not
+needed here): the row's tallest raw cropped content turned out to be the
+standing frames' own tail-to-ear span (~762px pre-scale at generation
+resolution), shared evenly by the arms-up AND arms-down standing frames — the
+raised arms never reach above ear height in this generation, so there's no
+single taller arms-up silhouette forcing a smaller shared scale. Measured
+empirically before promoting: at
+`targetContentHeightPx: 96` (default 96px `rowHeight`, no override), the
+standing frames land at exactly the committed idle tile's own content height
+(96px, full-tile edge-to-edge — the idle sprite has zero vertical padding),
+and frame 1's scaled size (86×68) closely matches the committed sleep-pose
+reference tile (82×67). Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-stretch` (`npm run
+assets:adult-stretch`) via `buildAdultRowSheet` — same byte-preserving append
+pattern as watering/drink/sleep — growing the sheet to 768×992. Continuity
+gates (frame 1 vs. the committed sleep-pose tile, frame 8 vs. the committed
+idle tile) were checked as post-ingest 96×96 side-by-side diffs on a magenta
+backdrop, eyeballed rather than pixel-diffed (frame 1 is newly generated art
+conditioned on the sleep pose, not a byte copy of it) — both read as a clean
+continuous match. No human cleanup beyond the mechanical pipeline.
 
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three

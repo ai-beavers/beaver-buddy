@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_DRINK, ADULT_SLEEP, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultSleepSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_DRINK, ADULT_SLEEP, ADULT_STRETCH, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultSleepSheet, buildAdultStretchSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -16,6 +16,7 @@ const hasSourceBeaver = fs.existsSync(new URL('../../assets-src/beaver', import.
 const hasWateringSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WATERING.sourceDir}/sheet.png`, import.meta.url));
 const hasDrinkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_DRINK.sourceDir}/sheet.png`, import.meta.url));
 const hasSleepSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_SLEEP.sourceDir}/sheet.png`, import.meta.url));
+const hasStretchSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_STRETCH.sourceDir}/sheet.png`, import.meta.url));
 
 // Cumulative y-offset of a row found by name, not position — rows keep
 // getting appended after each other (watering, then drink, ...), so no test
@@ -117,8 +118,9 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     };
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
     // is appended by ingest-typing.mjs (see ingest-typing); `watering`,
-    // `drink`, and `sleep` are appended by buildAdultWateringSheet /
-    // buildAdultDrinkSheet / buildAdultSleepSheet (see below).
+    // `drink`, `sleep`, and `stretch` are appended by buildAdultWateringSheet /
+    // buildAdultDrinkSheet / buildAdultSleepSheet / buildAdultStretchSheet
+    // (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -129,21 +131,27 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'watering', frames: 8 },
       { name: 'drink', frames: 8 },
       { name: 'sleep', frames: 8 },
+      { name: 'stretch', frames: 8 },
     ]);
   });
 
   // Golden rows: 96*4 + 128(parachute-wind) = 512; ingest-typing appends a
   // 96px `type` row → 608; buildAdultWateringSheet appends a 96px `watering`
   // row → 704; buildAdultDrinkSheet appends a 96px `drink` row → 800;
-  // buildAdultSleepSheet appends a 96px `sleep` row → 896. Width stays a flat
-  // 8-col grid at the 96px tile — only row height varies, never column width.
-  it('is a 768x896 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96)', () => {
+  // buildAdultSleepSheet appends a 96px `sleep` row → 896;
+  // buildAdultStretchSheet appends a 96px `stretch` row → 992 (the row's
+  // tallest raw content is the standing frames' own tail-to-ear span, shared
+  // evenly between arms-up and arms-down poses, so it fits the default 96px
+  // tile at targetContentHeightPx 96 with no rowHeight override needed — see
+  // STYLE.md provenance). Width stays a flat 8-col grid at the 96px tile —
+  // only row height varies, never column width.
+  it('is a 768x992 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(896);
+    expect(decoded.height).toBe(992);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(896);
+    expect(meta.sheetHeight).toBe(992);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -209,6 +217,7 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
     expect(committedMeta.rows.find((row) => row.name === 'watering')).toMatchObject({ name: 'watering', frames: 8 });
     expect(committedMeta.rows.find((row) => row.name === 'drink')).toMatchObject({ name: 'drink', frames: 8 });
     expect(committedMeta.rows.find((row) => row.name === 'sleep')).toMatchObject({ name: 'sleep', frames: 8 });
+    expect(committedMeta.rows.find((row) => row.name === 'stretch')).toMatchObject({ name: 'stretch', frames: 8 });
   }, 15_000);
 });
 
@@ -461,5 +470,70 @@ describe.skipIf(!hasSleepSource)('ingest-animation-frames sleep regeneration', (
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultSleepSheet(repoRoot).png.equals(buildAdultSleepSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Stretch row (BL-5): same committed-sheet + gated-regeneration convention as
+// watering/drink/sleep above, via the shared buildAdultRowSheet config.
+// Stretch is a ONE-SHOT wake-up transition (like `land`), not a loop — no
+// wraparound gate; frame1-vs-sleep-pose and frame8-vs-idle continuity are
+// checked as side-by-side diffs (eyeballed, saved under scratch — not
+// committed here), not a pixel-identity assertion, since frame 1 is newly
+// generated art conditioned on the sleep pose, not a copy of it.
+describe('ingest-animation-frames stretch row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a stretch row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'stretch');
+    expect(row).toEqual({ name: 'stretch', frames: 8 });
+  });
+
+  it('every stretch frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'stretch');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at stretch[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `stretch[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `stretch[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasStretchSource)('ingest-animation-frames stretch regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultStretchSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultStretchSheet(repoRoot).png.equals(buildAdultStretchSheet(repoRoot).png)).toBe(true);
   });
 });
