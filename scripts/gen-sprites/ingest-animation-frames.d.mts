@@ -48,8 +48,10 @@ export interface AdultRowResult {
 export const ADULT_WATERING: AdultRowConfig;
 export const ADULT_DRINK: AdultRowConfig;
 export const ADULT_SLEEP: AdultRowConfig;
+export const ADULT_STRETCH: AdultRowConfig;
 
 export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
 export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
 export function buildAdultDrinkSheet(repoRoot: string): AdultRowResult;
 export function buildAdultSleepSheet(repoRoot: string): AdultRowResult;
+export function buildAdultStretchSheet(repoRoot: string): AdultRowResult;

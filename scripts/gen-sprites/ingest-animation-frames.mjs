@@ -282,10 +282,42 @@ export function buildAdultSleepSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_SLEEP);
 }
 
+// Wake-up/stretch (BL-5): ONE-SHOT transition (like `land`, not a loop) —
+// wakes from the committed sleep pose, sits up, big arms-up stretch + yawn,
+// settles to the idle stance. Reference-conditioned on BOTH the committed
+// adult idle tile AND the committed sleep-pose tile (dual medias[] chaining)
+// so frame 1 genuinely continues the sleep row's final pose. Scale-trap
+// check (BL-19 parachute-wind precedent considered, not needed here): the
+// row's tallest raw content is the standing frames' own tail-to-ear span
+// (~762px pre-scale, shared evenly by the arms-up AND arms-down standing
+// frames — the raised arms never reach above ear height), not a taller
+// arms-up-only silhouette, so targetContentHeightPx=96 (default 96px
+// rowHeight) reproduces the committed idle tile's own full-tile content
+// height (measured 96/96, edge-to-edge, no padding) with no shrink — see
+// STYLE.md provenance for the measured comparison.
+export const ADULT_STRETCH = {
+  rowName: 'stretch',
+  sourceDir: 'adult-stretch',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultStretchSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_STRETCH);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
-// way (watering, drink, sleep, future BL-8..12 rows just add a config here).
-const ADULT_ROWS = { 'adult-watering': ADULT_WATERING, 'adult-drink': ADULT_DRINK, 'adult-sleep': ADULT_SLEEP };
+// way (watering, drink, sleep, stretch, future BL-8..12 rows just add a
+// config here).
+const ADULT_ROWS = {
+  'adult-watering': ADULT_WATERING,
+  'adult-drink': ADULT_DRINK,
+  'adult-sleep': ADULT_SLEEP,
+  'adult-stretch': ADULT_STRETCH,
+};
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {

@@ -29,7 +29,7 @@ describe('ingest-typing committed sheet', () => {
   const typeTopY = meta.rows.slice(0, typeRowIndex).reduce((sum, row) => sum + (row.height ?? meta.tile), 0);
 
   it('appends a type row of 8 frames to the golden adult sheet', () => {
-    expect(meta.rows.map((row) => row.name)).toEqual(['idle', 'walk', 'struggle', 'parachute-wind', 'land', 'type', 'watering', 'drink', 'sleep']);
+    expect(meta.rows.map((row) => row.name)).toEqual(['idle', 'walk', 'struggle', 'parachute-wind', 'land', 'type', 'watering', 'drink', 'sleep', 'stretch']);
     expect(meta.rows.find((row) => row.name === 'type')).toMatchObject({ name: 'type', frames: 8 });
   });
 
