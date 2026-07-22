@@ -52,16 +52,42 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×480 sheet,
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×704 sheet,
   96×96 tiles, fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
-  (8), `land` (8)
+  (8), `land` (8), `type` (8), `watering` (8)
 - **Provenance:** golden generated art (BL-18). `idle`/`walk` ingested via
   `scripts/gen-sprites/ingest-images.mjs` (`npm run assets:ingest-adult`);
   `struggle`/`parachute-wind`/`land` appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
-  assets:adult-anims`)
+  assets:adult-anims`); `type` appended via `scripts/gen-sprites/ingest-typing.mjs`
+  (`npm run assets:typing`); `watering` appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-watering` (`npm run
+  assets:adult-watering`, BL-1/T2) — Nano Banana Pro, reference-conditioned
+  on the committed adult sprite, green chroma-key background
 - **Status:** final
+
+### Tree — growth stages
+
+![tree stage 1 sheet](../assets/sprites/tree-stage-1.png)
+![tree stage 2 sheet](../assets/sprites/tree-stage-2.png)
+![tree stage 3 sheet](../assets/sprites/tree-stage-3.png)
+
+- **Files:** `assets/sprites/tree-stage-{1,2,3}.png` + `.json` — one sheet per
+  growth stage (swapped whole, not animated between), 1152×96 each, 96×96
+  tiles, fps hint 8
+- **Animations:** `sway` (12 frames) per stage — a gentle trunk-pivot rotation,
+  amplitude tuned per stage (5° sapling / 3° young / 2° mature)
+- **Provenance:** Comfy Cloud Nano Banana Pro, one growing lineage (stage 3
+  generated first, stage 2 conditioned on stage 3's output, stage 1
+  conditioned on stage 2's — not three independent prompts); ingested via
+  `tools/puppet-studio/ingest-parts.mjs <runDir> tree`, rigged as
+  `tools/puppet-studio/rigs/tree-stage-{1,2,3}.json`, baked via the puppet
+  studio (`npm run studio`) and promoted manually. See STYLE.md for the full
+  generation/bake repro steps (BL-1/T1).
+- **Status:** baked and committed; not yet wired into the running app (level
+  triggers, render layer — WAVE-2, see `docs/comfyui-avatar-generation.md`
+  open questions)
 
 ### Hatch lodge
 
