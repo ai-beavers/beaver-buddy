@@ -17,45 +17,44 @@ import { fileURLToPath } from 'node:url';
 import { decodePng, removeBackground } from '../../scripts/gen-sprites/ingest-images.mjs';
 import { encodeRgbaPng } from '../../scripts/gen-sprites/png.ts';
 
-const [runDir, rigName] = process.argv.slice(2);
-if (!runDir || !rigName) {
-  console.error('usage: node tools/puppet-studio/ingest-parts.mjs <runDir> <rigName>');
-  process.exit(1);
-}
-
-const studioRoot = fileURLToPath(new URL('.', import.meta.url));
-const outDir = path.resolve(studioRoot, '..', '..', 'assets-src', 'parts', rigName);
-
 // source file (in runDir) -> output file + target height in px (rig scale),
 // per rig — each rig's ComfyUI run has its own part set/filenames.
-const RIG_PART_SPECS = {
-  'beaver-baby': [
-    { src: 'torso.png', out: 'body.png', targetH: 30 },
-    { src: 'head.png', out: 'head.png', targetH: 24 },
-    { src: 'tail.png', out: 'tail.png', targetH: 16 },
-    { src: 'leg-front.png', out: 'leg-front.png', targetH: 16 },
-    { src: 'leg-back.png', out: 'leg-back.png', targetH: 16 },
-    { src: 'eye-open.png', out: 'eye-open.png', targetH: 6 },
-    { src: 'eye-closed.png', out: 'eye-closed.png', targetH: 6 },
-    { src: 'canopy.png', out: 'canopy.png', targetH: 24 },
-  ],
+// `preKeyed: true` marks a rig whose ComfyUI parts are already delivered
+// background-removed/transparent: removeBackground's border flood-fill
+// treats near-white/near-black as background, so re-running it on an
+// already-keyed part eats opaque border-connected detail pixels.
+export const RIG_PART_SPECS = {
+  'beaver-baby': {
+    preKeyed: true,
+    parts: [
+      { src: 'torso.png', out: 'body.png', targetH: 30 },
+      { src: 'head.png', out: 'head.png', targetH: 24 },
+      { src: 'tail.png', out: 'tail.png', targetH: 16 },
+      { src: 'leg-front.png', out: 'leg-front.png', targetH: 16 },
+      { src: 'leg-back.png', out: 'leg-back.png', targetH: 16 },
+      { src: 'eye-open.png', out: 'eye-open.png', targetH: 6 },
+      { src: 'eye-closed.png', out: 'eye-closed.png', targetH: 6 },
+      { src: 'canopy.png', out: 'canopy.png', targetH: 24 },
+    ],
+  },
   // Tree growth stages: one full-tree part per stage (no sub-parts). Source
   // renders ship on a solid white background (not green — a tree's own
   // foliage is green, so a green chroma key would eat leaf pixels the same
   // way a white key eats white canopy detail elsewhere; see
   // docs/dev-guardrails.md). `removeBackground` below strips the white the
   // same way the beaver-baby/teen full-frame sheets do.
-  tree: [
-    { src: 'tree-stage-1.png', out: 'tree-stage-1.png', targetH: 34 },
-    { src: 'tree-stage-2.png', out: 'tree-stage-2.png', targetH: 58 },
-    { src: 'tree-stage-3.png', out: 'tree-stage-3.png', targetH: 88 },
-  ],
+  tree: {
+    parts: [
+      { src: 'tree-stage-1.png', out: 'tree-stage-1.png', targetH: 34 },
+      { src: 'tree-stage-2.png', out: 'tree-stage-2.png', targetH: 58 },
+      { src: 'tree-stage-3.png', out: 'tree-stage-3.png', targetH: 88 },
+    ],
+  },
 };
 
-const PART_SPECS = RIG_PART_SPECS[rigName];
-if (!PART_SPECS) {
-  console.error(`no part spec for rig "${rigName}"; known rigs: ${Object.keys(RIG_PART_SPECS).join(', ')}`);
-  process.exit(1);
+// Applies removeBackground unless the rig's parts already ship keyed.
+export function keyIfNeeded(decoded, preKeyed) {
+  return preKeyed ? decoded : removeBackground(decoded);
 }
 
 const ALPHA_THRESHOLD = 16;
@@ -131,28 +130,40 @@ function downscale(img, targetH) {
   return { width: outW, height: outH, data };
 }
 
-fs.mkdirSync(outDir, { recursive: true });
-const summary = {};
-for (const spec of PART_SPECS) {
-  const srcPath = path.join(runDir, spec.src);
-  if (!fs.existsSync(srcPath)) {
-    console.error(`missing source: ${srcPath}`);
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  const [runDir, rigName] = process.argv.slice(2);
+  if (!runDir || !rigName) {
+    console.error('usage: node tools/puppet-studio/ingest-parts.mjs <runDir> <rigName>');
     process.exit(1);
   }
-  const decoded = decodePng(fs.readFileSync(srcPath));
-  // No-op for sources that already ship transparent (e.g. beaver-baby parts,
-  // background-removed by the ComfyUI workflow itself): removeBackground's
-  // border flood fill only touches pixels that are already near-white,
-  // near-black, or already transparent, so an already-keyed part is
-  // untouched. Sources with an opaque white backdrop (tree stages) get
-  // keyed here instead.
-  const keyed = removeBackground(decoded);
-  const trimmed = crop(keyed, contentBBox(keyed));
-  const scaled = downscale(trimmed, spec.targetH);
-  const outPath = path.join(outDir, spec.out);
-  fs.writeFileSync(outPath, encodeRgbaPng(scaled));
-  summary[spec.out] = { width: scaled.width, height: scaled.height };
-  console.log(`${spec.src} -> ${spec.out}: ${decoded.width}x${decoded.height} -> ${scaled.width}x${scaled.height}`);
+
+  const studioRoot = fileURLToPath(new URL('.', import.meta.url));
+  const outDir = path.resolve(studioRoot, '..', '..', 'assets-src', 'parts', rigName);
+
+  const rigSpec = RIG_PART_SPECS[rigName];
+  if (!rigSpec) {
+    console.error(`no part spec for rig "${rigName}"; known rigs: ${Object.keys(RIG_PART_SPECS).join(', ')}`);
+    process.exit(1);
+  }
+
+  fs.mkdirSync(outDir, { recursive: true });
+  const summary = {};
+  for (const spec of rigSpec.parts) {
+    const srcPath = path.join(runDir, spec.src);
+    if (!fs.existsSync(srcPath)) {
+      console.error(`missing source: ${srcPath}`);
+      process.exit(1);
+    }
+    const decoded = decodePng(fs.readFileSync(srcPath));
+    const keyed = keyIfNeeded(decoded, rigSpec.preKeyed);
+    const trimmed = crop(keyed, contentBBox(keyed));
+    const scaled = downscale(trimmed, spec.targetH);
+    const outPath = path.join(outDir, spec.out);
+    fs.writeFileSync(outPath, encodeRgbaPng(scaled));
+    summary[spec.out] = { width: scaled.width, height: scaled.height };
+    console.log(`${spec.src} -> ${spec.out}: ${decoded.width}x${decoded.height} -> ${scaled.width}x${scaled.height}`);
+  }
+  console.log(`\nwrote ${rigSpec.parts.length} parts to ${outDir}`);
+  console.log(`dims: ${JSON.stringify(summary)}`);
 }
-console.log(`\nwrote ${PART_SPECS.length} parts to ${outDir}`);
-console.log(`dims: ${JSON.stringify(summary)}`);
