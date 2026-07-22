@@ -266,7 +266,7 @@ export function buildAdultDrinkSheet(repoRoot) {
 // pulsing "zzz" wisps above the head — same reference-conditioned green
 // chroma-key 4x2 grid convention as watering/drink. Unlike drink/watering
 // (which settle to a grounded standing pose), sleep is a LOOP with no
-// settle/lie-down transition frame (auto-decision, BL-4 plan): matches every
+// settle/lie-down transition frame: matches every
 // other looping row, a one-shot fall-asleep transition can be added as its
 // own row later without reworking this one.
 export const ADULT_SLEEP = {

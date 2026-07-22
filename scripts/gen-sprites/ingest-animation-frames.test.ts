@@ -374,7 +374,7 @@ describe.skipIf(!hasDrinkSource)('ingest-animation-frames drink regeneration', (
 // Sleep row (BL-4): same committed-sheet + gated-regeneration convention as
 // the watering/drink blocks above, via the shared buildAdultRowSheet config.
 // Sleep is a loop-only row (curled idle + breathing + pulsing zzz), no
-// settle/lie-down transition frame (auto-decision, BL-4 plan).
+// settle/lie-down transition frame.
 describe('ingest-animation-frames sleep row (adult)', () => {
   const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
   const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
