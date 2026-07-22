@@ -28,6 +28,8 @@ import {
   FPS,
   decodePng,
   removeBackground,
+  chromaKeyGreen,
+  extractGridCell,
   cropToBbox,
   resizeAreaAverage,
   placeOnTile,
@@ -182,21 +184,98 @@ export function buildBabySheet(repoRoot) {
   return buildStageSheet(repoRoot, BABY);
 }
 
+// Adult watering-can loop (BL-1/T2): appended directly onto the already-
+// committed beaver-adult sheet, NOT folded into ADULT.animations above.
+// Rebuilding the whole adult stage from ADULT.animations would require
+// struggle/parachute-wind/land's own gitignored Comfy run dirs to also
+// exist locally, and Comfy generation isn't deterministic — re-baking them
+// on a machine that lacks those dumps would silently replace already-shipped
+// pixels. This mirrors ingest-typing.mjs's "append one row to the committed
+// sheet, preserving every earlier row byte-for-byte" pattern, but reads a
+// single 4-col x 2-row grid image (like the type row's source sheet) instead
+// of per-file frames, and reuses this file's own crop/scale/composite step
+// rather than a third copy of that logic.
+export const ADULT_WATERING = {
+  name: 'watering',
+  run: 'adult-watering',
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 88,
+};
+
+function rowHeight(row) {
+  return row.height ?? TILE;
+}
+
+export function buildAdultWateringSheet(repoRoot) {
+  const pngPath = path.join(repoRoot, 'assets', 'sprites', ADULT.shippedPng);
+  const jsonPath = pngPath.replace(/\.png$/, '.json');
+  const shipped = decodePng(fs.readFileSync(pngPath));
+  const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+
+  // Idempotent re-run: drop a pre-existing watering row before appending.
+  const baseRows = shippedMeta.rows.filter((row) => row.name !== ADULT_WATERING.name);
+  const baseHeight = baseRows.reduce((sum, row) => sum + rowHeight(row), 0);
+  const width = shippedMeta.sheetWidth;
+
+  const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', ADULT_WATERING.run, 'sheet.png');
+  const grid = decodePng(fs.readFileSync(sheetPath));
+  const cropped = [];
+  for (let row = 0; row < ADULT_WATERING.gridRows; row += 1) {
+    for (let col = 0; col < ADULT_WATERING.gridCols; col += 1) {
+      const cell = extractGridCell(grid, col, row, ADULT_WATERING.gridCols, ADULT_WATERING.gridRows);
+      cropped.push(cropToBbox(chromaKeyGreen(cell)));
+    }
+  }
+  const scale = computeStageScale(cropped, TILE, ADULT_WATERING.targetContentHeightPx);
+  const tiles = cropped.map((img) => {
+    const destW = Math.max(1, Math.round(img.width * scale));
+    const destH = Math.max(1, Math.round(img.height * scale));
+    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE);
+  });
+
+  const height = baseHeight + TILE;
+  const data = new Uint8ClampedArray(width * height * 4);
+  data.set(shipped.data.subarray(0, width * baseHeight * 4), 0);
+  tiles.forEach((tile, i) => {
+    for (let y = 0; y < TILE; y += 1) {
+      const destStart = ((baseHeight + y) * width + i * TILE) * 4;
+      data.set(tile.data.subarray(y * TILE * 4, (y + 1) * TILE * 4), destStart);
+    }
+  });
+
+  const meta = {
+    tile: shippedMeta.tile,
+    fps: shippedMeta.fps,
+    sheetWidth: width,
+    sheetHeight: height,
+    rows: [...baseRows, { name: ADULT_WATERING.name, frames: tiles.length }],
+  };
+  return { png: encodeRgbaPng({ width, height, data }), meta, scale };
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = path.join(import.meta.dirname, '..', '..');
   const stageArg = process.argv[2] ?? 'baby';
-  const config = STAGES[stageArg];
-  if (!config) {
-    throw new Error(`unknown stage "${stageArg}" (expected one of: ${Object.keys(STAGES).join(', ')})`);
+  if (stageArg === 'adult-watering') {
+    const { png, meta, scale } = buildAdultWateringSheet(repoRoot);
+    fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.png'), png);
+    fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.json'), `${JSON.stringify(meta, null, 2)}\n`);
+    console.log(`appended beaver-adult watering row (${meta.sheetWidth}x${meta.sheetHeight}, scale ${scale.toFixed(4)})`);
+  } else {
+    const config = STAGES[stageArg];
+    if (!config) {
+      throw new Error(`unknown stage "${stageArg}" (expected one of: ${[...Object.keys(STAGES), 'adult-watering'].join(', ')})`);
+    }
+    const { png, meta, scales } = buildStageSheet(repoRoot, config);
+    const outDir = path.join(repoRoot, 'assets-src', 'baked', config.bakedDirName);
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(path.join(outDir, 'sheet.png'), png);
+    fs.writeFileSync(path.join(outDir, 'sheet.json'), `${JSON.stringify(meta, null, 2)}\n`);
+    const scaleStr = Object.entries(scales)
+      .map(([k, v]) => `${k}=${v.toFixed(4)}`)
+      .join(' ');
+    console.log(`wrote ${outDir}/sheet.png (${meta.sheetWidth}x${meta.sheetHeight}), scales: ${scaleStr}`);
   }
-  const { png, meta, scales } = buildStageSheet(repoRoot, config);
-  const outDir = path.join(repoRoot, 'assets-src', 'baked', config.bakedDirName);
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(path.join(outDir, 'sheet.png'), png);
-  fs.writeFileSync(path.join(outDir, 'sheet.json'), `${JSON.stringify(meta, null, 2)}\n`);
-  const scaleStr = Object.entries(scales)
-    .map(([k, v]) => `${k}=${v.toFixed(4)}`)
-    .join(' ');
-  console.log(`wrote ${outDir}/sheet.png (${meta.sheetWidth}x${meta.sheetHeight}), scales: ${scaleStr}`);
 }

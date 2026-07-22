@@ -189,6 +189,48 @@ export function removeBackground(img) {
   return { width, height, data };
 }
 
+// Alternate to removeBackground for frames generated on a solid green
+// (#00FF00) chroma-key background: removeBackground's border flood-fill
+// only catches near-white/near-black, so it leaves green pixels behind (and,
+// used on a green source, would incorrectly key nothing). A pixel belongs to
+// the green screen if green clearly dominates red and blue — no antialiased
+// fringe survives, and bright/white character detail (teeth, eye shine) has
+// no green-dominant pixels so it's untouched. No border flood-fill needed:
+// green is uniform across the whole frame, not just the border.
+export function chromaKeyGreen(img) {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  out.set(data);
+  for (let i = 0; i < out.length; i += 4) {
+    const r = out[i];
+    const g = out[i + 1];
+    const b = out[i + 2];
+    if (g > 90 && g > r * 1.3 && g > b * 1.3) {
+      out[i + 3] = 0;
+    }
+  }
+  return { width, height, data: out };
+}
+
+// Slices cell [col,row] out of a colGrid x rowGrid grid image. Boundaries are
+// rounded so adjacent cells tile the full sheet exactly even when the cell
+// size isn't integral (a Gemini-generated grid's pixel dimensions aren't
+// always evenly divisible).
+export function extractGridCell(img, col, row, gridCols, gridRows) {
+  const x0 = Math.round((col * img.width) / gridCols);
+  const x1 = Math.round(((col + 1) * img.width) / gridCols);
+  const y0 = Math.round((row * img.height) / gridRows);
+  const y1 = Math.round(((row + 1) * img.height) / gridRows);
+  const w = x1 - x0;
+  const h = y1 - y0;
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    const srcStart = ((y0 + y) * img.width + x0) * 4;
+    out.set(img.data.subarray(srcStart, srcStart + w * 4), y * w * 4);
+  }
+  return { width: w, height: h, data: out };
+}
+
 // Step 2: crop to the bounding box of opaque pixels.
 export function cropToBbox(img) {
   const { width, height, data } = img;

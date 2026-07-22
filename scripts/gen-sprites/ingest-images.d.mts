@@ -41,6 +41,8 @@ export const STAGE_SPECS: readonly StageSpec[];
 
 export function decodePng(buf: Buffer): DecodedImage;
 export function removeBackground(img: DecodedImage): DecodedImage;
+export function chromaKeyGreen(img: DecodedImage): DecodedImage;
+export function extractGridCell(img: DecodedImage, col: number, row: number, gridCols: number, gridRows: number): DecodedImage;
 export function cropToBbox(img: DecodedImage): DecodedImage;
 export function resizeAreaAverage(img: DecodedImage, destW: number, destH: number): DecodedImage;
 export function placeOnTile(img: DecodedImage, tileW: number, tileH?: number): DecodedImage;

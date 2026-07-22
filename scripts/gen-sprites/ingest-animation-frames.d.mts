@@ -28,3 +28,21 @@ export const ADULT: StageAnimConfig;
 
 export function buildStageSheet(repoRoot: string, config: StageAnimConfig): StageSheetResult;
 export function buildBabySheet(repoRoot: string): StageSheetResult;
+
+export interface AdultWateringSpec {
+  readonly name: string;
+  readonly run: string;
+  readonly gridCols: number;
+  readonly gridRows: number;
+  readonly targetContentHeightPx: number;
+}
+
+export interface AdultWateringResult {
+  readonly png: Buffer;
+  readonly meta: SheetMeta;
+  readonly scale: number;
+}
+
+export const ADULT_WATERING: AdultWateringSpec;
+
+export function buildAdultWateringSheet(repoRoot: string): AdultWateringResult;
