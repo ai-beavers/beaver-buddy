@@ -205,6 +205,13 @@ export function buildAdultRowSheet(repoRoot, config) {
   const shipped = decodePng(fs.readFileSync(pngPath));
   const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
+  // Invariant: config.frames must match the grid cell count — buildAdultRowSheet
+  // reads every cell (gridCols*gridRows), so a stale/typo'd frames field would
+  // otherwise silently bake the wrong frame count with no error.
+  if (config.gridCols * config.gridRows !== config.frames) {
+    throw new Error(`${config.rowName}: frames (${config.frames}) !== gridCols*gridRows (${config.gridCols}x${config.gridRows})`);
+  }
+
   const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', config.sourceDir, 'sheet.png');
   const grid = decodePng(fs.readFileSync(sheetPath));
   const cropped = [];
