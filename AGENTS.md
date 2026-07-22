@@ -12,6 +12,18 @@ Hard-won gotchas — skim before touching the sprite pipeline, the grab/parachut
 interaction, or generating animation art:
 [`docs/dev-guardrails.md`](docs/dev-guardrails.md).
 
+## Git remotes — `origin` IS ai-beavers (we are contributors)
+
+**There is no fork in this workflow.** Remote layout (decided 2026-07-22):
+
+- **`origin` = `https://github.com/ai-beavers/beaver-buddy.git`** — the main repo.
+  We are contributors (maintain role). Always: branch from `origin/main`, push
+  branches directly to `origin`, open PRs against `ai-beavers/main`.
+  Branch protection requires a review approval (auto-merge is disabled);
+  reviewers: Gw3i (Vlady), jurij.
+- **`fork` = `https://github.com/rodgi040/beaver-buddy.git`** — the old fork,
+  kept as read-only backup. **Never push there, never open PRs from it.**
+
 ## Project planning docs — `.planning/` (committed)
 
 **In this project, the planning/tracking docs live in `.planning/`, NOT in a
