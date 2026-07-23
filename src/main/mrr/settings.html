@@ -58,6 +58,18 @@
   </head>
   <body>
     <fieldset>
+      <legend>Beaver Status</legend>
+      <div id="beaverStatus">
+        <p>Lv <strong id="beaverLevel">—</strong> — <strong id="beaverStage">—</strong></p>
+        <div style="background:#eee;height:8px;border-radius:4px;margin:4px 0">
+          <div id="xpBar" style="background:#4caf50;height:100%;border-radius:4px;width:0%"></div>
+        </div>
+        <p style="font-size:12px;color:#555" id="beaverXp">—</p>
+        <p style="font-size:11px;color:#777;margin-top:6px" id="beaverTokens"></p>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend>Connect</legend>
       <p class="hint">
         Opt in to read local Claude Code / Codex / Pi Agent / Kimi Code / OpenCode usage logs on this computer — no API keys.
@@ -156,6 +168,50 @@
         return Number(n || 0).toLocaleString('en-US');
       }
 
+      function formatStage(s) {
+        return s === 'young-baby' ? 'young baby' : s === 'older-teen' ? 'older teen' : s;
+      }
+
+      function renderXp(data) {
+        if (!data) {
+          document.getElementById('beaverLevel').textContent = '—';
+          document.getElementById('beaverStage').textContent = '—';
+          document.getElementById('xpBar').style.width = '0%';
+          document.getElementById('beaverXp').textContent = '—';
+          document.getElementById('beaverTokens').textContent = '';
+          return;
+        }
+        document.getElementById('beaverLevel').textContent = data.level;
+        document.getElementById('beaverStage').textContent = formatStage(data.stage);
+
+        // XP progress bar: fraction of current level completed
+        const currentLevelXp = data.level > 1 ? (data.nextLevelXp - (data.nextLevelXp - data.xp)) : 0;
+        // Reconstruct xpForLevel(current level)
+        const prevLevelXp = data.level <= 1 ? 0 : (data.nextLevelXp - (data.nextLevelXp - data.xp));
+        // Simpler: use the two data points we have
+        const delta = data.nextLevelXp - (data.level <= 1 ? 0 : data.xp);
+        // Progress % = (xp - cumXP_at_current_level) / (cumXP_at_next_level - cumXP_at_current_level)
+        // We don't have cumXP_at_current_level directly. Approximate:
+        // Use xp/(nextLevelXp) as proxy — not exact but gives visual sense
+        const pct = data.nextLevelXp > data.currentLevelXp
+          ? Math.min(100, Math.round(((data.xp - data.currentLevelXp) / (data.nextLevelXp - data.currentLevelXp)) * 100))
+          : 100;
+        document.getElementById('xpBar').style.width = pct + '%';
+        document.getElementById('beaverXp').textContent = Math.floor(data.xp).toLocaleString('en-US') + ' XP / next level: ' + data.nextLevelXp.toLocaleString('en-US');
+
+        // Per-model token cursors
+        const models = data.lastSeenByModel;
+        if (models && Object.keys(models).length > 0) {
+          const lines = Object.entries(models)
+            .filter(([,t]) => t > 0)
+            .sort(([,a],[,b]) => b - a)
+            .map(([model, tokens]) => model + ': ' + formatTokens(tokens));
+          document.getElementById('beaverTokens').textContent = 'Tokens scanned: ' + lines.join(' · ');
+        } else {
+          document.getElementById('beaverTokens').textContent = '';
+        }
+      }
+
       const sources = [
         ['claude', 'Claude', 'Claude Code'],
         ['codex', 'Codex', 'Codex'],
@@ -202,6 +258,7 @@
         mrrRadio.disabled = !mrrAvailable;
         document.getElementById('modeTokens').checked = status.mode === 'tokens';
         mrrRadio.checked = status.mode === 'mrr';
+        renderXp(status.xp);
       }
 
       async function save(payload) {

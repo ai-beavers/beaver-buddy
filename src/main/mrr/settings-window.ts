@@ -28,14 +28,24 @@ import {
   validateSaveInput,
 } from './settings-validate';
 
+import type { Stage } from '../xp/curve';
+
+export interface XpStatusPayload {
+  readonly xp: number;
+  readonly level: number;
+  readonly stage: Stage;
+  readonly currentLevelXp: number;
+  readonly nextLevelXp: number;
+  readonly lastSeenByModel: Record<string, number>;
+}
+
 export interface SettingsWindowDeps {
   readonly stateDir: string;
   readonly keychainService: string;
   readonly getSettings: () => SettingsState;
+  readonly getXpState: () => XpStatusPayload;
   readonly onSettingsChanged: (next: SettingsState) => void;
-  // Manually starts the beaver's "sit and type" working animation now.
   readonly onForceWork: () => void;
-  // Re-scan logs + return per-source status (enabled is opt-in; tokens only when enabled).
   readonly getUsageSources: () => UsageSourcesSnapshot;
   readonly onUsageEnabledChanged: (next: SettingsState) => void;
 }
@@ -128,10 +138,12 @@ export function createSettingsHandlers(
     readStatus(event) {
       if (!isAuthorized(event)) return { error: 'unauthorized' };
       const s = deps.getSettings();
+      const xp = deps.getXpState();
       return {
         stripeConnected: s.stripeConnected,
         revenuecatConnected: s.revenuecatConnected,
         mode: s.mode,
+        xp,
         ...usagePayload(deps.getUsageSources()),
       };
     },
