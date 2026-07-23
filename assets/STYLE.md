@@ -496,6 +496,28 @@ checkerboard-backdrop playback) — see
 assets:adult-exercise`), growing the sheet to 768×1408 (the 128px
 `rowHeight`). No human cleanup beyond the mechanical pipeline.
 
+`brainrot(8)` (BL-11, 2026-07-23): a LOOP — beaver stands slightly slouched,
+holds a small plain phone in both paws at chest height, half-lidded glazed
+stare toward the screen, thumb scrolling. Phone fully in-frame, no readable
+UI/logo. Same pose-coherence gate as throw-stick/collect-sticks/exercise.
+
+**Generation** — same environment constraint forced `partner_generate`
+(`vertexai/nano-banana-pro`) with the public committed `beaver-adult.png`
+raw URL and a copy-the-idle-tile instruction (green `#00FF00`, 4×2 grid).
+The accepted grid is on-model with a subtle thumb-scroll, but the model drew
+two slightly different body halves across the 4×2, so the raw cell order is
+not a clean loop. Mechanical fix (BL-7 mouth-patch class): bake only the
+body-consistent bottom half ping-ponged via
+`ADULT_BRAINROT.frameOrder = [4, 5, 6, 7, 7, 6, 5, 4]` — the two former
+failure seams (4→5 and 8→1) become same-cell repeats (zero-diff). RGB→RGBA
+normalization scratch-only. Default 96px row (`targetContentHeightPx: 96`).
+Evidence: `docs/design-reviews/BL-11-brainrot-contact.png`,
+`BL-11-brainrot-wraparound.png`, `BL-11-brainrot.gif` — see
+`docs/design-reviews/BL-11-brainrot-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-brainrot` (`npm run
+assets:adult-brainrot`), growing the sheet to 768×1504. No human cleanup
+beyond the mechanical pipeline.
+
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
 independent prompts, via Comfy Cloud Nano Banana Pro (`vertexai/nano-banana-pro`

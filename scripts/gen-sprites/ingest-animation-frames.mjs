@@ -205,28 +205,46 @@ export function buildAdultRowSheet(repoRoot, config) {
   const shipped = decodePng(fs.readFileSync(pngPath));
   const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
-  // Invariant: config.frames must match the grid cell count — buildAdultRowSheet
-  // reads every cell (gridCols*gridRows), so a stale/typo'd frames field would
-  // otherwise silently bake the wrong frame count with no error.
-  if (config.gridCols * config.gridRows !== config.frames) {
+  // The grid always holds gridCols*gridRows source cells. `frameOrder`, when
+  // present, selects/reorders those cells into the baked row (indices into the
+  // grid-order cell list) — used when a raw generation's cell sequence isn't
+  // itself a clean loop but a body-consistent subset of its cells is (BL-11:
+  // the model split the 4x2 grid into two slightly different halves, so the
+  // brainrot row loops one stable half ping-ponged). Without frameOrder the
+  // baked frame count must equal the grid cell count (every prior row).
+  const sourceCells = config.gridCols * config.gridRows;
+  const order = config.frameOrder ?? [...Array(sourceCells).keys()];
+  if (config.frameOrder) {
+    if (order.length !== config.frames) {
+      throw new Error(`${config.rowName}: frames (${config.frames}) !== frameOrder length (${order.length})`);
+    }
+    for (const i of order) {
+      if (!Number.isInteger(i) || i < 0 || i >= sourceCells) {
+        throw new Error(`${config.rowName}: frameOrder index ${i} out of range 0..${sourceCells - 1}`);
+      }
+    }
+  } else if (sourceCells !== config.frames) {
     throw new Error(`${config.rowName}: frames (${config.frames}) !== gridCols*gridRows (${config.gridCols}x${config.gridRows})`);
   }
 
   const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', config.sourceDir, 'sheet.png');
   const grid = decodePng(fs.readFileSync(sheetPath));
-  const cropped = [];
+  const cells = [];
   for (let row = 0; row < config.gridRows; row += 1) {
     for (let col = 0; col < config.gridCols; col += 1) {
       const cell = extractGridCell(grid, col, row, config.gridCols, config.gridRows);
-      cropped.push(cropToBbox(chromaKeyGreen(cell)));
+      cells.push(cropToBbox(chromaKeyGreen(cell)));
     }
   }
+  const cropped = order.map((i) => cells[i]);
   const rowHeight = config.rowHeight ?? TILE;
   const scale = computeStageScale(cropped, TILE, config.targetContentHeightPx);
+  // Area averaging can create green-dominant fringe pixels from transparent
+  // keyed pixels and opaque neighbors, so key once more after resizing.
   const tiles = cropped.map((img) => {
     const destW = Math.max(1, Math.round(img.width * scale));
     const destH = Math.max(1, Math.round(img.height * scale));
-    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE, rowHeight);
+    return placeOnTile(chromaKeyGreen(resizeAreaAverage(img, destW, destH)), TILE, rowHeight);
   });
 
   const { width, height, data, meta } = spliceRow(shipped, shippedMeta, config.rowName, tiles, rowHeight);
@@ -503,10 +521,36 @@ export function buildAdultExerciseSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_EXERCISE);
 }
 
+// Phone-scroll loop (glazed "brain rot" stare). The reference-conditioned
+// Nano Banana Pro grid keeps the beaver on-model and body-stable, but the
+// model drew the 4x2 grid as two slightly different halves (a body shift at
+// the row boundary and the wraparound), so the raw cell sequence isn't a
+// clean loop. The bottom row (cells 4-7) is the body-consistent half (measured
+// <1% body-region delta between its consecutive cells) with a subtle thumb
+// scroll, so the row loops that half ping-ponged: cells 4,5,6,7 up then
+// 7,6,5,4 back down. The two turn points (4->5 = cell7->cell7, seam 8->1 =
+// cell4->cell4) are the SAME cell, i.e. zero-diff, so the loop is smooth at
+// exactly the two transitions the first generation stuttered on. Widest crop
+// binds height at targetContentHeightPx=96; the default 96px row fits without
+// clipping.
+export const ADULT_BRAINROT = {
+  rowName: 'brainrot',
+  sourceDir: 'adult-brainrot',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+  frameOrder: [4, 5, 6, 7, 7, 6, 5, 4],
+};
+
+export function buildAdultBrainrotSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_BRAINROT);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, throw-stick,
-// collect-sticks, exercise, future items just add a config here).
+// collect-sticks, exercise, brainrot, future items just add a config here).
 // adult-speak is deliberately NOT in this map: it has no ComfyUI grid/config
 // (buildAdultRowSheet doesn't apply), it's dispatched as its own CLI branch
 // below.
@@ -520,6 +564,7 @@ const ADULT_ROWS = {
   'adult-collect-sticks': ADULT_COLLECT_STICKS,
   'adult-exercise': ADULT_EXERCISE,
   'adult-walk': ADULT_WALK,
+  'adult-brainrot': ADULT_BRAINROT,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
