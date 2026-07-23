@@ -30,18 +30,24 @@ function firstNumber(record: Record<string, unknown>, keys: readonly string[]): 
 function normalizeUsage(value: unknown): NormalizedUsage | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
-  const inputAlreadyFresh = 'input_other' in record || 'inputOther' in record;
+  // Pi-agent stores net input (cache already separated via cacheRead) and
+  // uses the short field names 'cacheRead'/'cacheWrite' instead of the
+  // longer variants. Detect pi-style usage objects so the caller treats
+  // input as already-fresh and never subtracts cacheRead twice.
+  const isPiStyle = 'cacheRead' in record || 'cacheWrite' in record;
+  const inputAlreadyFresh = 'input_other' in record || 'inputOther' in record || isPiStyle;
   const input = firstNumber(record, ['input_other', 'inputOther', 'input_tokens', 'prompt_tokens', 'inputTokens', 'input']);
   const output = firstNumber(record, ['output', 'output_tokens', 'completion_tokens', 'outputTokens']);
-  const cacheRead = Math.min(
-    firstNumber(record, ['input_cache_read', 'inputCacheRead', 'cache_read_input_tokens', 'cacheReadTokens']),
-    input,
-  );
+  const rawCacheRead = firstNumber(record, ['input_cache_read', 'inputCacheRead', 'cache_read_input_tokens', 'cacheReadTokens', 'cacheRead']);
+  // Cap cacheRead at input only when input is gross (cache not yet separated).
+  // Pi-agent reports net input so the cap would incorrectly clamp cacheRead.
+  const cacheRead = inputAlreadyFresh ? rawCacheRead : Math.min(rawCacheRead, input);
   const cacheCreation = firstNumber(record, [
     'input_cache_creation',
     'inputCacheCreation',
     'cache_creation_input_tokens',
     'cacheCreationTokens',
+    'cacheWrite',
   ]);
   if (input === 0 && output === 0 && cacheRead === 0 && cacheCreation === 0) return null;
   return { input, inputAlreadyFresh, output, cacheCreation, cacheRead };
@@ -50,8 +56,23 @@ function normalizeUsage(value: unknown): NormalizedUsage | null {
 function findUsageObject(value: unknown): { readonly usage: NormalizedUsage | null; readonly model: string | undefined } {
   if (!value || typeof value !== 'object') return { usage: null, model: undefined };
   const record = value as Record<string, unknown>;
-  const model = typeof record.model === 'string' ? record.model : typeof record.modelName === 'string' ? record.modelName : undefined;
-  return { usage: normalizeUsage(record.usage) ?? normalizeUsage(record.token_usage) ?? normalizeUsage(record.tokenUsage), model };
+  // Pi-agent nests usage + model inside `message` — try top-level first,
+  // then the nested `message` container as a fallback. Top-level always
+  // wins so existing Kimi / OpenCode flat formats are unchanged.
+  const message = record.message as Record<string, unknown> | undefined;
+  const model =
+    (typeof record.model === 'string' ? record.model : undefined) ??
+    (typeof record.modelName === 'string' ? record.modelName : undefined) ??
+    (typeof message?.model === 'string' ? message.model : undefined) ??
+    (typeof message?.modelName === 'string' ? message.modelName : undefined);
+  const usage =
+    normalizeUsage(record.usage) ??
+    normalizeUsage(record.token_usage) ??
+    normalizeUsage(record.tokenUsage) ??
+    normalizeUsage(message?.usage) ??
+    normalizeUsage(message?.token_usage) ??
+    normalizeUsage(message?.tokenUsage);
+  return { usage, model };
 }
 
 function timestampMs(value: unknown): number {
