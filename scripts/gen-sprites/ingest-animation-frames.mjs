@@ -421,9 +421,10 @@ export function buildAdultWalkSheet(repoRoot) {
 }
 
 // throw-stick (BL-9, ONE-SHOT): beaver picks up a stick, winds up, throws
-// toward screen-right — the stick stays fully in-frame at the paw in every
-// cell (never drawn as a separate flying object) per the item's contract;
-// flying-stick effects are runtime (#21) territory. Frame 1 ≈ the idle
+// toward screen-right. Contract: the stick remains fully within the tile in
+// every frame (including the release frames, where it's correctly drawn
+// mid-air just past the paw, not still gripped) — runtime (#21) must not
+// spawn an additional projectile while this row plays. Frame 1 ≈ the idle
 // stance; frame 8 settles back toward idle (post-throw follow-through
 // acceptable, not a byte match). Reference-conditioned Comfy Cloud Nano
 // Banana Pro generation on a green (#00FF00) chroma-key background, same

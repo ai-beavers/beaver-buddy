@@ -380,9 +380,11 @@ action row — beaver picks up a stick lying at its feet, winds up, throws it
 toward screen-right, follows through, settles back toward idle. Frame 1 ≈
 the committed idle stance; frame 8 settles back toward idle (post-throw
 follow-through, not a byte match — same "one-shot, not a loop" convention as
-`stretch`). The stick stays a single small twig, fully in-frame at or beside
-the paw in every cell it appears in — flying-stick physics/effects are #21
-overlay-object runtime territory, out of scope here.
+`stretch`). Contract: the stick — a single small twig — remains fully within
+the tile in every frame it appears in, including the release frames where
+it's correctly drawn mid-air just past the paw rather than still gripped;
+runtime (#21) must not spawn an additional projectile while this row plays,
+since the thrown stick is already part of the baked art.
 
 `collect-sticks(8)` (BL-9, 2026-07-23): a ONE-SHOT side-facing action row —
 beaver bends down, gathers 2–3 loose sticks off the ground into a bundle,

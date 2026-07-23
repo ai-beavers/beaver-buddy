@@ -57,13 +57,15 @@ blocked — was not exercised).
 
 Frame 1 (idle stance, stick on the ground) reads as the same character as
 the committed idle tile. Frames 2–4 show a clean bend/grab/stand-up
-sequence. Frames 5–6 show the wind-up and release — the stick stays
-touching or just leaving the open paw at the fully extended arm, never
-drawn as a separate flying object and never cut off by a cell edge (the
-item's hard contract). Frames 7–8 show the follow-through and a settle back
-toward the frame-1 stance (post-throw follow-through, not a byte match —
-documented as acceptable for a one-shot transition, same convention as
-`stretch`).
+sequence. Frames 5–6 show the wind-up and release — the stick remains fully
+within the tile in every frame, including frame 6 where it is correctly
+drawn mid-air just past the open paw at the fully extended arm rather than
+still gripped, and is never cut off by a cell edge (the item's contract;
+runtime (#21) must not spawn an additional projectile while this row
+plays, since the thrown stick is already part of the baked art). Frames
+7–8 show the follow-through and a settle back toward the frame-1 stance
+(post-throw follow-through, not a byte match — documented as acceptable
+for a one-shot transition, same convention as `stretch`).
 
 ### `collect-sticks`
 
