@@ -32,6 +32,10 @@ assets-src/*
 # swallow repo files of the same name at deeper paths.
 /.flightplan/
 
+# AGENTS.md — local agent instructions, never shipped (per repo-owner rule).
+# CLAUDE.md is the committed entry point for all agents.
+/AGENTS.md
+
 # Agent tooling stays maintainer-local: Flightplan fp-* skills/commands/agents
 # are workflow scaffolding, not project content. The vendored PixiJS skills
 # under .agents/skills/pixijs* ARE committed (pinned by skills-lock.json).
