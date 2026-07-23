@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_DRINK, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_WALK, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, BABY, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -20,6 +20,8 @@ const hasSleepSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_S
 const hasStretchSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_STRETCH.sourceDir}/sheet.png`, import.meta.url));
 const hasIdleSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_IDLE.sourceDir}/sheet.png`, import.meta.url));
 const hasWalkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WALK.sourceDir}/sheet.png`, import.meta.url));
+const hasThrowStickSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_THROW_STICK.sourceDir}/sheet.png`, import.meta.url));
+const hasCollectSticksSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_COLLECT_STICKS.sourceDir}/sheet.png`, import.meta.url));
 // speak (BL-7) has no ComfyUI source dir to gate on — it's mechanically
 // composited from the committed idle tile, so its regeneration test runs
 // unconditionally (see below).
@@ -124,9 +126,11 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     };
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
     // is appended by ingest-typing.mjs (see ingest-typing); `watering`,
-    // `drink`, `sleep`, `stretch`, and `speak` are appended by
-    // buildAdultWateringSheet / buildAdultDrinkSheet / buildAdultSleepSheet /
-    // buildAdultStretchSheet / buildAdultSpeakSheet (see below).
+    // `drink`, `sleep`, `stretch`, `speak`, `throw-stick`, and
+    // `collect-sticks` are appended by buildAdultWateringSheet /
+    // buildAdultDrinkSheet / buildAdultSleepSheet / buildAdultStretchSheet /
+    // buildAdultSpeakSheet / buildAdultThrowStickSheet /
+    // buildAdultCollectSticksSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -139,6 +143,8 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'sleep', frames: 8 },
       { name: 'stretch', frames: 8 },
       { name: 'speak', frames: 8 },
+      { name: 'throw-stick', frames: 8 },
+      { name: 'collect-sticks', frames: 8 },
     ]);
   });
 
@@ -151,15 +157,18 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // evenly between arms-up and arms-down poses, so it fits the default 96px
   // tile at targetContentHeightPx 96 with no rowHeight override needed — see
   // STYLE.md provenance); buildAdultSpeakSheet appends a 96px `speak` row →
-  // 1088 (default 96px tile, targetContentHeightPx 88). Width stays a flat
-  // 8-col grid at the 96px tile — only row height varies, never column width.
-  it('is a 768x1088 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96)', () => {
+  // 1088 (default 96px tile, targetContentHeightPx 88);
+  // buildAdultThrowStickSheet appends a 96px `throw-stick` row → 1184;
+  // buildAdultCollectSticksSheet appends a 96px `collect-sticks` row → 1280
+  // (BL-9). Width stays a flat 8-col grid at the 96px tile — only row height
+  // varies, never column width.
+  it('is a 768x1280 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96/96/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(1088);
+    expect(decoded.height).toBe(1280);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(1088);
+    expect(meta.sheetHeight).toBe(1280);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -708,5 +717,139 @@ describe.skipIf(!hasWalkSource)('ingest-animation-frames walk regeneration', () 
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultWalkSheet(repoRoot).png.equals(buildAdultWalkSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Throw-stick row (BL-9): a ONE-SHOT (not a loop) reference-conditioned
+// generation, same green-chroma-key 4x2 grid convention as
+// watering/drink/sleep/stretch. Unlike speak (a still body with a patched
+// mouth box), this is a dynamic full-body action row — BODY MOTION BETWEEN
+// FRAMES IS EXPECTED here (winding up, throwing, following through), so the
+// gate is pose COHERENCE (same character, same tail side, no palette
+// drift/redraw-flicker in static parts like head shape/fur color), not
+// frame-to-frame pixel identity like ADULT_SPEAK's mouth-patch invariant.
+// Checked by eyeball against the committed contact sheet + 8fps GIF
+// (docs/design-reviews/BL-9-throw-stick-contact.png /
+// BL-9-throw-stick.gif) per the BL-7 lesson (independent-cell generations
+// can silently flip tail side / drift shading) — no automated per-pixel
+// assertion can substitute for that eyeball check on a dynamic-motion row.
+describe('ingest-animation-frames throw-stick row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a throw-stick row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'throw-stick');
+    expect(row).toEqual({ name: 'throw-stick', frames: 8 });
+  });
+
+  it('every throw-stick frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'throw-stick');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at throw-stick[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `throw-stick[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `throw-stick[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasThrowStickSource)('ingest-animation-frames throw-stick regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultThrowStickSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultThrowStickSheet(repoRoot).png.equals(buildAdultThrowStickSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Collect-sticks row (BL-9): same one-shot/dynamic-motion convention as
+// throw-stick above. Frame 8 is an intentionally NON-idle end pose (beaver
+// standing, holding the gathered stick bundle against its chest) — this is
+// documented intent (STYLE.md), not a continuity bug, so no test asserts a
+// return-to-idle on the final frame.
+describe('ingest-animation-frames collect-sticks row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a collect-sticks row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'collect-sticks');
+    expect(row).toEqual({ name: 'collect-sticks', frames: 8 });
+  });
+
+  it('every collect-sticks frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'collect-sticks');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at collect-sticks[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `collect-sticks[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `collect-sticks[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasCollectSticksSource)('ingest-animation-frames collect-sticks regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultCollectSticksSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultCollectSticksSheet(repoRoot).png.equals(buildAdultCollectSticksSheet(repoRoot).png)).toBe(true);
   });
 });

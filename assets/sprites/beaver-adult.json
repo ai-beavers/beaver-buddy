@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 1088,
+  "sheetHeight": 1280,
   "rows": [
     {
       "name": "idle",
@@ -47,6 +47,14 @@
     },
     {
       "name": "speak",
+      "frames": 8
+    },
+    {
+      "name": "throw-stick",
+      "frames": 8
+    },
+    {
+      "name": "collect-sticks",
       "frames": 8
     }
   ]

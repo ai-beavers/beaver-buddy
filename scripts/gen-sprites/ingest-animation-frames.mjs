@@ -420,10 +420,60 @@ export function buildAdultWalkSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_WALK);
 }
 
+// throw-stick (BL-9, ONE-SHOT): beaver picks up a stick, winds up, throws
+// toward screen-right. Contract: the stick remains fully within the tile in
+// every frame (including the release frames, where it's correctly drawn
+// mid-air just past the paw, not still gripped) — runtime (#21) must not
+// spawn an additional projectile while this row plays. Frame 1 ≈ the idle
+// stance; frame 8 settles back toward idle (post-throw follow-through
+// acceptable, not a byte match). Reference-conditioned Comfy Cloud Nano
+// Banana Pro generation on a green (#00FF00) chroma-key background, same
+// 4x2 grid convention as watering/drink/sleep/stretch.
+// targetContentHeightPx: 96 matches the committed idle tile's own measured
+// full-tile content height — the height term binds here (tallest raw crop
+// 344x357 pre-scale), landing at 96x92.5, comfortably under the 96px width
+// cap.
+export const ADULT_THROW_STICK = {
+  rowName: 'throw-stick',
+  sourceDir: 'adult-throw-stick',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultThrowStickSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_THROW_STICK);
+}
+
+// collect-sticks (BL-9, ONE-SHOT): beaver bends, gathers 2-3 sticks into its
+// arms, straightens up holding the bundle. Frame 1 ≈ the idle stance; frame
+// 8 is an intentionally NON-idle end pose (standing, holding the bundle
+// against its chest) — documented here and in STYLE.md, not a continuity
+// bug. Same generation method/gates as throw-stick above.
+// Scale-trap check (BL-19/BL-5 precedent): the row's widest raw crop
+// (328x292, the two-armed hugging pose) binds the WIDTH term of
+// computeStageScale before targetContentHeightPx=96 can be reached — actual
+// content height lands at ~85.5px (96/328 width-capped scale), not 96;
+// left at 96 to document intent (match idle) rather than hand-tuning to the
+// capped value, same convention as ADULT_STRETCH's own scale-trap note.
+export const ADULT_COLLECT_STICKS = {
+  rowName: 'collect-sticks',
+  sourceDir: 'adult-collect-sticks',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultCollectSticksSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_COLLECT_STICKS);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
-// way (watering, drink, sleep, stretch, idle, walk, future BL-8..12 rows
-// just add a config here).
+// way (watering, drink, sleep, stretch, idle, walk, throw-stick,
+// collect-sticks, future items just add a config here).
 // adult-speak is deliberately NOT in this map: it has no ComfyUI grid/config
 // (buildAdultRowSheet doesn't apply), it's dispatched as its own CLI branch
 // below.
@@ -433,6 +483,8 @@ const ADULT_ROWS = {
   'adult-sleep': ADULT_SLEEP,
   'adult-stretch': ADULT_STRETCH,
   'adult-idle': ADULT_IDLE,
+  'adult-throw-stick': ADULT_THROW_STICK,
+  'adult-collect-sticks': ADULT_COLLECT_STICKS,
   'adult-walk': ADULT_WALK,
 };
 
