@@ -58,35 +58,50 @@ describe('curve: stage anchors', () => {
   });
 });
 
-describe('curve: cap and table integrity', () => {
-  it('has 32 entries with the spec total at the cap', () => {
-    expect(LEVEL_XP_THRESHOLDS).toHaveLength(32);
-    expect(LEVEL_XP_THRESHOLDS[31]).toBe(120_000);
+describe('curve: no cap — formula extends past L32', () => {
+  it('levels extend beyond 32 via the quadratic formula', () => {
+    expect(levelForXp(200_000)).toBeGreaterThan(32);
+    expect(levelForXp(1_000_000)).toBeGreaterThan(32);
+    expect(levelForXp(1_761_203)).toBeGreaterThan(100);
   });
 
-  it('level is capped at 32 regardless of xp', () => {
-    expect(levelForXp(1_000_000)).toBe(32);
-    expect(levelForXp(120_000)).toBe(32);
+  it('levelForXp is consistent with xpForLevel roundtrip past 32', () => {
+    for (const level of [33, 50, 100, 200]) {
+      expect(levelForXp(xpForLevel(level))).toBe(level);
+    }
   });
 
-  it('xpForLevel clamps below 1 to L1 and above 32 to L32', () => {
-    expect(xpForLevel(0)).toBe(0);
-    expect(xpForLevel(100)).toBe(120_000);
+  it('xpForLevel has no upper cap — grows with level', () => {
+    const l32 = xpForLevel(32);
+    const l50 = xpForLevel(50);
+    const l100 = xpForLevel(100);
+    expect(l50).toBeGreaterThan(l32);
+    expect(l100).toBeGreaterThan(l50);
   });
 
-  it('table is strictly increasing from L1 onward', () => {
+  it('each successive level is progressively harder (quadratic)', () => {
+    const delta31_32 = xpForLevel(32) - xpForLevel(31);
+    const delta1_4 = xpForLevel(4) - xpForLevel(1);
+    expect(delta31_32).toBeGreaterThan(delta1_4);
+  });
+
+  it('table (L1-L32 reference) is strictly increasing', () => {
     for (let i = 1; i < LEVEL_XP_THRESHOLDS.length; i += 1) {
       expect(LEVEL_XP_THRESHOLDS[i]).toBeGreaterThan(LEVEL_XP_THRESHOLDS[i - 1]);
     }
   });
 
   it('table matches the derived formula for every level', () => {
-    // L1 is defined as 0; L2..L32 are round(120000 * L^2 / 32^2).
     expect(LEVEL_XP_THRESHOLDS[0]).toBe(0);
     for (let level = 2; level <= 32; level += 1) {
       const expected = Math.round((120_000 * level * level) / (32 * 32));
       expect(LEVEL_XP_THRESHOLDS[level - 1]).toBe(expected);
     }
+  });
+
+  it('has 32 entries with the spec total at index 31', () => {
+    expect(LEVEL_XP_THRESHOLDS).toHaveLength(32);
+    expect(LEVEL_XP_THRESHOLDS[31]).toBe(120_000);
   });
 });
 
