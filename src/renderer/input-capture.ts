@@ -49,12 +49,15 @@ export function isPointOverPet(x: number, y: number, petX: number, petY: number)
   return x >= petX && x < petX + size && y >= petY && y < petY + size;
 }
 
-// BL-17/BL-18/Wave-B: the parachute interaction needs struggle/parachute-
-// wind/land rows. Only baby and adult ship those rows; young-baby, teen, and
-// older-teen sheets are idle/walk only, so they correctly fall through to
-// false here and stay click-through.
+import { capabilities } from './stage-capabilities';
+
+// The parachute interaction needs struggle/parachute-wind/land rows, which
+// are gated by StageCapabilities.canGrab per stage. The renderer queries
+// this at runtime — when Vlady's M5 pipeline later adds the missing rows
+// to young-baby / older-teen sheets, flipping canGrab to true is all that
+// is needed (no hard-coded stage-name checks anywhere).
 export function stageHasInteraction(stage: Stage): boolean {
-  return stage === 'baby' || stage === 'adult';
+  return capabilities(stage).canGrab;
 }
 
 export function determineCaptureMode(

@@ -23,7 +23,7 @@ import { createDetectorState, detectEvents } from './quips/detectors';
 import { QUIP_DISPLAY_DURATION_MS } from './quips/quip-config';
 import { type QuipTrigger } from './quips/quips';
 import { createSchedulerState, schedule, type SchedulerState } from './quips/scheduler';
-import type { Stage } from './xp/curve';
+import { xpForLevel, type Stage } from './xp/curve';
 import { MrrEngine } from './mrr/mrr-engine';
 import { loadSettingsState, saveSettingsState, type SettingsState } from './mrr/settings-store';
 import { openSettingsWindow } from './mrr/settings-window';
@@ -272,6 +272,17 @@ app.whenReady().then(async () => {
       stateDir,
       keychainService,
       getSettings: () => growthSettings,
+      getXpState: () => {
+        const state = xpEngine.getState();
+        return {
+          xp: state.xp,
+          level: state.level,
+          stage: state.stage,
+          currentLevelXp: xpForLevel(state.level),
+          nextLevelXp: xpForLevel(state.level + 1),
+          lastSeenByModel: xpEngine.getLastSeenByModel(),
+        };
+      },
       onSettingsChanged: (next) => {
         growthSettings = next;
         xpEngine.setMode(growthSettings.mode);

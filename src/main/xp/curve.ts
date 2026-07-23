@@ -63,17 +63,30 @@ const STAGE_ANCHORS: ReadonlyArray<{ readonly level: number; readonly stage: Sta
 
 export function levelForXp(xp: number): number {
   const clamped = Math.max(0, xp);
-  // Inverse of the quadratic formula: L = floor(sqrt(xp / TOTAL) * 32).
-  // No upper cap — the formula extends past L32 naturally, making every
-  // subsequent level progressively harder to reach.
-  return Math.max(1, Math.floor(Math.sqrt(clamped / TOTAL_XP) * ANCHOR_DENOM));
+  // Table covers the calibrated L1-L32 range exactly — avoids the float
+  // rounding drift that floor(sqrt(round(...) / TOTAL) * 32) would produce
+  // (round() can push a threshold just below the integer boundary).
+  for (let i = 1; i < LEVEL_XP_THRESHOLDS.length; i += 1) {
+    if (clamped < LEVEL_XP_THRESHOLDS[i]) return i;
+  }
+  if (clamped <= LEVEL_XP_THRESHOLDS[31]) return 32;
+  // Beyond L32: inverse quadratic with a correction pass — cumXP uses
+  // round(), which can place thresholds just under integer boundaries
+  // (same float effect), so floor() may land one level low. One while
+  // iteration handles the drift; bounded because the formula is monotonic.
+  let level = Math.floor(Math.sqrt(clamped / TOTAL_XP) * ANCHOR_DENOM);
+  if (level < 32) level = 32;
+  while (xpForLevel(level + 1) <= clamped) level += 1;
+  return level;
 }
 
 export function xpForLevel(level: number): number {
   const l = Math.max(1, level);
-  // L1 is defined as 0; L2+ uses the quadratic formula.
-  // No upper cap — every level has a defined XP threshold.
-  return l <= 1 ? 0 : Math.round((TOTAL_XP * l * l) / (ANCHOR_DENOM * ANCHOR_DENOM));
+  if (l <= 1) return 0;
+  // Table for L1-L32 (exact calibration, no float drift).
+  if (l <= 32) return LEVEL_XP_THRESHOLDS[l - 1];
+  // Beyond L32: raw quadratic formula — no rounding table to drift against.
+  return Math.round((TOTAL_XP * l * l) / (ANCHOR_DENOM * ANCHOR_DENOM));
 }
 
 export function stageForLevel(level: number): Stage {

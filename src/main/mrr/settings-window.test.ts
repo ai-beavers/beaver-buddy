@@ -118,6 +118,14 @@ describe('createSettingsHandlers', () => {
           },
         };
       },
+      getXpState: () => ({
+        xp: 3500,
+        level: 5,
+        stage: 'young-baby',
+        currentLevelXp: 2930,
+        nextLevelXp: 4219,
+        lastSeenByModel: { 'claude-opus-4-8': 5000, 'unknown': 1000 },
+      }),
     };
   }
 
@@ -163,12 +171,13 @@ describe('createSettingsHandlers', () => {
     expect(d.onForceWork).toHaveBeenCalledTimes(1);
   });
 
-  it('readStatus returns mode/connected booleans plus per-source usage, never secrets', () => {
+  it('readStatus returns mode/connected/XP plus per-source usage, never secrets', () => {
     const handlers = createSettingsHandlers(deps(), () => true);
     expect(handlers.readStatus(fakeEvent)).toMatchObject({
       stripeConnected: false,
       revenuecatConnected: false,
       mode: 'tokens',
+      xp: { xp: 3500, level: 5, stage: 'young-baby' },
       claude: { enabled: false, connected: false, logsFound: true, lifetimeTokens: 0, todayTokens: 0 },
       codex: { enabled: false, connected: false, logsFound: true, lifetimeTokens: 9_000_000, todayTokens: 1_000 },
     });
@@ -312,6 +321,7 @@ describe('openSettingsWindow', () => {
         claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
         codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
       }),
+      getXpState: () => ({ xp: 0, level: 1, stage: 'baby' as const, currentLevelXp: 0, nextLevelXp: 469, lastSeenByModel: {} }),
       onUsageEnabledChanged: () => {},
     };
 
@@ -387,6 +397,7 @@ describe('openSettingsWindow', () => {
         claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
         codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
       }),
+      getXpState: () => ({ xp: 0, level: 1, stage: 'baby' as const, currentLevelXp: 0, nextLevelXp: 469, lastSeenByModel: {} }),
       onUsageEnabledChanged: () => {},
     };
 
@@ -434,6 +445,7 @@ describe('openSettingsWindow', () => {
         claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
         codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
       }),
+      getXpState: () => ({ xp: 0, level: 1, stage: 'baby' as const, currentLevelXp: 0, nextLevelXp: 469, lastSeenByModel: {} }),
       onUsageEnabledChanged: () => {},
     };
 

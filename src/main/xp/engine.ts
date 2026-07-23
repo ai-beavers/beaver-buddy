@@ -64,6 +64,10 @@ export class XpEngine {
     return { xp: this.state.xp, level, stage: stageForLevel(level) };
   }
 
+  getLastSeenByModel(): Record<string, number> {
+    return { ...this.state.lastSeenByModel };
+  }
+
   // The most recent emitted update, or a synthesized non-evolving snapshot
   // when nothing has been emitted yet. Lets a receiver that starts
   // listening late (a renderer page that finishes loading after launch-time
