@@ -470,10 +470,43 @@ export function buildAdultCollectSticksSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_COLLECT_STICKS);
 }
 
+// exercise (BL-8, LOOP): beaver lifts a SHORT log overhead like a dumbbell,
+// two full reps across 8 frames (chest -> overhead -> chest, twice), settles
+// back near frame 1 so it loops seamlessly. Scale-trap check (the reason
+// this row's plan called it out explicitly): a wide log would bind
+// computeStageScale's WIDTH term and shrink the whole character — the
+// accepted generation's widest raw crop is 318x380 (the overhead-lift
+// frames, arms+log reaching above the head). At targetContentHeightPx=96
+// (the default tile) the HEIGHT term binds fine (no width clipping), but
+// the tallest raw content is the ARMS-UP-AND-LOG silhouette, not the
+// standing body itself (same shape of trap ADULT_STRETCH's comment
+// describes and rejects) — locking the scale off it at 96 undersizes the
+// standing body to ~82px, visibly smaller than idle. Fix (parachute-wind
+// precedent, BL-19): rowHeight: 128 lets targetContentHeightPx go to 112
+// without the width term taking over (96/318=0.3019 vs 112/380=0.2947 —
+// HEIGHT still binds, width lands at a max of 93.7px across all 8 frames,
+// under the 96px tile) — this scales the standing/chest-height frame (raw
+// 318×380 widest crop) to ~96px tall, matching idle's
+// own measured full-tile content height, while the overhead frames extend
+// up into the taller tile instead of shrinking everything to fit.
+export const ADULT_EXERCISE = {
+  rowName: 'exercise',
+  sourceDir: 'adult-exercise',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 112,
+  rowHeight: 128,
+};
+
+export function buildAdultExerciseSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_EXERCISE);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, throw-stick,
-// collect-sticks, future items just add a config here).
+// collect-sticks, exercise, future items just add a config here).
 // adult-speak is deliberately NOT in this map: it has no ComfyUI grid/config
 // (buildAdultRowSheet doesn't apply), it's dispatched as its own CLI branch
 // below.
@@ -485,6 +518,7 @@ const ADULT_ROWS = {
   'adult-idle': ADULT_IDLE,
   'adult-throw-stick': ADULT_THROW_STICK,
   'adult-collect-sticks': ADULT_COLLECT_STICKS,
+  'adult-exercise': ADULT_EXERCISE,
   'adult-walk': ADULT_WALK,
 };
 

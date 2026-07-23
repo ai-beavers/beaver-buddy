@@ -86,15 +86,17 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1280 sheet,
-  96×96 tiles, fps hint 8
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1408 sheet,
+  96×96 tiles (`exercise` and `parachute-wind` are 128px-tall rows), fps
+  hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
   `stretch` (8, ONE-SHOT wake-up transition, not a loop), `speak` (8,
   forward-facing talking loop, mouth cycling open/closed), `throw-stick` (8,
   ONE-SHOT, picks up and throws a stick, settles back toward idle),
   `collect-sticks` (8, ONE-SHOT, gathers 2-3 sticks into a bundle, ends
-  holding the bundle — an intentionally non-idle end pose)
+  holding the bundle — an intentionally non-idle end pose), `exercise` (8,
+  LOOP, lifts a short log overhead like a dumbbell, two full reps)
 - **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
   teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
   Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
@@ -145,7 +147,17 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   chroma-key background, same `buildAdultRowSheet` ingestion as
   watering/drink/sleep/stretch. Both passed the pose-coherence gate
   (consistent tail side/palette, no independent-cell redraw flicker) on the
-  first generation attempt.
+  first generation attempt. `exercise` (BL-8) is appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-exercise`
+  (`npm run assets:adult-exercise`) — a LOOP (unlike throw-stick/
+  collect-sticks), reference-conditioned `partner_generate` generation, same
+  environment deviation and green chroma-key convention. Needed a
+  `rowHeight: 128` override (parachute-wind precedent): the row's widest raw
+  crop is also its tallest (the overhead-lift pose), and locking the scale
+  off it at the plain 96px tile undersized the standing body relative to
+  idle — see STYLE.md provenance for the full scale-trap writeup and the
+  generation-attempt history (a self-inflicted grid-line artifact on attempt
+  2 was corrected on attempt 3).
 - **Status:** final
 
 ### Tree — growth stages

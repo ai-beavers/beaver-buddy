@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, BABY, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_EXERCISE, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, BABY, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultExerciseSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -22,6 +22,7 @@ const hasIdleSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_ID
 const hasWalkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WALK.sourceDir}/sheet.png`, import.meta.url));
 const hasThrowStickSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_THROW_STICK.sourceDir}/sheet.png`, import.meta.url));
 const hasCollectSticksSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_COLLECT_STICKS.sourceDir}/sheet.png`, import.meta.url));
+const hasExerciseSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_EXERCISE.sourceDir}/sheet.png`, import.meta.url));
 // speak (BL-7) has no ComfyUI source dir to gate on — it's mechanically
 // composited from the committed idle tile, so its regeneration test runs
 // unconditionally (see below).
@@ -126,11 +127,11 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     };
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
     // is appended by ingest-typing.mjs (see ingest-typing); `watering`,
-    // `drink`, `sleep`, `stretch`, `speak`, `throw-stick`, and
-    // `collect-sticks` are appended by buildAdultWateringSheet /
+    // `drink`, `sleep`, `stretch`, `speak`, `throw-stick`, `collect-sticks`,
+    // and `exercise` are appended by buildAdultWateringSheet /
     // buildAdultDrinkSheet / buildAdultSleepSheet / buildAdultStretchSheet /
     // buildAdultSpeakSheet / buildAdultThrowStickSheet /
-    // buildAdultCollectSticksSheet (see below).
+    // buildAdultCollectSticksSheet / buildAdultExerciseSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -145,6 +146,7 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'speak', frames: 8 },
       { name: 'throw-stick', frames: 8 },
       { name: 'collect-sticks', frames: 8 },
+      { name: 'exercise', frames: 8, height: 128 },
     ]);
   });
 
@@ -160,15 +162,23 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // 1088 (default 96px tile, targetContentHeightPx 88);
   // buildAdultThrowStickSheet appends a 96px `throw-stick` row → 1184;
   // buildAdultCollectSticksSheet appends a 96px `collect-sticks` row → 1280
-  // (BL-9). Width stays a flat 8-col grid at the 96px tile — only row height
-  // varies, never column width.
-  it('is a 768x1280 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96/96/96)', () => {
+  // (BL-9); buildAdultExerciseSheet appends a 128px `exercise` row → 1408
+  // (BL-8) — a rowHeight:128 override (parachute-wind precedent) so
+  // targetContentHeightPx can go to 112 without the WIDTH term taking over
+  // (96/318=0.3019 vs 112/380=0.2947 — HEIGHT still binds, max content width
+  // 93.7px across all 8 frames, under the 96px tile) — this scales the
+  // standing/chest-height frames to ~96px tall, matching idle's own
+  // full-tile content height, instead of the whole row shrinking to fit the
+  // overhead-arms-and-log frames inside a plain 96px tile. Width stays a
+  // flat 8-col grid at the 96px tile — only row height varies, never column
+  // width.
+  it('is a 768x1408 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96/96/96/128)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(1280);
+    expect(decoded.height).toBe(1408);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(1280);
+    expect(meta.sheetHeight).toBe(1408);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -851,5 +861,75 @@ describe.skipIf(!hasCollectSticksSource)('ingest-animation-frames collect-sticks
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultCollectSticksSheet(repoRoot).png.equals(buildAdultCollectSticksSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// exercise (BL-8): a LOOP (unlike throw-stick/collect-sticks, which are
+// ONE-SHOT) — two full log-lift reps across 8 frames, frame 8 settling back
+// near frame 1 so it loops seamlessly. Same pose-COHERENCE gate as
+// throw-stick/collect-sticks (dynamic full-body motion is expected; the
+// BL-7 lesson is about independent-cell body/tail/palette drift, not
+// frame-to-frame pixel identity) plus a prop-coherence check specific to
+// this row: the log's length/diameter must read as constant and the beaver
+// must keep two-paw contact with it in every frame, with no paw/log/body
+// intersections — checked by eyeball against the committed contact sheet +
+// 8fps GIF + a dedicated wraparound (frame 8 vs frame 1) comparison, per
+// docs/design-reviews/BL-8-exercise-verdict.md.
+describe('ingest-animation-frames exercise row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has an exercise row, found by name, 8 frames, 128px tall (rowHeight override, parachute-wind precedent)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'exercise');
+    expect(row).toEqual({ name: 'exercise', frames: 8, height: 128 });
+  });
+
+  it('every exercise frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'exercise');
+    const { tile } = meta;
+    const rowHeight = meta.rows.find((r) => r.name === 'exercise')?.height ?? tile;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < rowHeight; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === rowHeight - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at exercise[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `exercise[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `exercise[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasExerciseSource)('ingest-animation-frames exercise regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultExerciseSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultExerciseSheet(repoRoot).png.equals(buildAdultExerciseSheet(repoRoot).png)).toBe(true);
   });
 });
