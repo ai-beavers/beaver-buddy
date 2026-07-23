@@ -154,6 +154,7 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'brainrot', frames: 8 },
       { name: 'wave', frames: 8 },
       { name: 'flush', frames: 8 },
+      { name: 'toilet', frames: 8, height: 128 },
     ]);
   });
 
@@ -179,14 +180,22 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // overhead-arms-and-log frames inside a plain 96px tile. Width stays a
   // flat 8-col grid at the 96px tile — only row height varies, never column
   // width. buildAdultBrainrotSheet appends a plain 96px `brainrot` row ->
-  // 1504; its height-bound pose fits the default tile.
-  it('is a 768x1696 sheet (8 cols at the 96px tile; row heights … + wave/flush)', () => {
+  // 1504; its height-bound pose fits the default tile. buildAdultWaveSheet
+  // appends a 96px `wave` row -> 1600; buildAdultFlushSheet appends a 96px
+  // `flush` row -> 1696; buildAdultToiletSheet appends a 128px `toilet` row
+  // (BL-14) -> 1824 — a rowHeight:128 override (parachute-wind/exercise
+  // precedent) so the tall toilet-tank + seated-beaver early frames and the
+  // cresting sweep-wave frame extend upward past the base tile instead of
+  // shrinking the whole row's scale off that tallest silhouette; the width
+  // term binds at scale 0.2791 (max content 96px wide, under the tile) so no
+  // frame clips horizontally.
+  it('is a 768x1824 sheet (8 cols at the 96px tile; row heights … + wave/flush/toilet)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(1696);
+    expect(decoded.height).toBe(1824);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(1696);
+    expect(meta.sheetHeight).toBe(1824);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {

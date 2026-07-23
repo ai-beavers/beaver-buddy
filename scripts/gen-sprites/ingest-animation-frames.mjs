@@ -585,6 +585,44 @@ export function buildAdultFlushSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_FLUSH);
 }
 
+// Full toilet routine ONE-SHOT (BL-14): the complete bit the short `flush`
+// gag only hinted at — beaver sits on a stylized toilet, does its business,
+// flushes, then a tile-scale water wave sweeps it (and the toilet) away to
+// the side it faces, leaving a wet, receding wash that settles back toward a
+// dry idle stance. Natural 4x2 grid order (no frameOrder); the beaver stays
+// clearly visible in every frame (owner acceptance bar — an earlier take
+// dropped the beaver on the sweep frames and was rejected). Reference-
+// conditioned Nano Banana Pro generation on a green (#00FF00) chroma-key
+// background, same convention as every other adult row.
+//
+// rowHeight: 128 (parachute-wind/exercise precedent): the tallest raw content
+// is the toilet-tank + seated beaver (early frames) and the cresting sweep
+// wave (frame 7), both taller than a bare standing beaver. At the default
+// 96px tile computeStageScale would lock the whole row's scale off that
+// tallest silhouette and shrink the beaver noticeably below idle size; the
+// taller tile lets the tank/wave extend upward past the base tile (drawFrame
+// bottom-anchors every row to the shared ground line) while the beaver's body
+// renders at a readable size. targetContentHeightPx: 112 matches the
+// exercise row's tuned value for the same 128px-tile tradeoff. LOOP-vs-one-
+// shot is a WAVE-2 runtime concern (documented in STYLE.md), not encoded here.
+//
+// Scope note: the "huge, full-screen wall of water" version of the sweep is a
+// separate WAVE-2 runtime effect (canvas draw across the whole overlay, not a
+// tile) — deferred by owner decision; this row ships the tile-scale sweep only.
+export const ADULT_TOILET = {
+  rowName: 'toilet',
+  sourceDir: 'adult-toilet',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 112,
+  rowHeight: 128,
+};
+
+export function buildAdultToiletSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_TOILET);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, throw-stick,
@@ -606,6 +644,7 @@ const ADULT_ROWS = {
   'adult-brainrot': ADULT_BRAINROT,
   'adult-wave': ADULT_WAVE,
   'adult-flush': ADULT_FLUSH,
+  'adult-toilet': ADULT_TOILET,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

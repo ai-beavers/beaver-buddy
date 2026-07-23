@@ -86,9 +86,9 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1696 sheet,
-  96×96 tiles (`exercise` and `parachute-wind` are 128px-tall rows), fps
-  hint 8
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1824 sheet,
+  96×96 tiles (`exercise`, `parachute-wind`, and `toilet` are 128px-tall rows),
+  fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
   `stretch` (8, ONE-SHOT wake-up transition, not a loop), `speak` (8,
@@ -98,7 +98,9 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   holding the bundle — an intentionally non-idle end pose), `exercise` (8,
   LOOP, lifts a short log overhead like a dumbbell, two full reps),
   `brainrot` (8, LOOP, glazed phone-scroll, thumb flick), `wave` (8, LOOP,
-  friendly wave-goodbye), `flush` (8, ONE-SHOT, stylized toilet-flush gag)
+  friendly wave-goodbye), `flush` (8, ONE-SHOT, stylized toilet-flush gag),
+  `toilet` (8, ONE-SHOT, 128px-tall, full toilet routine — sits on a stylized
+  toilet, flushes, then a tile-scale wave sweeps toilet + beaver away)
 - **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
   teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
   Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
@@ -173,7 +175,12 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   owner-scoped as both a wave-goodbye LOOP and a compressed flush gag
   ONE-SHOT; `wave` uses `frameOrder` ping-pong on its body-consistent half
   — see STYLE.md provenance and
-  `docs/design-reviews/BL-10-toilet-verdict.md`.
+  `docs/design-reviews/BL-10-toilet-verdict.md`. `toilet` (BL-14) is appended
+  via `scripts/gen-sprites/ingest-animation-frames.mjs adult-toilet`
+  (`npm run assets:adult-toilet`) — the FULL toilet routine (sit → flush →
+  tile-scale sweep) at `rowHeight: 128`; the full-screen wall-of-water version
+  of the sweep is deferred to a WAVE-2 runtime effect — see STYLE.md
+  provenance and `docs/design-reviews/BL-14-toilet-verdict.md`.
 - **Status:** final
 
 ### Tree — growth stages

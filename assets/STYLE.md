@@ -537,6 +537,43 @@ Evidence: `docs/design-reviews/BL-10-{wave,flush}-{contact,wraparound}.png`
 `adult-flush` (`npm run assets:adult-wave` / `assets:adult-flush`), growing
 the sheet to 768×1696. No human cleanup beyond the mechanical pipeline.
 
+`toilet(8)` (BL-14, 2026-07-23): owner-scoped as the FULL toilet routine the
+short `flush` gag only hinted at — a ONE-SHOT: beaver sits on a stylized
+toilet bowl + tank, does its business, flushes (water swirl), then a
+tile-scale water wave sweeps the toilet AND beaver away to the side it faces,
+leaving a small swept-away silhouette. The beaver stays clearly visible in
+every frame (owner acceptance bar — a first take that dropped the beaver on
+the sweep frames was rejected and regenerated). Natural 4×8 → 4×2 grid order,
+no `frameOrder`. Distinct from the shipped `flush` gag (no toilet prop) — both
+ship; `flush` is the quick bit, `toilet` the full routine.
+
+**Generation** — same `partner_generate` (`vertexai/nano-banana-pro`) + public
+adult-sheet raw-URL reference path as BL-8/BL-9/BL-10/BL-11, green (`#00FF00`)
+chroma-key background, RGB output normalized to RGBA before ingest. Regenerated
+once for the beaver-visibility gate above; accepted take then ingested
+unmodified.
+
+**Row height** — `rowHeight: 128` (parachute-wind/exercise precedent),
+`targetContentHeightPx: 112`. The tallest raw content is the toilet-tank +
+seated beaver (early frames, ~292×381) and the cresting sweep wave (frame 7,
+~344×355), both taller than a bare standing beaver; at the default 96px tile
+`computeStageScale` would lock the whole row's scale off that tallest
+silhouette and shrink the beaver below idle size. The taller tile lets the
+tank/wave extend upward past the base tile (drawFrame bottom-anchors every row
+to the shared ground line) while the beaver renders at a readable size. The
+WIDTH term binds at scale 0.2791 (max content 96px wide — fills the tile, no
+horizontal clip; max content height 106px, inside the 128px tile). LOOP-vs-
+one-shot is a WAVE-2 runtime concern, not encoded in the sheet meta.
+
+**Scope note** — the "huge, full-screen wall of water" version of the sweep
+(a canvas draw spanning the whole overlay, not a tile) is a separate WAVE-2
+runtime effect, deferred by owner decision; this row ships the tile-scale
+sweep only. Evidence: `docs/design-reviews/BL-14-toilet-contact.png` + GIF —
+see `docs/design-reviews/BL-14-toilet-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-toilet`
+(`npm run assets:adult-toilet`), growing the sheet to 768×1824. No human
+cleanup beyond the mechanical pipeline.
+
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
 independent prompts, via Comfy Cloud Nano Banana Pro (`vertexai/nano-banana-pro`
