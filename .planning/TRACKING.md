@@ -63,3 +63,13 @@ erweitern. Stage-Capabilities-Modul als Fundament für stufenspezifisches Verhal
 abgeglichen: adult-Rows existieren bereits für P1–P8 via build-loop; young-baby/older-teen/adult
 brauchen noch volle Rows (M5/P12). Settings-UI-Konzept wartet auf Owner-Transkript.
 Status: **geplant** (PLAN.md; Subbranch `feat/xp-cap-and-settings` abzweigend von `feat/reset-removal-xp-migration`)
+
+## 2026-07-23 — pi-agent Token-Counter Fix (Debug-Session)
+
+Vorhaben: pi-agent Session-JSONL-Dateien werden vom generischen Parser nicht erfasst, weil
+usage (`message.usage`) und model (`message.model`) eine Ebene tiefer liegen als erwartet.
+Zusätzlich passen Pi-Feldnamen (`cacheRead`/`cacheWrite`) nicht zu den vom Parser erwarteten
+(`cacheReadTokens`/`cacheCreationTokens`). Fix: `findUsageObject` um `message.*`-Fallback
+erweitern, `normalizeUsage` um die kurzen Feldnamen ergänzen, Pi-spezifischen
+`inputAlreadyFresh`-Indikator hinzufügen.
+Status: **umgesetzt** (generic-parser.ts: `findUsageObject` um `message.*`-Fallback + `normalizeUsage` um Pi-Feldnamen erweitert; `inputAlreadyFresh` erkennt Pi-style usage-Objekte; `cacheRead`-Cap nur bei gross-input; 5 neue Tests; typecheck/lint/653 Tests grün)
