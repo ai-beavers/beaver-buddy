@@ -132,3 +132,9 @@ export const CLICK_WINDOW_S = 4;
 export const WORK_PROBABILITY = 0.05;
 export const WORK_DURATION_MIN_S = 8;
 export const WORK_DURATION_MAX_S = 16;
+
+// Toilet+newspaper+recovery gag (adult sheet rows toilet-read / flush / wave /
+// shake-dry). Each ONE-SHOT step plays exactly one pass of an 8-frame row at
+// SPRITE_FPS. Low probability so it's a rare surprise like working.
+export const TOILET_ROUTINE_PROBABILITY = 0.03;
+export const TOILET_ROUTINE_STEP_DURATION_S = 8 / SPRITE_FPS;
