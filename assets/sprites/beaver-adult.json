@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 1280,
+  "sheetHeight": 1408,
   "rows": [
     {
       "name": "idle",
@@ -56,6 +56,11 @@
     {
       "name": "collect-sticks",
       "frames": 8
+    },
+    {
+      "name": "exercise",
+      "frames": 8,
+      "height": 128
     }
   ]
 }
