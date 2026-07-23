@@ -14,54 +14,86 @@ afterEach(() => {
   fs.rmSync(stateDir, { recursive: true, force: true });
 });
 
-describe('xp store', () => {
-  it('missing file -> fresh state, no crash', () => {
-    expect(loadState(stateDir)).toEqual({ xp: 0, lastSeenLifetimeTokens: 0, lastMrrAwardDate: null });
+describe('xp store v2', () => {
+  it('missing file -> fresh v2 state, no crash', () => {
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 0, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
   });
 
-  it('roundtrips a saved state', async () => {
-    const state = { xp: 1234.5, lastSeenLifetimeTokens: 987654, lastMrrAwardDate: '2026-07-13' };
+  it('roundtrips a saved v2 state', async () => {
+    const state = { xp: 1234.5, lastSeenByModel: { 'claude-opus': 5000 }, lastMrrAwardDate: '2026-07-13', schemaVersion: 2 as const };
     await saveState(stateDir, state);
     expect(loadState(stateDir)).toEqual(state);
   });
 
-  it('corrupt file -> fresh state, no crash', () => {
+  it('corrupt file -> fresh v2 state, no crash', () => {
     fs.mkdirSync(stateDir, { recursive: true });
     fs.writeFileSync(path.join(stateDir, 'xp-state.json'), '{not valid json');
-    expect(loadState(stateDir)).toEqual({ xp: 0, lastSeenLifetimeTokens: 0, lastMrrAwardDate: null });
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 0, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
   });
 
-  it('schema-invalid file (negative xp) -> fresh state', () => {
+  it('schema-invalid v2 (negative xp) -> fresh v2 state', () => {
     fs.mkdirSync(stateDir, { recursive: true });
-    fs.writeFileSync(path.join(stateDir, 'xp-state.json'), JSON.stringify({ xp: -5, lastSeenLifetimeTokens: 0 }));
-    expect(loadState(stateDir)).toEqual({ xp: 0, lastSeenLifetimeTokens: 0, lastMrrAwardDate: null });
+    fs.writeFileSync(path.join(stateDir, 'xp-state.json'), JSON.stringify({ xp: -5, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 }));
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 0, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
   });
 
-  it('schema-invalid file (lastMrrAwardDate not a string/null) -> fresh state', () => {
+  it('schema-invalid v2 (negative cursor) -> fresh v2 state', () => {
     fs.mkdirSync(stateDir, { recursive: true });
     fs.writeFileSync(
       path.join(stateDir, 'xp-state.json'),
-      JSON.stringify({ xp: 5, lastSeenLifetimeTokens: 0, lastMrrAwardDate: 12345 }),
+      JSON.stringify({ xp: 5, lastSeenByModel: { a: -1 }, lastMrrAwardDate: null, schemaVersion: 2 }),
     );
-    expect(loadState(stateDir)).toEqual({ xp: 0, lastSeenLifetimeTokens: 0, lastMrrAwardDate: null });
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 0, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
+  });
+
+  it('schema-invalid v2 (lastMrrAwardDate not string/null) -> fresh v2 state', () => {
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(stateDir, 'xp-state.json'),
+      JSON.stringify({ xp: 5, lastSeenByModel: {}, lastMrrAwardDate: 12345, schemaVersion: 2 }),
+    );
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 0, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
   });
 
   it('creates the state dir if missing', async () => {
     const nested = path.join(stateDir, 'nested', 'dir');
-    await saveState(nested, { xp: 1, lastSeenLifetimeTokens: 2, lastMrrAwardDate: null });
-    expect(loadState(nested)).toEqual({ xp: 1, lastSeenLifetimeTokens: 2, lastMrrAwardDate: null });
+    await saveState(nested, { xp: 1, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
+    expect(loadState(nested)).toEqual({ xp: 1, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
   });
 
   it('leaves no stray tmp files behind after a save (atomic tmp cleanup)', async () => {
-    await saveState(stateDir, { xp: 10, lastSeenLifetimeTokens: 20, lastMrrAwardDate: null });
-    await saveState(stateDir, { xp: 30, lastSeenLifetimeTokens: 40, lastMrrAwardDate: null });
+    await saveState(stateDir, { xp: 10, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
+    await saveState(stateDir, { xp: 30, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 });
     const entries = fs.readdirSync(stateDir);
     expect(entries).toEqual(['xp-state.json']);
   });
+});
 
-  it('schema migration: an old file without lastMrrAwardDate loads clean as null', () => {
+describe('xp store v1 migration sentinel', () => {
+  it('loads an old v1 file as schemaVersion 1', () => {
     fs.mkdirSync(stateDir, { recursive: true });
     fs.writeFileSync(path.join(stateDir, 'xp-state.json'), JSON.stringify({ xp: 42, lastSeenLifetimeTokens: 4200 }));
-    expect(loadState(stateDir)).toEqual({ xp: 42, lastSeenLifetimeTokens: 4200, lastMrrAwardDate: null });
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 42, lastSeenLifetimeTokens: 4200, lastMrrAwardDate: null, schemaVersion: 1 });
+  });
+
+  it('preserves an optional lastMrrAwardDate from a v1 file', () => {
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'xp-state.json'), JSON.stringify({ xp: 7, lastSeenLifetimeTokens: 700, lastMrrAwardDate: '2026-07-13' }));
+    const state = loadState(stateDir);
+    expect(state).toEqual({ xp: 7, lastSeenLifetimeTokens: 700, lastMrrAwardDate: '2026-07-13', schemaVersion: 1 });
+  });
+
+  it('rejects a v1 file with negative lastSeenLifetimeTokens', () => {
+    fs.mkdirSync(stateDir, { recursive: true });
+    fs.writeFileSync(path.join(stateDir, 'xp-state.json'), JSON.stringify({ xp: 1, lastSeenLifetimeTokens: -1 }));
+    const state = loadState(stateDir);
+    expect(state.schemaVersion).toBe(2);
+    expect(state.xp).toBe(0);
   });
 });

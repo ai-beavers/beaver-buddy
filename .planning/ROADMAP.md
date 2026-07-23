@@ -37,7 +37,7 @@ Rule: exactly **one accountable per phase**; agents work only for the phase owne
 
 ### M4 — Level, XP & profile system · Z1 (**Rodgi**, 3–4 w, ∥ M3)
 - [ ] Phase 1 — Token tracking & aggregation (daily, per model, no cache; #24/#25) · none
-- [ ] Phase 2 — XP/level model + level table 1–32 · ← M4/P1
+- [x] Phase 2 — XP/level model + level table 1–32 · ← M4/P1 (implemented 2026-07-23: quadratic curve, 5 stages, model-weighted XP, cap removed past L32)
 - [ ] Phase 3 — Persistence & profile (naming, achievements) · ← M4/P2
 - [ ] Phase 4 — Character-map JSON (level↔sprites↔animations) · ← M2/P1–P2 ✅
 

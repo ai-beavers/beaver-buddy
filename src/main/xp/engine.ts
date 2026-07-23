@@ -1,11 +1,11 @@
-// XP accrual + evolution detection. Subscribes to the usage tracker's
-// lifetime token total through a durable, forward-only cursor
-// (lastSeenLifetimeTokens) so restarts, log rotation, and re-scans can never
-// double-count XP: delta is always max(0, total - lastSeen), and the cursor
-// itself only ever moves forward.
+// XP accrual + evolution detection. Subscribes to the usage tracker through
+// per-model forward-only cursors (lastSeenByModel) so restarts, log rotation,
+// and re-scans can never double-count XP: delta is always max(0, total −
+// cursor), and cursors only ever move forward.
 
-import { levelForXp, stageForLevel, TOKENS_PER_XP, type Stage } from './curve';
-import { loadState, saveState, type XpState } from './store';
+import { levelForXp, stageForLevel, XP_PER_1K_TOKENS, type Stage } from './curve';
+import { weightForModel } from './weights';
+import { loadState, saveState, type XpStateV2 } from './store';
 import type { UsageTotals } from '../usage/totals';
 
 export interface PetState {
@@ -36,17 +36,20 @@ export type GrowthMode = 'tokens' | 'mrr';
 
 export class XpEngine {
   private readonly stateDir: string;
-  private state: XpState;
+  private state: XpStateV2;
   private lastUpdate: PetUpdate | null = null;
   private readonly listeners = new Set<(update: PetUpdate) => void>();
   private mode: GrowthMode = 'tokens';
 
-  constructor(stateDir: string, initial: XpState = loadState(stateDir)) {
+  constructor(stateDir: string, initial: XpStateV2 = loadState(stateDir) as XpStateV2) {
     this.stateDir = stateDir;
-    this.state = initial;
+    // If something passes a v1 sentinel here, coerce to a clean v2 so the
+    // engine never operates on the old single cursor. main.ts runs migration
+    // before constructing the engine, so this is a defensive fallback.
+    this.state = initial.schemaVersion === 2 ? initial : { xp: 0, lastSeenByModel: {}, lastMrrAwardDate: initial.lastMrrAwardDate ?? null, schemaVersion: 2 };
   }
 
-  // Gates ingestLifetimeTokens below — set from the persisted growth
+  // Gates ingestModelTotals below — set from the persisted growth
   // settings at startup and on every settings:save mode change.
   setMode(mode: GrowthMode): void {
     this.mode = mode;
@@ -59,6 +62,10 @@ export class XpEngine {
   getState(): PetState {
     const level = levelForXp(this.state.xp);
     return { xp: this.state.xp, level, stage: stageForLevel(level) };
+  }
+
+  getLastSeenByModel(): Record<string, number> {
+    return { ...this.state.lastSeenByModel };
   }
 
   // The most recent emitted update, or a synthesized non-evolving snapshot
@@ -81,30 +88,43 @@ export class XpEngine {
   // Wires the usage tracker: applies whatever it has already scanned once,
   // then every subsequent change. Returns an unsubscribe function.
   async attachTracker(tracker: TrackerLike): Promise<() => void> {
-    const unsubscribe = tracker.onChange((totals) => this.ingestLifetimeTokens(totals.lifetime.totalTokens));
-    await this.ingestLifetimeTokens(tracker.getTotals().lifetime.totalTokens);
+    const unsubscribe = tracker.onChange((totals) => this.ingestModelTotals(totals.lifetimeByModel));
+    await this.ingestModelTotals(tracker.getTotals().lifetimeByModel);
     return unsubscribe;
   }
 
-  async ingestLifetimeTokens(totalTokens: number): Promise<void> {
-    const delta = Math.max(0, totalTokens - this.state.lastSeenLifetimeTokens);
-    if (delta === 0) return; // cursor only moves forward — no double count
+  async ingestModelTotals(byModel: ReadonlyMap<string, { inputTokens: number; outputTokens: number }>): Promise<void> {
+    let totalDeltaXp = 0;
+    const nextCursors: Record<string, number> = { ...this.state.lastSeenByModel };
+
+    for (const [model, tokens] of byModel) {
+      const total = tokens.inputTokens + tokens.outputTokens;
+      const cursor = this.state.lastSeenByModel[model] ?? 0;
+      const delta = Math.max(0, total - cursor);
+      if (delta > 0) {
+        nextCursors[model] = total;
+        totalDeltaXp += (delta / 1000) * XP_PER_1K_TOKENS * weightForModel(model);
+      }
+    }
+
     if (this.mode === 'mrr') {
       // Cursor keeps advancing silently — no XP award — so switching back
       // to tokens mode later can never retroactively award this history
       // (the no-double-count invariant holds in both switch directions).
-      await this.applyState({ lastSeenLifetimeTokens: totalTokens });
+      await this.applyState({ lastSeenByModel: nextCursors });
       return;
     }
-    await this.applyXp(delta / TOKENS_PER_XP, totalTokens);
+
+    if (totalDeltaXp === 0) return;
+    await this.applyState({ xp: this.state.xp + totalDeltaXp, lastSeenByModel: nextCursors });
   }
 
   // Dev-only acceptance path (--inject-xp): goes through the same
-  // persist/level/evolution logic as real accrual, but leaves the token
-  // cursor untouched so it can never mask or double-count real usage.
+  // persist/level/evolution logic as real accrual, but leaves the per-model
+  // cursors untouched so it can never mask or double-count real usage.
   async injectXp(amount: number): Promise<void> {
     if (!(amount > 0)) return;
-    await this.applyXp(amount, this.state.lastSeenLifetimeTokens);
+    await this.applyState({ xp: this.state.xp + amount });
   }
 
   // MRR growth-mode award path: applies XP and records the local date it
@@ -115,37 +135,13 @@ export class XpEngine {
     await this.applyState({ xp: this.state.xp + Math.max(0, xpAmount), lastMrrAwardDate: localDate });
   }
 
-  // User-visible progress reset (settings window danger zone): XP back to
-  // 0 (level 1 / baby), lastMrrAwardDate cleared so a same-day MRR poll can
-  // grant again after reset. Goes through applyState with allowStageSnap: a
-  // stage regression is not an evolution, so the emitted update must carry
-  // no evolvingTo (otherwise main.ts would fire the evolution quip and the
-  // renderer would start its evolution sequence instead of the hatch replay
-  // — callers send HATCH_START themselves before this notification lands).
-  // lastSeenLifetimeTokens stays untouched: it is the usage tracker's
-  // forward-only durable cursor, and resetting it would re-award the entire
-  // lifetime token history on the next tracker tick — silently undoing the
-  // reset.
-  async resetProgress(): Promise<void> {
-    await this.applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true });
-  }
-
-  private async applyXp(deltaXp: number, lastSeenLifetimeTokens: number): Promise<void> {
-    await this.applyState({ xp: this.state.xp + deltaXp, lastSeenLifetimeTokens });
-  }
-
-  private async applyState(patch: Partial<XpState>, options: { allowStageSnap?: boolean } = {}): Promise<void> {
+  private async applyState(patch: Partial<XpStateV2>): Promise<void> {
     const before = this.getState();
     this.state = { ...this.state, ...patch };
     await saveState(this.stateDir, this.state);
     const after = this.getState();
-    // Normal accrual: hold the pre-evolution stage and set evolvingTo so
-    // the renderer can play the transition. Hard reset snaps straight to
-    // the new stage (hatch owns the visual restart).
     const stageChanged = after.stage !== before.stage;
-    const update: PetUpdate = options.allowStageSnap
-      ? { level: after.level, stage: after.stage }
-      : { level: after.level, stage: stageChanged ? before.stage : after.stage, evolvingTo: stageChanged ? after.stage : undefined };
+    const update: PetUpdate = { level: after.level, stage: stageChanged ? before.stage : after.stage, evolvingTo: stageChanged ? after.stage : undefined };
     this.lastUpdate = update;
     for (const listener of this.listeners) listener(update);
   }

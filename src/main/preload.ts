@@ -21,8 +21,8 @@ const FORCE_WORK_CHANNEL = 'state:force-work'; // must match src/main/ipc-channe
 
 interface PetChangedPayload {
   level: number;
-  stage: 'baby' | 'teen' | 'adult';
-  evolvingTo?: 'baby' | 'teen' | 'adult';
+  stage: 'baby' | 'young-baby' | 'teen' | 'older-teen' | 'adult';
+  evolvingTo?: 'baby' | 'young-baby' | 'teen' | 'older-teen' | 'adult';
 }
 
 interface QuipChangedPayload {

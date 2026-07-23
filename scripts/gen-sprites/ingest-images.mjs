@@ -189,6 +189,48 @@ export function removeBackground(img) {
   return { width, height, data };
 }
 
+// Alternate to removeBackground for frames generated on a solid green
+// (#00FF00) chroma-key background: removeBackground's border flood-fill
+// only catches near-white/near-black, so it leaves green pixels behind (and,
+// used on a green source, would incorrectly key nothing). A pixel belongs to
+// the green screen if green clearly dominates red and blue — no antialiased
+// fringe survives, and bright/white character detail (teeth, eye shine) has
+// no green-dominant pixels so it's untouched. No border flood-fill needed:
+// green is uniform across the whole frame, not just the border.
+export function chromaKeyGreen(img) {
+  const { width, height, data } = img;
+  const out = new Uint8ClampedArray(data.length);
+  out.set(data);
+  for (let i = 0; i < out.length; i += 4) {
+    const r = out[i];
+    const g = out[i + 1];
+    const b = out[i + 2];
+    if (g > 90 && g > r * 1.3 && g > b * 1.3) {
+      out[i + 3] = 0;
+    }
+  }
+  return { width, height, data: out };
+}
+
+// Slices cell [col,row] out of a colGrid x rowGrid grid image. Boundaries are
+// rounded so adjacent cells tile the full sheet exactly even when the cell
+// size isn't integral (a Gemini-generated grid's pixel dimensions aren't
+// always evenly divisible).
+export function extractGridCell(img, col, row, gridCols, gridRows) {
+  const x0 = Math.round((col * img.width) / gridCols);
+  const x1 = Math.round(((col + 1) * img.width) / gridCols);
+  const y0 = Math.round((row * img.height) / gridRows);
+  const y1 = Math.round(((row + 1) * img.height) / gridRows);
+  const w = x1 - x0;
+  const h = y1 - y0;
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    const srcStart = ((y0 + y) * img.width + x0) * 4;
+    out.set(img.data.subarray(srcStart, srcStart + w * 4), y * w * 4);
+  }
+  return { width: w, height: h, data: out };
+}
+
 // Step 2: crop to the bounding box of opaque pixels.
 export function cropToBbox(img) {
   const { width, height, data } = img;
@@ -308,6 +350,50 @@ export function computeStageScale(bboxes, tile, targetContentHeightPx) {
   return Math.min(targetContentHeightPx / maxH, tile / maxW);
 }
 
+// Replaces (or appends) one named row in an already-baked sheet, keyed by
+// NAME not position. Two separate scripts append rows onto the same
+// committed sheet over time (e.g. a `type` row, then later a `watering`
+// row) — a re-run of the earlier script can no longer assume its row is a
+// contiguous prefix or the physical last row, so finding it by name and
+// preserving every other row's bytes around it (shifting whatever comes
+// after when the row's height changes) is the only order-safe way to
+// rebuild in place. Rows before the target keep their exact bytes; rows
+// after it are copied unchanged, just shifted if tileHeight differs from
+// the row being replaced.
+export function spliceRow(sheet, meta, rowName, tiles, tileHeight = meta.tile) {
+  const width = meta.sheetWidth;
+  const heightOf = (row) => row.height ?? meta.tile;
+  const idx = meta.rows.findIndex((row) => row.name === rowName);
+  const before = idx === -1 ? meta.rows : meta.rows.slice(0, idx);
+  const after = idx === -1 ? [] : meta.rows.slice(idx + 1);
+  const beforeHeight = before.reduce((sum, row) => sum + heightOf(row), 0);
+  const afterHeight = after.reduce((sum, row) => sum + heightOf(row), 0);
+  const oldRowHeight = idx === -1 ? 0 : heightOf(meta.rows[idx]);
+
+  const height = beforeHeight + tileHeight + afterHeight;
+  const data = new Uint8ClampedArray(width * height * 4);
+  data.set(sheet.data.subarray(0, width * beforeHeight * 4), 0);
+  tiles.forEach((tile, i) => {
+    for (let y = 0; y < tileHeight; y += 1) {
+      const destStart = ((beforeHeight + y) * width + i * meta.tile) * 4;
+      data.set(tile.data.subarray(y * meta.tile * 4, (y + 1) * meta.tile * 4), destStart);
+    }
+  });
+  if (after.length > 0) {
+    const oldAfterStart = width * (beforeHeight + oldRowHeight) * 4;
+    const newAfterStart = width * (beforeHeight + tileHeight) * 4;
+    data.set(sheet.data.subarray(oldAfterStart, oldAfterStart + width * afterHeight * 4), newAfterStart);
+  }
+
+  const rowMeta = { name: rowName, frames: tiles.length, ...(tileHeight !== meta.tile ? { height: tileHeight } : {}) };
+  return {
+    width,
+    height,
+    data,
+    meta: { tile: meta.tile, fps: meta.fps, sheetWidth: width, sheetHeight: height, rows: [...before, rowMeta, ...after] },
+  };
+}
+
 // Row/frame order is CLAUDE.md-binding (see assets/STYLE.md): right-facing
 // only, idle then walk, no run/sleep/react. The user's left-facing images
 // ({stage}-idle-left.png, {stage}-to-left-{1,2}.png) are unused — the
@@ -315,7 +401,15 @@ export function computeStageScale(bboxes, tile, targetContentHeightPx) {
 //
 // Baby is built by ingest-animation-frames.mjs (parachute drop / BL-17);
 // it is intentionally absent from this list so the still-frame ingest only
-// rebuilds teen.
+// rebuilds teen/young-baby/older-teen.
+//
+// beaver-young-baby (BL-6/T1) and beaver-older-teen (BL-6/T2) are new
+// in-between figures, not yet wired into Stage/stageForLevel (WAVE-2) — an
+// unwired sheet is inert, so committing them is safe ahead of that wiring.
+// Both are full-frame Comfy Cloud generations, dual-reference-conditioned
+// (young-baby: committed baby idle tile + teen idle tile; older-teen:
+// committed teen idle tile + adult idle tile) so each reads BETWEEN its two
+// neighbors rather than as a new character — see assets/STYLE.md Provenance.
 export const STAGE_SPECS = [
   {
     name: 'beaver-teen',
@@ -325,6 +419,26 @@ export const STAGE_SPECS = [
     rows: [
       { name: 'idle', files: ['teen-idle-right.png'] },
       { name: 'walk', files: ['teen-to-right-1.png', 'teen-to-right-2.png'] },
+    ],
+  },
+  {
+    name: 'beaver-young-baby',
+    tile: TILE,
+    fps: FPS,
+    targetContentHeightPx: 76,
+    rows: [
+      { name: 'idle', files: ['young-baby-idle-right.png'] },
+      { name: 'walk', files: ['young-baby-to-right-1.png', 'young-baby-to-right-2.png'] },
+    ],
+  },
+  {
+    name: 'beaver-older-teen',
+    tile: TILE,
+    fps: FPS,
+    targetContentHeightPx: 94,
+    rows: [
+      { name: 'idle', files: ['older-teen-idle-right.png'] },
+      { name: 'walk', files: ['older-teen-to-right-1.png', 'older-teen-to-right-2.png'] },
     ],
   },
 ];
@@ -380,6 +494,14 @@ export function ingestStage(stageSpec, srcDir) {
   return { png, meta, scale };
 }
 
+// Optional CLI arg picks one stage by name (e.g. `assets:young-baby` ==
+// `ingest-images.mjs beaver-young-baby`) so a new figure's script doesn't
+// require every OTHER stage's source frames to also exist locally; that
+// explicit-arg path still fails loudly (raw ENOENT) if ITS OWN source frames
+// are missing. Omitting the arg (`assets:ingest`) rebuilds every stage but
+// skips (with a one-line notice) any stage whose source frames aren't
+// present locally, since it's normal for only one stage's gitignored
+// assets-src/beaver/ frames to exist on a given machine (BL-11 norm).
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = path.join(import.meta.dirname, '..', '..');
@@ -388,7 +510,22 @@ if (isMain) {
     throw new Error(`missing ${srcDir} — copy the source images there first (gitignored, not part of the repo)`);
   }
 
-  for (const stageSpec of STAGE_SPECS) {
+  const stageArg = process.argv[2];
+  const stageSpecs = stageArg ? STAGE_SPECS.filter((spec) => spec.name === stageArg) : STAGE_SPECS;
+  if (stageArg && stageSpecs.length === 0) {
+    throw new Error(`unknown stage "${stageArg}" (expected one of: ${STAGE_SPECS.map((s) => s.name).join(', ')})`);
+  }
+
+  for (const stageSpec of stageSpecs) {
+    if (!stageArg) {
+      const missingFile = [...new Set(stageSpec.rows.flatMap((row) => row.files))].find(
+        (file) => !fs.existsSync(path.join(srcDir, file)),
+      );
+      if (missingFile) {
+        console.log(`skipping ${stageSpec.name}: assets-src/beaver/${missingFile} not found`);
+        continue;
+      }
+    }
     const { png, meta, scale } = ingestStage(stageSpec, srcDir);
     const pngPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.png`);
     const metaPath = path.join(repoRoot, 'assets', 'sprites', `${stageSpec.name}.json`);

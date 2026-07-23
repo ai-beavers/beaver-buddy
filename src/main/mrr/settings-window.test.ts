@@ -97,7 +97,6 @@ describe('createSettingsHandlers', () => {
         settings = next;
         changed.push(next);
       },
-      onProgressReset: vi.fn().mockResolvedValue(undefined),
       onForceWork: vi.fn(),
       getUsageSources: () => usageSnapshot,
       onUsageEnabledChanged: (next) => {
@@ -119,6 +118,14 @@ describe('createSettingsHandlers', () => {
           },
         };
       },
+      getXpState: () => ({
+        xp: 3500,
+        level: 5,
+        stage: 'young-baby',
+        currentLevelXp: 2930,
+        nextLevelXp: 4219,
+        lastSeenByModel: { 'claude-opus-4-8': 5000, 'unknown': 1000 },
+      }),
     };
   }
 
@@ -151,11 +158,9 @@ describe('createSettingsHandlers', () => {
     expect(handlers.readStatus(fakeEvent)).toMatchObject({ error: 'unauthorized' });
     await expect(handlers.save(fakeEvent, { stripeKey: 'rk_fake' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     await expect(handlers.disconnect(fakeEvent, { target: 'stripe' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
-    await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: false, error: 'unauthorized' });
     await expect(handlers.connectUsage(fakeEvent, { target: 'claude' })).resolves.toEqual({ ok: false, error: 'unauthorized' });
     expect(handlers.forceWork(fakeEvent)).toEqual({ ok: false, error: 'unauthorized' });
     expect(changed).toHaveLength(0);
-    expect(d.onProgressReset).not.toHaveBeenCalled();
     expect(d.onForceWork).not.toHaveBeenCalled();
   });
 
@@ -166,12 +171,13 @@ describe('createSettingsHandlers', () => {
     expect(d.onForceWork).toHaveBeenCalledTimes(1);
   });
 
-  it('readStatus returns mode/connected booleans plus per-source usage, never secrets', () => {
+  it('readStatus returns mode/connected/XP plus per-source usage, never secrets', () => {
     const handlers = createSettingsHandlers(deps(), () => true);
     expect(handlers.readStatus(fakeEvent)).toMatchObject({
       stripeConnected: false,
       revenuecatConnected: false,
       mode: 'tokens',
+      xp: { xp: 3500, level: 5, stage: 'young-baby' },
       claude: { enabled: false, connected: false, logsFound: true, lifetimeTokens: 0, todayTokens: 0 },
       codex: { enabled: false, connected: false, logsFound: true, lifetimeTokens: 9_000_000, todayTokens: 1_000 },
     });
@@ -271,31 +277,6 @@ describe('createSettingsHandlers', () => {
     expect(deleteSecretMock).toHaveBeenCalledWith(stateDir, 'svc', 'revenuecat-key');
     expect(deleteSecretMock).toHaveBeenCalledWith(stateDir, 'svc', 'revenuecat-project');
   });
-
-  it('resetProgress calls the dep exactly once and reports success', async () => {
-    const d = deps();
-    const handlers = createSettingsHandlers(d, () => true);
-    await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: true });
-    expect(d.onProgressReset).toHaveBeenCalledTimes(1);
-  });
-
-  it('resetProgress leaves growth settings and usage opt-ins untouched', async () => {
-    settings = { ...settings, stripeConnected: true, claudeEnabled: true };
-    const d = deps();
-    const handlers = createSettingsHandlers(d, () => true);
-    await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: true });
-    expect(d.onProgressReset).toHaveBeenCalledTimes(1);
-    expect(settings.stripeConnected).toBe(true);
-    expect(settings.claudeEnabled).toBe(true);
-    expect(changed).toHaveLength(0);
-  });
-
-  it('resetProgress maps a dep failure onto { ok: false }', async () => {
-    const d = deps();
-    vi.mocked(d.onProgressReset).mockRejectedValue(new Error('boom'));
-    const handlers = createSettingsHandlers(d, () => true);
-    await expect(handlers.resetProgress(fakeEvent)).resolves.toEqual({ ok: false, error: 'reset failed' });
-  });
 });
 
 describe('openSettingsWindow', () => {
@@ -335,12 +316,12 @@ describe('openSettingsWindow', () => {
         codexEnabled: false,
       }),
       onSettingsChanged: () => {},
-      onProgressReset: vi.fn().mockResolvedValue(undefined),
       onForceWork: vi.fn(),
       getUsageSources: () => ({
         claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
         codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
       }),
+      getXpState: () => ({ xp: 0, level: 1, stage: 'baby' as const, currentLevelXp: 0, nextLevelXp: 469, lastSeenByModel: {} }),
       onUsageEnabledChanged: () => {},
     };
 
@@ -411,12 +392,12 @@ describe('openSettingsWindow', () => {
         codexEnabled: false,
       }),
       onSettingsChanged: () => {},
-      onProgressReset: vi.fn().mockResolvedValue(undefined),
       onForceWork: vi.fn(),
       getUsageSources: () => ({
         claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
         codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
       }),
+      getXpState: () => ({ xp: 0, level: 1, stage: 'baby' as const, currentLevelXp: 0, nextLevelXp: 469, lastSeenByModel: {} }),
       onUsageEnabledChanged: () => {},
     };
 
@@ -459,12 +440,12 @@ describe('openSettingsWindow', () => {
         codexEnabled: false,
       }),
       onSettingsChanged: () => {},
-      onProgressReset: vi.fn().mockResolvedValue(undefined),
       onForceWork: vi.fn(),
       getUsageSources: () => ({
         claude: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
         codex: { enabled: false, logsFound: false, connected: false, lifetimeTokens: 0, todayTokens: 0 },
       }),
+      getXpState: () => ({ xp: 0, level: 1, stage: 'baby' as const, currentLevelXp: 0, nextLevelXp: 469, lastSeenByModel: {} }),
       onUsageEnabledChanged: () => {},
     };
 

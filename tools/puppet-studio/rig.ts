@@ -8,7 +8,12 @@
 export interface RigPart {
   /** Unique part identifier, referenced by animation tracks. */
   readonly id: string;
-  /** Image filename inside assets-src/parts/<rigName>/. */
+  /**
+   * Image filename inside assets-src/parts/<rigName>/, or a relative path
+   * (e.g. "../tree/tree-stage-1.png") for parts shared across rigs — either
+   * way it must resolve within assets-src/parts/ (containment enforced by
+   * serve.mjs's safeResolve).
+   */
   readonly src: string;
   /** [x, y] pixel inside the part image that rotation/scale centers on. */
   readonly pivot: readonly [number, number];

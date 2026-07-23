@@ -52,7 +52,8 @@ npm start   # build + launch the overlay
 ```
 
 Requires **Node 24.x** and **macOS 14+** or **Windows 10/11**. To re-play the
-hatch after first launch, run with `--reset-hatch`.
+hatch after first launch, delete the `onboarding-state.json` file in the app's
+user data directory and restart.
 
 ## Build & Package
 

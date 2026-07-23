@@ -9,7 +9,6 @@ import {
   FORCE_WORK_CHANNEL,
   SETTINGS_DISCONNECT_CHANNEL,
   SETTINGS_READ_STATUS_CHANNEL,
-  SETTINGS_RESET_PROGRESS_CHANNEL,
   SETTINGS_SAVE_CHANNEL,
   SETTINGS_CONNECT_USAGE_CHANNEL,
   SETTINGS_FORCE_WORK_CHANNEL,
@@ -70,11 +69,6 @@ describe('ipc-channels drift guard', () => {
   it('settings-preload.ts hand-synced channel literal matches SETTINGS_DISCONNECT_CHANNEL', () => {
     const match = settingsSource.match(/const SETTINGS_DISCONNECT_CHANNEL = '([^']*)'/);
     expect(match?.[1]).toBe(SETTINGS_DISCONNECT_CHANNEL);
-  });
-
-  it('settings-preload.ts hand-synced channel literal matches SETTINGS_RESET_PROGRESS_CHANNEL', () => {
-    const match = settingsSource.match(/const SETTINGS_RESET_PROGRESS_CHANNEL = '([^']*)'/);
-    expect(match?.[1]).toBe(SETTINGS_RESET_PROGRESS_CHANNEL);
   });
 
   it('settings-preload.ts hand-synced channel literal matches SETTINGS_CONNECT_USAGE_CHANNEL', () => {

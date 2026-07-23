@@ -11,6 +11,7 @@ interface RawClaudeLine {
   readonly timestamp?: string;
   readonly requestId?: string;
   readonly message?: {
+    readonly model?: string;
     readonly id?: string;
     readonly usage?: {
       readonly input_tokens?: number;
@@ -56,6 +57,7 @@ export function parseClaudeFile(filePath: string): UsageEntry[] {
 
     byKey.set(`${id}:${requestId}`, {
       timestampMs,
+      model: parsed.message?.model,
       inputTokens: toNumber(usage.input_tokens),
       outputTokens: toNumber(usage.output_tokens),
       cacheCreationTokens: toNumber(usage.cache_creation_input_tokens),

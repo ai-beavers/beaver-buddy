@@ -20,12 +20,44 @@ it('maps Kimi wire token_usage fields without counting cache reads twice', () =>
     file,
     `${JSON.stringify({
       timestamp: '2026-07-22T10:00:00.000Z',
+      model: 'kimi-k3',
       token_usage: { input_other: 100, output: 30, input_cache_read: 40, input_cache_creation: 10 },
     })}\n`,
   );
 
   expect(parseGenericUsageFile(file)).toEqual([
-    { timestampMs: Date.parse('2026-07-22T10:00:00.000Z'), inputTokens: 100, outputTokens: 30, cacheCreationTokens: 10, cacheReadTokens: 40 },
+    { timestampMs: Date.parse('2026-07-22T10:00:00.000Z'), model: 'kimi-k3', inputTokens: 100, outputTokens: 30, cacheCreationTokens: 10, cacheReadTokens: 40 },
+  ]);
+});
+
+it('falls back to modelName when model is absent', () => {
+  const file = path.join(tmpDir, 'modelname.jsonl');
+  fs.writeFileSync(
+    file,
+    `${JSON.stringify({
+      timestamp: '2026-07-22T10:00:00.000Z',
+      modelName: 'some-model',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    })}\n`,
+  );
+
+  expect(parseGenericUsageFile(file)).toEqual([
+    { timestampMs: Date.parse('2026-07-22T10:00:00.000Z'), model: 'some-model', inputTokens: 10, outputTokens: 5, cacheCreationTokens: 0, cacheReadTokens: 0 },
+  ]);
+});
+
+it('sets model to undefined when neither model nor modelName is present', () => {
+  const file = path.join(tmpDir, 'nomodel.jsonl');
+  fs.writeFileSync(
+    file,
+    `${JSON.stringify({
+      timestamp: '2026-07-22T10:00:00.000Z',
+      usage: { inputTokens: 10, outputTokens: 5 },
+    })}\n`,
+  );
+
+  expect(parseGenericUsageFile(file)).toEqual([
+    { timestampMs: Date.parse('2026-07-22T10:00:00.000Z'), model: undefined, inputTokens: 10, outputTokens: 5, cacheCreationTokens: 0, cacheReadTokens: 0 },
   ]);
 });
 

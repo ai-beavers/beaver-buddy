@@ -8,6 +8,12 @@ export interface UsageEntry {
   readonly outputTokens: number;
   readonly cacheCreationTokens: number;
   readonly cacheReadTokens: number;
+  readonly model?: string;
+}
+
+export interface ModelTotals {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
 }
 
 export interface Totals {
@@ -21,10 +27,15 @@ export interface Totals {
 export interface UsageTotals {
   readonly daily: ReadonlyMap<string, Totals>;
   readonly lifetime: Totals;
+  readonly lifetimeByModel: ReadonlyMap<string, ModelTotals>;
 }
 
 function emptyTotals(): Totals {
   return { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalTokens: 0 };
+}
+
+function emptyModelTotals(): ModelTotals {
+  return { inputTokens: 0, outputTokens: 0 };
 }
 
 function addEntry(totals: Totals, entry: UsageEntry): Totals {
@@ -38,6 +49,13 @@ function addEntry(totals: Totals, entry: UsageEntry): Totals {
     cacheCreationTokens,
     cacheReadTokens,
     totalTokens: inputTokens + outputTokens + cacheCreationTokens + cacheReadTokens,
+  };
+}
+
+function addModelTotals(totals: ModelTotals, entry: UsageEntry): ModelTotals {
+  return {
+    inputTokens: totals.inputTokens + entry.inputTokens,
+    outputTokens: totals.outputTokens + entry.outputTokens,
   };
 }
 
@@ -60,12 +78,16 @@ export function todayTotalTokens(totals: UsageTotals, nowMs: number): number {
 export function aggregate(entries: readonly UsageEntry[]): UsageTotals {
   const daily = new Map<string, Totals>();
   let lifetime = emptyTotals();
+  const lifetimeByModel = new Map<string, ModelTotals>();
 
   for (const entry of entries) {
     const key = localDateKey(entry.timestampMs);
     daily.set(key, addEntry(daily.get(key) ?? emptyTotals(), entry));
     lifetime = addEntry(lifetime, entry);
+
+    const modelKey = entry.model ?? 'unknown';
+    lifetimeByModel.set(modelKey, addModelTotals(lifetimeByModel.get(modelKey) ?? emptyModelTotals(), entry));
   }
 
-  return { daily, lifetime };
+  return { daily, lifetime, lifetimeByModel };
 }

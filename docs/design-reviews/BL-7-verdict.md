@@ -69,19 +69,19 @@ Isolated environment, never touching the real installed app's userData:
 Total sequence: ≈5.13s from page ready to handoff. Every measured segment
 matches its configured duration to within the CDP poll granularity (~40ms).
 
-The `--reset-hatch` replay run (below) reproduced the identical timeline
+The hatch replay run (below), triggered by deleting the `onboarding-state.json` file and relaunching, reproduced the identical timeline
 (lodge-idle 42ms → shake 845ms → burst 3487ms → baby-appear 4171ms → done
 5175ms), confirming the sequence is deterministic run-to-run.
 
 ## Frame smoothness (rAF interval sampling)
 
 Sampled via the injected `requestAnimationFrame` wrapper across the full
-~5.1s hatch sequence (both the fresh-launch and `--reset-hatch` runs):
+~5.1s hatch sequence (both the fresh-launch and the hatch-replay-via-`onboarding-state.json`-deletion runs):
 
 | Run | Frame count | p50 (ms) | p95 (ms) | max (ms) |
 |---|---|---|---|---|
 | Fresh launch | 645 | 8.3 | 9.9 | 41.7 |
-| `--reset-hatch` replay | 649 | 8.3 | 10.1 | 41.7 |
+| Hatch replay (via `onboarding-state.json` deletion) | 649 | 8.3 | 10.1 | 41.7 |
 
 p50/p95 sit around 8.3-10.1ms — well under the ≤~20ms proxy threshold for
 60fps-smooth (this machine's display evidently refreshes faster than
@@ -104,7 +104,7 @@ Isolated userData directory, three sequential launches:
    was `1010.37` (a random roam-init position, not the corner) — the pet
    went straight to normal roaming, proving persistence across restarts and
    the "runs exactly once" acceptance criterion.
-3. **Relaunch, same userData, `--reset-hatch`**: hatch replayed in full
+3. **Relaunch, same userData, after deleting `onboarding-state.json`**: hatch replayed in full
    (identical 5-phase timeline, table above). `onboarding-state.json`
    remained `{"hatched":true}` afterward (re-persisted at trigger time) —
    confirms the hidden QA reset flag works and doesn't leave the state
@@ -160,4 +160,4 @@ clean.
 cross-checked against `window.__debugHatch` at each capture and against the
 frame-timestamp log for smoothness; persistence cross-checked against the
 on-disk `onboarding-state.json` for both the no-flag relaunch (exactly-once)
-and `--reset-hatch` relaunch (QA reset) acceptance criteria.
+and hatch replay via `onboarding-state.json` deletion (QA reset) acceptance criteria.

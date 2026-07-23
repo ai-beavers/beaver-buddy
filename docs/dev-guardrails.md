@@ -46,6 +46,10 @@ ComfyUI runs ingested mechanically**. When generating:
   (e.g. the white parachute-canopy stripes). A white background + the ingest's
   flood-fill removal eats white detail that touches the edge. Key the green to
   transparent at slice time, and protect bright/white pixels in the key.
+- **Inverse case: generate on a WHITE background if the sprite contains green**
+  (e.g. tree foliage) — a green chroma key would eat the green detail itself —
+  and key the white to transparent locally with `removeBackground`'s border
+  flood-fill instead, as used for the tree growth stages.
 - Comfy Cloud needs an active **subscription** to queue jobs.
 
 ## Ingest / bake pipeline (`scripts/gen-sprites/`)

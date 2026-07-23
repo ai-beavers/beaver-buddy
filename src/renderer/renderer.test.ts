@@ -233,4 +233,29 @@ describe('renderer: HiDPI bounds and clear behavior', () => {
     expect(rect.width).toBe(layout.width + 2);
     expect(rect.height).toBe(layout.height + BUBBLE_TAIL_SIZE_PX + 3);
   });
+
+  it('loads the correct sheet directly after a migration jump (no evolvingTo)', async () => {
+    await import('./renderer.js');
+
+    // Simulates the PET_CHANGED resend after a migration: the main process
+    // sends the current level/stage without an evolution, and the renderer
+    // must snap the sheet synchronously without starting an evolution.
+    listeners.pet[0]({ level: 10, stage: 'teen' });
+
+    const rafCallback = (windowStub.requestAnimationFrame as ReturnType<typeof vi.fn>).mock.calls[0][0] as (t: number) => void;
+    rafCallback(0);
+
+    expect(windowStub.__debugPet).toEqual({ level: 10, stage: 'teen', evolving: false });
+  });
+
+  it('loads the correct young-baby sheet directly after a migration jump', async () => {
+    await import('./renderer.js');
+
+    listeners.pet[0]({ level: 6, stage: 'young-baby' });
+
+    const rafCallback = (windowStub.requestAnimationFrame as ReturnType<typeof vi.fn>).mock.calls[0][0] as (t: number) => void;
+    rafCallback(0);
+
+    expect(windowStub.__debugPet).toEqual({ level: 6, stage: 'young-baby', evolving: false });
+  });
 });

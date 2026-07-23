@@ -47,10 +47,11 @@ function normalizeUsage(value: unknown): NormalizedUsage | null {
   return { input, inputAlreadyFresh, output, cacheCreation, cacheRead };
 }
 
-function findUsageObject(value: unknown): NormalizedUsage | null {
-  if (!value || typeof value !== 'object') return null;
+function findUsageObject(value: unknown): { readonly usage: NormalizedUsage | null; readonly model: string | undefined } {
+  if (!value || typeof value !== 'object') return { usage: null, model: undefined };
   const record = value as Record<string, unknown>;
-  return normalizeUsage(record.usage) ?? normalizeUsage(record.token_usage) ?? normalizeUsage(record.tokenUsage);
+  const model = typeof record.model === 'string' ? record.model : typeof record.modelName === 'string' ? record.modelName : undefined;
+  return { usage: normalizeUsage(record.usage) ?? normalizeUsage(record.token_usage) ?? normalizeUsage(record.tokenUsage), model };
 }
 
 function timestampMs(value: unknown): number {
@@ -63,15 +64,16 @@ function timestampMs(value: unknown): number {
 
 
 function parseJsonObject(value: unknown): UsageEntry[] {
-  const usage = findUsageObject(value);
+  const found = findUsageObject(value);
   const ts = timestampMs(value);
-  if (!usage || !Number.isFinite(ts)) return [];
+  if (!found.usage || !Number.isFinite(ts)) return [];
   return [{
     timestampMs: ts,
-    inputTokens: usage.inputAlreadyFresh ? usage.input : usage.input - usage.cacheRead,
-    outputTokens: usage.output,
-    cacheCreationTokens: usage.cacheCreation,
-    cacheReadTokens: usage.cacheRead,
+    model: found.model,
+    inputTokens: found.usage.inputAlreadyFresh ? found.usage.input : found.usage.input - found.usage.cacheRead,
+    outputTokens: found.usage.output,
+    cacheCreationTokens: found.usage.cacheCreation,
+    cacheReadTokens: found.usage.cacheRead,
   }];
 }
 
@@ -99,15 +101,16 @@ export function parseGenericUsageFile(filePath: string): UsageEntry[] {
     } catch {
       continue;
     }
-    const usage = findUsageObject(parsed);
+    const found = findUsageObject(parsed);
     const ts = timestampMs(parsed);
-    if (!usage || !Number.isFinite(ts)) continue;
+    if (!found.usage || !Number.isFinite(ts)) continue;
     entries.push({
       timestampMs: ts,
-      inputTokens: usage.inputAlreadyFresh ? usage.input : usage.input - usage.cacheRead,
-      outputTokens: usage.output,
-      cacheCreationTokens: usage.cacheCreation,
-      cacheReadTokens: usage.cacheRead,
+      model: found.model,
+      inputTokens: found.usage.inputAlreadyFresh ? found.usage.input : found.usage.input - found.usage.cacheRead,
+      outputTokens: found.usage.output,
+      cacheCreationTokens: found.usage.cacheCreation,
+      cacheReadTokens: found.usage.cacheRead,
     });
   }
   return entries;

@@ -32,11 +32,11 @@ interface UsageFields {
   readonly completion_tokens?: number;
 }
 
-function tokenCountLine(timestamp: string, total: UsageFields, last?: UsageFields): string {
+function tokenCountLine(timestamp: string, total: UsageFields, last?: UsageFields, model?: string): string {
   return JSON.stringify({
     timestamp,
     type: 'event_msg',
-    payload: { type: 'token_count', info: { total_token_usage: total, ...(last ? { last_token_usage: last } : {}) } },
+    payload: { type: 'token_count', info: { total_token_usage: total, ...(last ? { last_token_usage: last } : {}), ...(model ? { model } : {}) } },
   });
 }
 
@@ -49,9 +49,26 @@ describe('parseCodexFile', () => {
 
     const entries = parseCodexFile(file);
     expect(entries).toEqual([
-      { timestampMs: Date.parse('2026-07-13T09:00:00.000Z'), inputTokens: 100, outputTokens: 20, cacheCreationTokens: 0, cacheReadTokens: 0 },
-      { timestampMs: Date.parse('2026-07-13T09:05:00.000Z'), inputTokens: 150, outputTokens: 40, cacheCreationTokens: 0, cacheReadTokens: 0 },
+      { timestampMs: Date.parse('2026-07-13T09:00:00.000Z'), model: undefined, inputTokens: 100, outputTokens: 20, cacheCreationTokens: 0, cacheReadTokens: 0 },
+      { timestampMs: Date.parse('2026-07-13T09:05:00.000Z'), model: undefined, inputTokens: 150, outputTokens: 40, cacheCreationTokens: 0, cacheReadTokens: 0 },
     ]);
+  });
+
+  it('extracts the model from the token_count info when present', () => {
+    const file = writeFixture('rollout-model.jsonl', [
+      tokenCountLine('2026-07-13T09:00:00.000Z', { input_tokens: 100, output_tokens: 20 }, undefined, 'codex-model-1'),
+    ]);
+    const entries = parseCodexFile(file);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ inputTokens: 100, outputTokens: 20, model: 'codex-model-1' });
+  });
+
+  it('leaves model undefined when the token_count info has no model field', () => {
+    const file = writeFixture('rollout-no-model.jsonl', [
+      tokenCountLine('2026-07-13T09:00:00.000Z', { input_tokens: 100, output_tokens: 20 }),
+    ]);
+    const entries = parseCodexFile(file);
+    expect(entries[0]).toMatchObject({ inputTokens: 100, outputTokens: 20, model: undefined });
   });
 
   it('sums deltas across multiple sessions independently (fresh baseline per file)', () => {

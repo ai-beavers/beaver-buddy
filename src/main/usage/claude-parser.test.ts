@@ -30,6 +30,7 @@ function usageLine(overrides: Record<string, unknown> = {}): string {
     requestId: 'req-1',
     message: {
       id: 'msg-1',
+      model: 'claude-3-5-sonnet-20240620',
       usage: { input_tokens: 100, output_tokens: 50, cache_creation_input_tokens: 10, cache_read_input_tokens: 5 },
     },
     ...overrides,
@@ -41,7 +42,7 @@ describe('parseClaudeFile', () => {
     const file = writeFixture('session-a.jsonl', [usageLine()]);
     const entries = parseClaudeFile(file);
     expect(entries).toEqual([
-      { timestampMs: Date.parse('2026-07-13T10:00:00.000Z'), inputTokens: 100, outputTokens: 50, cacheCreationTokens: 10, cacheReadTokens: 5 },
+      { timestampMs: Date.parse('2026-07-13T10:00:00.000Z'), model: 'claude-3-5-sonnet-20240620', inputTokens: 100, outputTokens: 50, cacheCreationTokens: 10, cacheReadTokens: 5 },
     ]);
   });
 
@@ -80,10 +81,16 @@ describe('parseClaudeFile', () => {
     expect(entries[0]).toMatchObject({ inputTokens: 30, outputTokens: 20 });
   });
 
-  it('defaults missing usage token fields to zero', () => {
-    const file = writeFixture('session-e.jsonl', [usageLine({ message: { id: 'msg-1', usage: { input_tokens: 42 } } })]);
+  it('defaults missing usage token fields to zero and preserves the model', () => {
+    const file = writeFixture('session-e.jsonl', [usageLine({ message: { id: 'msg-1', model: 'claude-opus-4', usage: { input_tokens: 42 } } })]);
     const entries = parseClaudeFile(file);
-    expect(entries[0]).toMatchObject({ inputTokens: 42, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0 });
+    expect(entries[0]).toMatchObject({ inputTokens: 42, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, model: 'claude-opus-4' });
+  });
+
+  it('falls back to undefined model when the message has no model field', () => {
+    const file = writeFixture('session-no-model.jsonl', [usageLine({ message: { id: 'msg-1', usage: { input_tokens: 10 } } })]);
+    const entries = parseClaudeFile(file);
+    expect(entries[0]).toMatchObject({ inputTokens: 10, model: undefined });
   });
 
   it('skips lines with no usage object at all (e.g. user messages)', () => {
