@@ -51,7 +51,6 @@ export const ADULT_SLEEP: AdultRowConfig;
 export const ADULT_STRETCH: AdultRowConfig;
 export const ADULT_IDLE: AdultRowConfig;
 export const ADULT_WALK: AdultRowConfig;
-export const ADULT_SPEAK: AdultRowConfig;
 
 export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
 export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
@@ -60,4 +59,13 @@ export function buildAdultSleepSheet(repoRoot: string): AdultRowResult;
 export function buildAdultStretchSheet(repoRoot: string): AdultRowResult;
 export function buildAdultIdleSheet(repoRoot: string): AdultRowResult;
 export function buildAdultWalkSheet(repoRoot: string): AdultRowResult;
+
+// speak (BL-7) is mechanically composited from the committed idle tile, not
+// a ComfyUI grid — its config shape is just the row name and the mouth
+// patch's pixel bounding box, not an AdultRowConfig.
+export interface AdultSpeakConfig {
+  readonly rowName: string;
+  readonly mouthBox: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
+}
+export const ADULT_SPEAK: AdultSpeakConfig;
 export function buildAdultSpeakSheet(repoRoot: string): AdultRowResult;

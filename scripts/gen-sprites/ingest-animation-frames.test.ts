@@ -20,7 +20,9 @@ const hasSleepSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_S
 const hasStretchSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_STRETCH.sourceDir}/sheet.png`, import.meta.url));
 const hasIdleSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_IDLE.sourceDir}/sheet.png`, import.meta.url));
 const hasWalkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WALK.sourceDir}/sheet.png`, import.meta.url));
-const hasSpeakSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_SPEAK.sourceDir}/sheet.png`, import.meta.url));
+// speak (BL-7) has no ComfyUI source dir to gate on — it's mechanically
+// composited from the committed idle tile, so its regeneration test runs
+// unconditionally (see below).
 
 // Cumulative y-offset of a row found by name, not position — rows keep
 // getting appended after each other (watering, then drink, ...), so no test
@@ -545,103 +547,90 @@ describe.skipIf(!hasStretchSource)('ingest-animation-frames stretch regeneration
   });
 });
 
-// Speak row (BL-7): same committed-sheet + gated-regeneration convention as
-// watering/drink/sleep/stretch above, via the shared buildAdultRowSheet
-// config. Speak is a LOOP (forward-facing, mouth cycling open/closed twice
-// per 8-frame cycle), like sleep — no settle transition.
+// Speak row (BL-7, redone): a first attempt generated a full 8-frame AI
+// grid (same convention as watering/drink/sleep/stretch) and FAILED the
+// design gate — independent per-frame generations redrew the tail/pose/
+// shading, reading as whole-body flicker rather than a talking mouth (see
+// git history and the superseded docs/design-reviews/BL-7-speak-verdict.md
+// entry). The redo derives every frame MECHANICALLY from the committed idle
+// tile, patching only ADULT_SPEAK.mouthBox — so the real invariant to test
+// isn't "is the wraparound delta plausible" (that passed the broken art
+// too), it's "are the two derived states byte-identical to their source
+// outside the patched box", which is now directly provable.
 describe('ingest-animation-frames speak row (adult)', () => {
   const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
   const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
 
-  it('has a speak row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+  function readMeta() {
+    return JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
       tile: number;
       rows: readonly { name: string; frames: number; height?: number }[];
     };
-    const row = meta.rows.find((r) => r.name === 'speak');
+  }
+
+  function extractFrame(decoded: ReturnType<typeof decodePng>, originY: number, tile: number, frame: number): Uint8ClampedArray {
+    const out = new Uint8ClampedArray(tile * tile * 4);
+    for (let y = 0; y < tile; y += 1) {
+      const srcStart = ((originY + y) * decoded.width + frame * tile) * 4;
+      out.set(decoded.data.subarray(srcStart, srcStart + tile * 4), y * tile * 4);
+    }
+    return out;
+  }
+
+  it('has a speak row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const row = readMeta().rows.find((r) => r.name === 'speak');
     expect(row).toEqual({ name: 'speak', frames: 8 });
   });
 
-  it('every speak frame has content, is grounded, and has no surviving green', () => {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
-      tile: number;
-      rows: readonly { name: string; frames: number; height?: number }[];
-    };
+  it('idle-tile-derived frames (2, 3, 4, 6, 7, 8 — 1-indexed) are byte-identical to the committed idle tile', () => {
+    const meta = readMeta();
     const decoded = decodePng(fs.readFileSync(pngPath));
     const originY = rowOffset(meta, 'speak');
     const { tile } = meta;
+    const idle = extractFrame(decoded, 0, tile, 0); // idle row is always frame 0 at sheet origin
 
-    for (let frame = 0; frame < 8; frame += 1) {
-      const originX = frame * tile;
-      let opaque = 0;
-      let bottomOpaque = false;
-      for (let y = 0; y < tile; y += 1) {
-        for (let x = 0; x < tile; x += 1) {
-          const i = ((originY + y) * decoded.width + originX + x) * 4;
-          const alpha = decoded.data[i + 3];
-          if (alpha > 0) {
-            opaque += 1;
-            if (y === tile - 1) bottomOpaque = true;
-            const r = decoded.data[i];
-            const g = decoded.data[i + 1];
-            const b = decoded.data[i + 2];
-            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at speak[${frame}] ${x},${y}`).toBe(false);
-          }
-        }
-      }
-      expect(opaque, `speak[${frame}] is empty`).toBeGreaterThan(0);
-      expect(bottomOpaque, `speak[${frame}] not grounded`).toBe(true);
+    for (const frame of [1, 2, 3, 5, 6, 7]) {
+      const f = extractFrame(decoded, originY, tile, frame);
+      expect(Buffer.from(f).equals(Buffer.from(idle)), `speak[${frame}] (closed) should equal the idle tile`).toBe(true);
     }
   });
 
-  // Loop wraparound gate: frame 8 -> frame 1 must read as a continuous
-  // talking pulse, not a jump-cut. The mouth cycles open(1)/closed(2-4)/
-  // open(5)/closed(6-8), so frame8(closed)->frame1(open) is the SAME
-  // magnitude of change as the frame4(closed)->frame5(open) transition
-  // already inside the loop — a real pixel delta at the mouth is expected
-  // and desired (that's the animation), not a discontinuity. This asserts
-  // the wraparound delta doesn't exceed the loop's own internal swing.
-  it('frame8-to-frame1 wraparound delta is no larger than the loop\'s own internal frame4-to-frame5 swing', () => {
-    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
-      tile: number;
-      rows: readonly { name: string; frames: number; height?: number }[];
-    };
+  // The real jitter invariant (this is what the discarded AI-grid approach
+  // could never guarantee): for every adjacent frame pair, including the
+  // 8->1 wraparound, every pixel OUTSIDE the mouth patch box must be
+  // BYTE-IDENTICAL — not just "similar", zero tolerance. This is only
+  // provable because every frame derives from one shared base tile.
+  it('every adjacent frame pair (including 8->1) is byte-identical outside the mouth box — zero body jitter', () => {
+    const meta = readMeta();
     const decoded = decodePng(fs.readFileSync(pngPath));
     const originY = rowOffset(meta, 'speak');
     const { tile } = meta;
+    const { x0, y0, x1, y1 } = ADULT_SPEAK.mouthBox;
 
-    function extractFrame(frame: number): Uint8ClampedArray {
-      const out = new Uint8ClampedArray(tile * tile * 4);
-      for (let y = 0; y < tile; y += 1) {
-        const srcStart = ((originY + y) * decoded.width + frame * tile) * 4;
-        out.set(decoded.data.subarray(srcStart, srcStart + tile * 4), y * tile * 4);
-      }
-      return out;
-    }
-
-    function diffCount(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
+    function diffOutsideBox(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
       let n = 0;
-      for (let i = 0; i < a.length; i += 4) {
-        const d = Math.max(
-          Math.abs(a[i] - b[i]),
-          Math.abs(a[i + 1] - b[i + 1]),
-          Math.abs(a[i + 2] - b[i + 2]),
-          Math.abs(a[i + 3] - b[i + 3]),
-        );
-        if (d > 20) n += 1;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          if (x >= x0 && x < x1 && y >= y0 && y < y1) continue;
+          const i = (y * tile + x) * 4;
+          if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) n += 1;
+        }
       }
       return n;
     }
 
-    const wraparoundDelta = diffCount(extractFrame(7), extractFrame(0));
-    const internalDelta = diffCount(extractFrame(3), extractFrame(4));
-    // A generous slack factor: the two swings are the same kind of
-    // open<->closed transition, but not pixel-identical in magnitude.
-    expect(wraparoundDelta).toBeLessThanOrEqual(internalDelta * 1.5 + 200);
+    const frames = Array.from({ length: 8 }, (_, i) => extractFrame(decoded, originY, tile, i));
+    for (let i = 0; i < 8; i += 1) {
+      const next = (i + 1) % 8; // wraps 8->1 at i=7
+      expect(diffOutsideBox(frames[i], frames[next]), `frame ${i + 1}->${next + 1} differs outside the mouth box`).toBe(0);
+    }
   });
 });
 
-describe.skipIf(!hasSpeakSource)('ingest-animation-frames speak regeneration', () => {
+// speak has no ComfyUI source dir — buildAdultSpeakSheet only reads the
+// already-committed idle tile, so its regeneration check has nothing to
+// gate on and always runs.
+describe('ingest-animation-frames speak regeneration', () => {
   it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
     const { png, meta } = buildAdultSpeakSheet(repoRoot);
     expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);

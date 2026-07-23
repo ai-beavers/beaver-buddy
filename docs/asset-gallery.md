@@ -124,10 +124,15 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   reference-conditioned on it AND the adult idle tile) and settles back to
   the idle stance. `speak` (BL-7) is appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult-speak`
-  (`npm run assets:adult-speak`) via the same `buildAdultRowSheet` builder —
-  forward-facing (not side profile, unlike the movement rows), mouth cycling
-  open/closed twice per 8-frame loop, reference-conditioned the same way,
-  green chroma-key background — see STYLE.md provenance.
+  (`npm run assets:adult-speak`) — forward-facing (not side profile, unlike
+  the movement rows), mouth cycling open/closed twice per 8-frame loop.
+  Unlike every row above, `speak` is NOT a ComfyUI generation: a first
+  AI-grid attempt failed the design gate (independent per-frame generations
+  drifted the body/tail/shading, reading as flicker, not talking) and was
+  replaced with a bespoke builder that mechanically patches only a small
+  mouth-region box on the committed idle tile, so every frame is
+  byte-identical outside that box by construction — see STYLE.md provenance
+  for the full before/after.
 - **Status:** final
 
 ### Tree — growth stages

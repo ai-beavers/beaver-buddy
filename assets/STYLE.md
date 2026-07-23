@@ -136,8 +136,10 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   growing the sheet to 768×992; see Provenance. `speak(8)` — a forward-facing
   talking LOOP, mouth cycling open/closed twice per 8-frame cycle — is
   appended on top of that by `scripts/gen-sprites/ingest-animation-frames.mjs
-  adult-speak` (`npm run assets:adult-speak`, BL-7) via the same
-  `buildAdultRowSheet` helper, growing the sheet to 768×1088; see Provenance.
+  adult-speak` (`npm run assets:adult-speak`, BL-7), growing the sheet to
+  768×1088; see Provenance. Unlike every other row above, `speak` is NOT a
+  ComfyUI grid ingest — it's mechanically composited from the committed idle
+  tile (see Provenance for why).
 - **Tree growth stages** (`tree-stage-1.png`/`tree-stage-2.png`/`tree-stage-3.png`,
   BL-1/T1): one row each, `sway(12)`, baked at fps 8 by the puppet studio
   (`tools/puppet-studio/`) — 96×96 tile, sheet 1152×96. Not a multi-row sheet
@@ -328,26 +330,50 @@ backdrop, eyeballed rather than pixel-diffed (frame 1 is newly generated art
 conditioned on the sleep pose, not a byte copy of it) — both read as a clean
 continuous match. No human cleanup beyond the mechanical pipeline.
 
-`speak(8)` (BL-7, 2026-07-22): a 4×2 grid (8 frames) of a forward-facing
-talking LOOP — the beaver stands facing the viewer (not side profile, unlike
-the movement rows), body mostly still, with the mouth cycling
-open → closed → closed → closed → open → closed → closed → closed and a
-small chin/head bob synced to the mouth, so runtime (WAVE-2, out of scope
-here) can loop any slice of it under a quip's duration. Generated via Comfy
-Cloud Nano Banana Pro (`GeminiImage2Node`), reference-conditioned on the same
-already-uploaded adult reference image every other adult row is anchored to
-(reused by filename, no new upload — direct uploads are blocked in this
-environment, per `docs/dev-guardrails.md`), on a green (`#00FF00`) chroma-key
-background. Ingested by `scripts/gen-sprites/ingest-animation-frames.mjs
-adult-speak` (`npm run assets:adult-speak`) via `buildAdultRowSheet` — same
-byte-preserving append pattern as watering/drink/sleep/stretch — growing the
-sheet to 768×1088. **Loop wraparound gate**: frame 8 (mouth closed) → frame 1
-(mouth open) is the same kind of transition as frame 4 → frame 5 already
-inside the loop (also closed → open), not a discontinuity — verified both by
-a committed side-by-side diff (`docs/design-reviews/BL-7-speak-wraparound.png`)
-and a dedicated test (`ingest-animation-frames.test.ts`) asserting the
-wraparound pixel delta doesn't exceed the loop's own internal frame4→frame5
-swing. No human cleanup beyond the mechanical pipeline.
+`speak(8)` (BL-7, 2026-07-23): a forward-facing talking LOOP — the beaver
+stands facing the viewer (not side profile, unlike the movement rows), body
+completely still, mouth cycling open → closed → closed → closed → open →
+closed → closed → closed, so runtime (WAVE-2, out of scope here) can loop
+any slice of it under a quip's duration.
+
+**First attempt (discarded) and why**: like watering/drink/sleep/stretch, a
+first pass generated a 4×2 Comfy Cloud grid (`GeminiImage2Node`,
+reference-conditioned on the shared adult reference image, green chroma-key
+background). It FAILED the design gate: each of the 8 cells is an
+INDEPENDENT generation, and nothing forces independent generations to agree
+on body pose/tail side/shading — the row read as whole-body flicker at
+playback speed, not a talking mouth (tail flipped sides around frames 6–8,
+shading drifted throughout). The wraparound-only gate used at the time
+(comparing frame8→frame1's delta against the loop's own internal
+frame4→frame5 delta) passed this broken art, because BOTH deltas were
+inflated by the same whole-body redraw — it measured "is the swing
+consistent," not "is only the mouth moving."
+
+**Fix, shipped**: every frame is derived MECHANICALLY from the single
+already-accepted, already-committed idle tile (`assets/sprites/beaver-adult.png`
+row 0) — no new generation, no chroma-key, no grid. A small mouth-region
+bounding box (`ADULT_SPEAK.mouthBox`, x:54–86 y:34–52 in the 96px tile) is
+patched with a hand-authored open-mouth cavity (ellipse fill + outline ring)
+and a short row of teeth, colors resampled directly from the idle tile's own
+nose (cavity fill), outline (ring), and visible tooth (teeth) pixels — no new
+palette entries. The "closed" state is the idle tile completely unmodified;
+the "open" state is the idle tile with only that box patched. The 8-frame
+row is `open, closed, closed, closed, open, closed, closed, closed` — two of
+the exact same two derived tiles, duplicated, not 8 separate renders.
+Ingested by `scripts/gen-sprites/ingest-animation-frames.mjs adult-speak`
+(`npm run assets:adult-speak`, a bespoke builder — NOT `buildAdultRowSheet`,
+which is grid/chroma-key-specific and doesn't apply here), growing the sheet
+to 768×1088. **Jitter is now structurally impossible, not just visually
+absent**: because every frame is a clone of one of two tiles that only
+differ inside `mouthBox`, every pixel outside that box is BYTE-IDENTICAL
+across every adjacent frame pair, including the 8→1 wraparound — asserted by
+a dedicated test in `ingest-animation-frames.test.ts` (zero-tolerance, not a
+delta threshold), not just eyeballed. Evidence:
+`docs/design-reviews/BL-7-speak-contact-sheet.png` (all 8 frames, same body
+throughout) and `docs/design-reviews/BL-7-speak-wraparound.png` (frame 1 vs
+frame 8). No human cleanup beyond the mechanical pipeline — and no beaver
+pixels were freshly authored/generated at all; the mouth patch reuses colors
+already present in the accepted idle art.
 
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
