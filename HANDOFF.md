@@ -1,41 +1,76 @@
-# Session Handoff — 2026-07-22
+# Session Handoff — 2026-07-23
 
 ## current_state
 
-- Current branch: `chore/zyklus1-planning` at `436ad67`, tracking `upstream/chore/zyklus1-planning`.
-- Milestone/phase implicated by the working changes: M4 / Phase 1 (Token Tracking & Aggregation), although `.planning/Planning/Milestone-4/Phase-1/PHASE.md` still says `not-started` and both waves remain unchecked.
-- The working tree is heavily dirty. Existing changes include many `.planning/` files, `CLAUDE.md`, usage-tracking/settings source and tests, plus untracked `src/main/usage/generic-parser.ts`, `src/main/usage/generic-parser.test.ts`, `src/main/usage/sources.ts`, and `kimi-export-session_-20260722-160138.md`.
-- Local branches: `chore/zyklus1-planning` and `main`. Remotes: `origin` (`rodgi040/beaver-buddy`) and `upstream` (`ai-beavers/beaver-buddy`).
-- No merge, commit, checkout, reset, staging, or planning-state edit was performed in this pause session.
+- **Branch:** `feat/xp-cap-and-settings`, 5 commits ahead of `feat/reset-removal-xp-migration` (PR #52)
+- **Working tree:** clean
+- **Milestone/Phase:** M4/P2 (XP/Level) — spec curve + 5 stages + model-weighted XP migration implemented
+- **App status:** Beaver Buddy runs at L122 adult with 1.76M XP (weighted, cache-excluded per model)
 
-## completed
+## completed (2026-07-23 session)
 
-- Read `CLAUDE.md`, `.planning/KICKOFF.md`, `.planning/STATE.md`, `.planning/ROADMAP.md`, the active-looking M4/P1 `PHASE.md`, and every discovered `BLOCKER.md`.
-- Inspected the real branch, remote, log, and working-tree state.
-- Reconciled the prior conversation summary with the current checkout: the earlier claim that only a `work` branch and no remotes existed does not describe this checkout.
-- Captured the current state in this root `HANDOFF.md` without modifying the user-owned `.planning/` state.
+### Wave A — Reset-Feature entfernt
+- Branch `feat/reset-removal-xp-migration`: Reset-Button, IPC channel, handler, engine.resetProgress(), --reset-hatch flag, allowStageSnap option + all tests/docs removed
+- PR #52 opened against ai-beavers/beaver-buddy (contribution PR, English)
+- Hatch onboarding preserved; QA replay via onboarding-state.json deletion
+
+### Wave B — XP-Migration mit Modellgewichtung
+- model field through usage pipeline (UsageEntry.model, lifetimeByModel per model, no cache)
+- model-weights.json: 26 models, γ=2, REF=45, clamp 0.5–2.0, log-name mapping
+- 5-stage curve (baby/young-baby/teen/older-teen/adult), 32-level quadratic table, XP_PER_1K_TOKENS=5
+- XpState v2: per-model cursors (lastSeenByModel), schemaVersion: 2
+- Idempotent migration (migrate.ts, runs once at startup before attachTracker)
+- Renderer 5-stage wiring: stage union extended, stageHasInteraction correct for new stages, tray labels humanised
+- 647 tests green (37 net new), typecheck + lint clean
+
+### Wave C — XP-Cap entfernt
+- No hard cap at L32. Formula extends naturally: levelForXp uses table L1-L32, formula + correction for L33+
+- xpForLevel: table L1-L32, raw formula for L33+
+- Float drift fix: table avoids round()-drift for L1-L32, while-loop correction for L33+
+- Current user state: 1.76M XP → L122 adult
+
+### Wave D — Settings UI
+- Beaver Status section in settings.html: level, stage, XP progress bar (fraction of current level), per-model token cursors
+- XpStatusPayload: {xp, level, stage, currentLevelXp, nextLevelXp, lastSeenByModel}
+- SettingsWindowDeps.getXpState() wired from xpEngine
+- XpEngine.getLastSeenByModel() added
+
+### Wave E — Alterslogik-Fundament
+- stage-capabilities.ts: {canGrab, canType, roamPace} per stage
+- input-capture.ts: stageHasInteraction delegates to capabilities.canGrab
+- RoamPace values defined (0.7–1.25) for future use
+
+### Wave F1 — Animations-Crosscheck
+- M5 12 Phases all documented as stubs. Adult sheet has rows for P1-P8 (BL-1..9). P9-P11 + young-baby/older-teen/adult full rows still needed (M5/P12).
+- Meeting transcript (2026-07-21) covers M3-M6 roadmap, no detailed animation tasks.
+
+### Docs
+- CLAUDE.md: Agent hygiene rule (Electron kill only by path filter, never global)
+- STATE.md: updated to 2026-07-23
+- PLAN.md: full Wave A-F plan documented
+- TRACKING.md: progress entries for Waves A/B, C-F plan
 
 ## remaining
 
-1. Inspect and classify the large existing diff before changing branches or merging; determine which edits belong to the new usage-tracking feature and which are unrelated/user-owned (especially the many `.planning/` changes).
-2. Identify the intended feature commit/branch. The commit `aa1e273` quoted in the prior conversation is not visible in the current eight-commit log and was not verified in this checkout.
-3. Protect or commit the intended feature changes on a proper feature branch before attempting any merge. Do not overwrite or discard the existing dirty worktree.
-4. Fetch only if current remote state is needed and network access is authorized, then compare `main`, feature work, `origin`, and `upstream`.
-5. Run `npm run typecheck`, `npm run lint`, and `npm test` in this checkout after the intended code state is established. The earlier reported passing results were not rerun during this pause session.
-6. Perform the requested local merge only after the target branch and ownership of all dirty changes are unambiguous.
+1. Owner test: settings window display, cap removal verification (tray label shows L122)
+2. Push `feat/xp-cap-and-settings` → update PR #52 or create separate PR
+3. Wave F2: UI layout concept for settings window (waiting for owner transcript)
+4. pi-agent token counter fix (own debug session)
+5. M5/P12 dispatch to Vlady: young-baby/older-teen/adult complete animation rows
 
 ## decisions
 
-- "Darum habe ich **keinen Merge-Commit erstellt**" — decision recorded from the prior conversation; its stated rationale (no second branch/no remote) is contradicted by this checkout and must be re-evaluated before resuming.
-- "never edit `.planning/` planning state yourself — updates flow through Rodgi" — binding project rule; therefore this pause did not update `.planning/STATE.md` even though the generic `fp-pause` workflow normally updates `STATE.md`.
-- "Do not commit unless the user asks." — `fp-pause` rule followed; no commit was created.
+- XP cap permanently removed; formula extends past L32, L25+ stays adult. New stages will be added via M5/P12.
+- Settings window shows real-time xp/level/stage + per-model cursors. No extra channel needed — readStatus transports everything.
+- Stage behaviour gated via capabilities module, not hard-coded stage names.
+- Electron kill must filter by beaver-buddy CommandLine — never kill all electron instances.
 
 ## blockers
 
-- The working tree contains a large set of pre-existing modified and untracked files whose ownership/scope has not yet been classified. Switching or merging now risks mixing or overwriting work.
-- Planning reports PR #40 as awaiting required review, but remote PR state was not refreshed in this pause session.
-- Root `STATE.md` did not exist, while `.planning/STATE.md` is explicitly protected from direct agent edits.
+- M5/P12: young-baby/older-teen sheets have only idle/walk rows — needs Vlady's Comfy Cloud agent. All other P1-P8 adult rows exist (BL-1..9 build-loop merge).
+- PR #52 awaiting review on ai-beavers/beaver-buddy.
+- Wave F2 waiting for owner's UI transcript.
 
 ## next_action
 
-Run a scoped diff inventory (`git diff --stat`, then inspect the usage/settings files separately from `.planning/`) and map every feature file to its intended branch before any merge or checkout.
+Start the app with `npm start`, open Settings → "Beaver Status" to verify XP display. Push/pull decisions after owner test.
