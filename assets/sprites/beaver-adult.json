@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 1408,
+  "sheetHeight": 1504,
   "rows": [
     {
       "name": "idle",
@@ -61,6 +61,10 @@
       "name": "exercise",
       "frames": 8,
       "height": 128
+    },
+    {
+      "name": "brainrot",
+      "frames": 8
     }
   ]
 }

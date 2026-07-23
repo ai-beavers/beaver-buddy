@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_EXERCISE, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, BABY, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultExerciseSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_BRAINROT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_EXERCISE, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, BABY, buildAdultBrainrotSheet, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultExerciseSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -23,6 +23,7 @@ const hasWalkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WA
 const hasThrowStickSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_THROW_STICK.sourceDir}/sheet.png`, import.meta.url));
 const hasCollectSticksSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_COLLECT_STICKS.sourceDir}/sheet.png`, import.meta.url));
 const hasExerciseSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_EXERCISE.sourceDir}/sheet.png`, import.meta.url));
+const hasBrainrotSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_BRAINROT.sourceDir}/sheet.png`, import.meta.url));
 // speak (BL-7) has no ComfyUI source dir to gate on — it's mechanically
 // composited from the committed idle tile, so its regeneration test runs
 // unconditionally (see below).
@@ -128,10 +129,11 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
     // is appended by ingest-typing.mjs (see ingest-typing); `watering`,
     // `drink`, `sleep`, `stretch`, `speak`, `throw-stick`, `collect-sticks`,
-    // and `exercise` are appended by buildAdultWateringSheet /
+    // `exercise`, and `brainrot` are appended by buildAdultWateringSheet /
     // buildAdultDrinkSheet / buildAdultSleepSheet / buildAdultStretchSheet /
     // buildAdultSpeakSheet / buildAdultThrowStickSheet /
-    // buildAdultCollectSticksSheet / buildAdultExerciseSheet (see below).
+    // buildAdultCollectSticksSheet / buildAdultExerciseSheet /
+    // buildAdultBrainrotSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -147,6 +149,7 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'throw-stick', frames: 8 },
       { name: 'collect-sticks', frames: 8 },
       { name: 'exercise', frames: 8, height: 128 },
+      { name: 'brainrot', frames: 8 },
     ]);
   });
 
@@ -171,14 +174,15 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // full-tile content height, instead of the whole row shrinking to fit the
   // overhead-arms-and-log frames inside a plain 96px tile. Width stays a
   // flat 8-col grid at the 96px tile — only row height varies, never column
-  // width.
-  it('is a 768x1408 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96/96/96/128)', () => {
+  // width. buildAdultBrainrotSheet appends a plain 96px `brainrot` row ->
+  // 1504; its height-bound pose fits the default tile.
+  it('is a 768x1504 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96/96/96/128/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(1408);
+    expect(decoded.height).toBe(1504);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(1408);
+    expect(meta.sheetHeight).toBe(1504);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -931,5 +935,65 @@ describe.skipIf(!hasExerciseSource)('ingest-animation-frames exercise regenerati
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultExerciseSheet(repoRoot).png.equals(buildAdultExerciseSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Prop and pose coherence are visual gates; these tests pin the mechanical
+// row contract and catch failed chroma-keying.
+describe('ingest-animation-frames brainrot row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a brainrot row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'brainrot');
+    expect(row).toEqual({ name: 'brainrot', frames: 8 });
+  });
+
+  it('every brainrot frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'brainrot');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const alpha = decoded.data[i + 3];
+          if (alpha > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at brainrot[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `brainrot[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `brainrot[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasBrainrotSource)('ingest-animation-frames brainrot regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultBrainrotSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultBrainrotSheet(repoRoot).png.equals(buildAdultBrainrotSheet(repoRoot).png)).toBe(true);
   });
 });
