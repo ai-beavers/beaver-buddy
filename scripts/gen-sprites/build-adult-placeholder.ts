@@ -81,8 +81,30 @@ export function buildAdultPlaceholder(): { png: Buffer; meta: SheetMetaJson } {
   return { png: encodeRgbaPng({ width, height, data }), meta };
 }
 
+// This generator always writes a FRESH 2-row (idle/walk) sheet derived from
+// the teen sheet — it has no notion of the other rows (struggle/
+// parachute-wind/land/type/watering/drink/sleep/stretch) later scripts
+// append onto the committed beaver-adult.png. Once those rows exist, a
+// rerun would silently destroy all of them, not just idle/walk. No override
+// flag: WAVE-2 retires this script once real adult art replaces it
+// everywhere, so the safe answer is always "don't run it" past that point.
+export function assertSafeToOverwrite(existingRows: readonly { readonly name: string }[]): void {
+  const extra = existingRows.filter((row) => row.name !== 'idle' && row.name !== 'walk');
+  if (extra.length > 0) {
+    throw new Error(
+      `refusing to run assets:adult-placeholder: committed beaver-adult.json already has rows beyond idle/walk ` +
+        `(${extra.map((row) => row.name).join(', ')}) — this script writes a fresh 2-row sheet and would destroy them`,
+    );
+  }
+}
+
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
+  if (fs.existsSync(fileURLToPath(ADULT_META_URL))) {
+    const existingMeta = JSON.parse(fs.readFileSync(fileURLToPath(ADULT_META_URL), 'utf8')) as SheetMetaJson;
+    assertSafeToOverwrite(existingMeta.rows);
+  }
+
   const { png, meta } = buildAdultPlaceholder();
   fs.writeFileSync(fileURLToPath(ADULT_SHEET_URL), png);
   fs.writeFileSync(fileURLToPath(ADULT_META_URL), `${JSON.stringify(meta, null, 2)}\n`);

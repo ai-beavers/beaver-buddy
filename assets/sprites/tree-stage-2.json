@@ -1,0 +1,12 @@
+{
+  "tile": 96,
+  "fps": 8,
+  "sheetWidth": 1152,
+  "sheetHeight": 96,
+  "rows": [
+    {
+      "name": "sway",
+      "frames": 12
+    }
+  ]
+}

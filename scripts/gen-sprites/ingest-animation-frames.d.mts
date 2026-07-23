@@ -28,3 +28,50 @@ export const ADULT: StageAnimConfig;
 
 export function buildStageSheet(repoRoot: string, config: StageAnimConfig): StageSheetResult;
 export function buildBabySheet(repoRoot: string): StageSheetResult;
+
+export interface AdultRowConfig {
+  readonly rowName: string;
+  readonly sourceDir: string;
+  readonly frames: number;
+  readonly gridCols: number;
+  readonly gridRows: number;
+  readonly targetContentHeightPx: number;
+  readonly rowHeight?: number;
+}
+
+export interface AdultRowResult {
+  readonly png: Buffer;
+  readonly meta: SheetMeta;
+  readonly scale: number;
+}
+
+export const ADULT_WATERING: AdultRowConfig;
+export const ADULT_DRINK: AdultRowConfig;
+export const ADULT_SLEEP: AdultRowConfig;
+export const ADULT_STRETCH: AdultRowConfig;
+export const ADULT_IDLE: AdultRowConfig;
+export const ADULT_WALK: AdultRowConfig;
+export const ADULT_THROW_STICK: AdultRowConfig;
+export const ADULT_COLLECT_STICKS: AdultRowConfig;
+export const ADULT_EXERCISE: AdultRowConfig;
+
+export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
+export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
+export function buildAdultDrinkSheet(repoRoot: string): AdultRowResult;
+export function buildAdultSleepSheet(repoRoot: string): AdultRowResult;
+export function buildAdultStretchSheet(repoRoot: string): AdultRowResult;
+export function buildAdultIdleSheet(repoRoot: string): AdultRowResult;
+export function buildAdultWalkSheet(repoRoot: string): AdultRowResult;
+export function buildAdultThrowStickSheet(repoRoot: string): AdultRowResult;
+export function buildAdultCollectSticksSheet(repoRoot: string): AdultRowResult;
+export function buildAdultExerciseSheet(repoRoot: string): AdultRowResult;
+
+// speak (BL-7) is mechanically composited from the committed idle tile, not
+// a ComfyUI grid — its config shape is just the row name and the mouth
+// patch's pixel bounding box, not an AdultRowConfig.
+export interface AdultSpeakConfig {
+  readonly rowName: string;
+  readonly mouthBox: { readonly x0: number; readonly y0: number; readonly x1: number; readonly y1: number };
+}
+export const ADULT_SPEAK: AdultSpeakConfig;
+export function buildAdultSpeakSheet(repoRoot: string): AdultRowResult;
