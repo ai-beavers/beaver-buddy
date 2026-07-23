@@ -4,7 +4,6 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { XpEngine, type PetUpdate, type TrackerLike } from './engine';
 import { TOKENS_PER_XP, xpForLevel } from './curve';
-import { loadState } from './store';
 import type { UsageTotals } from '../usage/totals';
 
 let stateDir: string;
@@ -233,78 +232,5 @@ describe('XpEngine: growth mode gating (setMode/ingestLifetimeTokens/awardMrr)',
     engine.onUpdate((u) => updates.push(u));
     await engine.awardMrr(xpForLevel(16), '2026-07-13');
     expect(updates.some((u) => u.evolvingTo === 'teen')).toBe(true);
-  });
-});
-
-describe('XpEngine: resetProgress', () => {
-  it('resets xp/level/stage to 0/1/baby and persists', async () => {
-    const engine = new XpEngine(stateDir);
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // teen
-    await engine.resetProgress();
-
-    expect(engine.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
-    expect(loadState(stateDir)).toEqual({
-      xp: 0,
-      lastSeenLifetimeTokens: TOKENS_PER_XP * xpForLevel(17),
-      lastMrrAwardDate: null,
-    });
-  });
-
-  it('keeps the forward-only token cursor, so the tracker never re-awards the history after a reset', async () => {
-    const engine = new XpEngine(stateDir);
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    await engine.resetProgress();
-
-    // Same total replayed (e.g. next tracker tick): cursor already there, delta 0.
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    expect(engine.getState().xp).toBe(0);
-    // Only genuine growth past the old cursor accrues again.
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 12);
-    expect(engine.getState().xp).toBe(2);
-  });
-
-  it('emits exactly one update { level: 1, stage: baby } without evolvingTo and tracks it as last update', async () => {
-    const engine = new XpEngine(stateDir);
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * xpForLevel(17)); // teen
-    const updates: PetUpdate[] = [];
-    engine.onUpdate((u) => updates.push(u));
-
-    await engine.resetProgress();
-
-    // A stage regression is not an evolution: no evolvingTo, and the stage
-    // in the payload is the post-reset one (baby), not the pre-reset one.
-    expect(updates).toEqual([{ level: 1, stage: 'baby' }]);
-    expect(engine.getLastUpdate()).toEqual({ level: 1, stage: 'baby' });
-  });
-
-  it('clears lastMrrAwardDate so a same-day MRR poll can grant again', async () => {
-    const engine = new XpEngine(stateDir, { xp: xpForLevel(32), lastSeenLifetimeTokens: 50_000, lastMrrAwardDate: '2026-07-13' });
-    const updates: PetUpdate[] = [];
-    engine.onUpdate((u) => updates.push(u));
-    await engine.resetProgress();
-    expect(engine.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
-    expect(engine.getLastMrrAwardDate()).toBeNull();
-    expect(updates).toEqual([{ level: 1, stage: 'baby' }]);
-  });
-
-  it('accrues only the delta past the pre-reset cursor afterwards', async () => {
-    const engine = new XpEngine(stateDir);
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 20);
-    await engine.resetProgress();
-    expect(engine.getState().xp).toBe(0);
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 20); // same cursor: no new XP
-    expect(engine.getState().xp).toBe(0);
-    await engine.ingestLifetimeTokens(TOKENS_PER_XP * 25); // only the new delta
-    expect(engine.getState().xp).toBe(5);
-  });
-
-  it('persists across a fresh engine load', async () => {
-    const engine1 = new XpEngine(stateDir);
-    await engine1.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    await engine1.resetProgress();
-    const engine2 = new XpEngine(stateDir);
-    expect(engine2.getState()).toEqual({ xp: 0, level: 1, stage: 'baby' });
-    await engine2.ingestLifetimeTokens(TOKENS_PER_XP * 10);
-    expect(engine2.getState().xp).toBe(0);
   });
 });

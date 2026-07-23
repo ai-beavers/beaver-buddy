@@ -1,127 +1,117 @@
-# Plan — Fork → upstream migration (COMPLETED 2026-07-22)
+# PLAN — Reset-Feature entfernen + XP-State-Migration mit Punkte-Matrix
 
-> **Status: fully implemented.** PR #41 (animation-authoring docs) and PR #40
-> (vendored skills + Cycle-1 planning, fully English) were merged by Gw3i.
-> Remote layout swapped: `origin` = ai-beavers/beaver-buddy (contributor workflow:
-> branch from `origin/main`, push to `origin`, PR against ai-beavers/main; rule
-> recorded in AGENTS.md). Fork `rodgi040/beaver-buddy` remains as read-only
-> backup remote `fork` (archiving in the GitHub UI is a pending owner action).
-> 15 stale upstream branches were closed with `archive/*` tags; tags `v0.1.0` +
-> `docs/animation-authoring` pushed upstream. Dependabot PRs #38/#39 remain for
-> owner merge. The full step-by-step plan lived in this file during execution;
-> see git history (2026-07-22) for details.
+> Datum: 2026-07-23 · Kontext: Debug-Befund „Biber wächst nicht" (Cursor `lastSeenLifetimeTokens`
+> = 7,2 Mrd. bei `xp = 0`, siehe `.planning/Debugging/DEBUG-beaver-growth.md` + Scout-Analyse 2026-07-23)
 
----
+## Ziel
 
-# Plan — Flightplan Re-Onboarding & Cycle-1 Planning
+1. **Aufgabe 1:** Die Funktion „Reset Beaver XP + Hatch" vollständig aus Code, UI und Tests entfernen.
+2. **Migration:** `xp-state.json` einmalig sauber migrieren — XP korrekt aus der Token-Historie
+   mit der **Punkte-Matrix-Logik** (Modellgewichtung γ=2 nach XP-LEVEL-MODEL.md §1a) berechnen,
+   Cache-Tokens strikt ausschließen, Cursor korrekt setzen.
+3. **Aufgabe 2 (Konzept):** Tokenstand persistent im Profil speichern, sodass der Start nur noch
+   das 24h-Delta berechnen muss → in dieser Runde nur **Konzept erarbeiten** (Owner: „muss noch
+   genauer durchgeplant werden"), Umsetzung danach.
+4. **Aufgabe 3:** pi-agent Token-Zähler fehlerhaft → ✅ bereits als offen in `.flightplan/NOTE.md`
+   erfasst (2026-07-23). Kein Code in dieser Runde.
 
-> Context: The old Flightplan version did not sort `.flightplan/` cleanly; the meeting
-> of 2026-07-21 (`.fp-new-projekt/MEETINGS-TRANSCRIPTS/`) defines **Cycle 1** for the first time,
-> which is not reflected in any planning file. The ongoing M2/P3 parachute work
-> (WAVE-3 with Claude Code) is **paused** and will be continued later.
->
-> **Team (3 contributors):**
-> - **Rodgi (Owner)** — involved everywhere; focus: building features together, helping
->   with animations, **precise definition of the state logic**; overall review & owner decisions
-> - **Vlady** — **sprite animations** (drives Claude Code/ComfyUI generation, asset review)
-> - **Jurij** — **event logic & hard tech** (state machine, tracking, IPC, architecture)
-> - **Agent rule (binding): pi = Rodgi only** · **Claude Code = Vlady & Jurij, everywhere**
->   (not just assets; still the only agent with Comfy Cloud MCP)
->
-> Tasks are distributed so that work does not overlap:
-> exactly **one human Accountable per phase**, parallel work only on disjoint phases.
+## Kontext-Antwort: onboarding-state.json (Owner-Rückfrage)
 
-## Step 0 — Pause the running phase cleanly (fp-pause)
+- **Einziger Zweck:** `{ hatched: boolean }` — merkt, ob die einmalige Hatch-Onboarding-Sequenz
+  schon lief (`src/main/onboarding.ts`).
+- **Fehlt die Datei** (oder ist korrupt) → `hatched: false` → Hatch spielt beim nächsten Start
+  erneut. Genau das ist der QA-Weg, den `--reset-hatch` heute abkürzt.
+- **Konsumenten:** `main.ts:174-182` (Launch-Hatch + sofortiges Persistieren, exactly-once),
+  `main.ts:393` (Senden an Renderer nach did-finish-load), `main.ts:269-272` (der zu löschende
+  Reset-Pfad), `renderer.ts` (Hatch-Animation, unterdrückt Evolution/Roaming währenddessen).
+- **Konsequenz:** Die Datei selbst **bleibt** (Onboarding braucht sie). Entfernt wird nur der
+  Reset-Schreibpfad + das `--reset-hatch`-Flag. QA-Replay geht danach weiterhin über
+  „Datei löschen" (Factory-Reset-Prinzip laut CLAUDE.md).
 
-- Rewrite `HANDOFF.md`: status „WAVE-3 PAUSED (owner decision)". Document the resume path
-  exactly: Claude Code later continues P1 (white artifacts) + P3a (struggle-b/c)
-  via `/fp-resume`; pi then P2/P4/P3b. Spec remains `WAVE-3.md`.
-- `STATE.md`: set Now/Next to „re-onboarding & Cycle-1 planning"; P3 as „paused".
-- `Planning/Milestone-2/Phase-3/PHASE.md`: status → `in-progress (paused)`.
+## Scope
 
-## Step 1 — Cleanup & migration (re-onboarding)
+### Wave A — Reset-Feature entfernen (Aufgabe 1) — ✅ IMPLEMENTED 2026-07-23
 
-Target structure (all local/gitignored, convention stays):
+| Ebene | Datei | Änderung |
+|---|---|---|
+| Settings-UI | `src/main/mrr/settings.html` | Reset-Button + JS-Handler entfernt |
+| Preload | `src/main/mrr/settings-preload.ts` | `resetProgress`-Binding + Channel-Konstante entfernt |
+| IPC | `src/main/ipc-channels.ts` | `SETTINGS_RESET_PROGRESS_CHANNEL` entfernt |
+| Handler | `src/main/mrr/settings-window.ts` | Interface-Eintrag, Handler, Registrierung entfernt |
+| Orchestrierung | `src/main/main.ts` | `onProgressReset`-Dep entfernt |
+| Engine | `src/main/xp/engine.ts` | `resetProgress()` + `allowStageSnap`-Option entfernt (keine weiteren Nutzer) |
+| QA-Flag | `src/main/main.ts` | `--reset-hatch` entfernt; QA-Replay = `onboarding-state.json` löschen |
+| Tests | `engine.test.ts`, `settings-window.test.ts`, `ipc-channels.test.ts` | Reset-Tests entfernt; Hatch/Evolution-Interplay-Tests behalten (Hatch bleibt) |
+| Docs | `README.md`, `docs/design-reviews/BL-7/BL-11/BL-19-verdict.md` | QA-Anleitung auf Datei-Löschen umgestellt |
 
-```
-.flightplan/
-  STATE.md · ROADMAP.md · HANDOFF.md · NOTE.md
-  Meetings/2026-07-21-planung/   ← raw transcript text + summary + animations raw text
-  Reference/windows-native-flight-plan.md   ← active item source #1–#64
-  Archive/                        ← .fp-new-projekt remainder (phase-*.md, plans/, …)
-  Planning/Milestone-N/Phase-N/…  (unchanged)
-  Reviews/ · Debugging/
-```
+Verifikation: typecheck ✅ · lint ✅ · 610 Tests ✅ · grep clean ✅
 
-- `MEETINGS-TRANSCRIPTS/` → `.flightplan/Meetings/2026-07-21-planung/` (normalize
-  filenames: `transcript-raw.md`, `summary.md`, `animations-rohtext.md`).
-- `windows-native-flight-plan.md` → `.flightplan/Reference/`.
-- Remainder of `.fp-new-projekt/` → `.flightplan/Archive/`; then delete `.fp-new-projekt/`.
-- **Update references:** ROADMAP.md, MILESTONE.md (M1–M4), NOTE.md; check `.gitignore`.
-- **Clean up NOTE.md:** mark F2 as done; remove inbox duplicates; add new
-  meeting items to the inbox (Level/XP, Recording Agent, naming, achievements,
-  prestige, safety mechanism, account linking later, cosmetic monetization).
-- **Fix Debugging/README.md** (reference to non-existent `Planning/Debugging/`).
+### Wave B — XP-State-Migration mit Punkte-Matrix (Aufgabe „sauber migrieren")
 
-## Step 2 — Anchor Cycle 1 in ROADMAP.md
+1. **`model`-Feld durchziehen:** `UsageEntry.model?: string` (`usage/totals.ts`); Parser
+   `claude-parser.ts`, `codex-parser.ts`, `generic-parser.ts` extrahieren den Model-Namen
+   aus den Roh-Logs; Tests + Fixtures ergänzen.
+2. **Gewichtstabelle als Daten:** Seed-Tabelle aus XP-LEVEL-MODEL.md §1a (26 Modelle,
+   REF=45, γ=2, Clamp 0.5–2.0, unknown = 1.0) als JSON-Datendatei (Vorläufer der
+   Character Map aus M4/P4) + Mapping-Funktion Log-Modelname → Tabellen-Modell.
+3. **Einmal-Migration (idempotent, Schema-Version in `xp-state.json`):**
+   - Voller Rescan der Logs → Summe **echter Input+Output-Tokens pro Modell** (Cache ausgeschlossen).
+   - `XP = Σ_model (tokens_model / 1000 × 5 × weight[model])` (XP_PER_1K_TOKENS = 5).
+   - `xp-state.json` neu schreiben: `xp` = berechneter Wert, `lastSeenLifetimeTokens` =
+     aktuelle **Cache-bereinigte** Gesamtsumme, `schemaVersion: 2` als Migrations-Marker.
+   - Bei bereits migriertem State (Version 2): kein erneutes Aufaddieren.
+4. **Laufender Pfad:** `XpEngine` auf Cache-bereinigte, gewichtete XP umstellen — Delta
+   weiterhin forward-only, aber Basis = input+output ohne Cache, gewichtet pro Modell.
+   (Engine braucht dafür per-Modell-Deltas statt einer Lifetime-Summe → `TrackerLike`-
+   Interface erweitern, `ingestLifetimeTokens` → `ingestModelDeltas`.)
+5. **Kurve/Stufen:** Umstellung auf Spec-Kurve (quadratisch, TOTAL 120.000, 5 Stufen
+   L1–4/5–8/9–16/17–24/25–32) in `curve.ts` + Stage-Typ erweitern. **Assets für alle
+   5 Stufen liegen bereits vor** (`beaver-young-baby`, `beaver-older-teen` seit Merge).
+   Renderer-Verkabelung der 2 neuen Stufen (Sheet-Loading, Evolution) inklusive.
+   **Owner-Entscheid 2026-07-23: jetzt komplett umsetzen.**
 
-- **Cycle-1 header** with exit criteria (meeting 2026-07-21):
-  1. Working, downloadable app (Windows installer)
-  2. 100 downloads
-  3. 7 additional contributors (currently: 3 — Owner, Vladi, Juri)
-- Every milestone gets a cycle marker + **owner field** (team responsible).
-- Reference block (source: `Meetings/…/summary.md`): XP = input+output tokens (excluding cache),
-  daily-aggregated per model, local config file (no auth in Z1), levels 1–32
-  (1–16 ≈ baby→teen), interactions from ~level 8, prestige post-Z1, character-map JSON,
-  separation of event logic ↔ character animation.
+### Wave C — Konzept „Tokenstand im Profil / 24h-Start" (Aufgabe 2, nur Design)
 
-## Step 3 — Define milestones together (team walkthrough)
+Kurzes Konzept-Dokument (`.planning/Planning/Milestone-4/` als Entwurf, Freigabe durch Rodgi):
+- Persistenz der Tages-Aggregate (pro Datum + Modell) in einer Profil-/State-Datei
+  (Anschluss an M4/P1 WAVE-2 Storage + M4/P3 Profil).
+- Start-Verhalten: nur Dateien mit mtime innerhalb der letzten 24h neu parsen; ältere
+  Aggregate aus dem persistierten Stand laden; Cursor-Abgleich.
+- Schnittstelle zum M4/P1-Reader (TokScale-Logik) und zur Character Map.
 
-**Order (option B, derived from meeting signals + dependencies — draft,
-finalized in the walkthrough) — with team assignment:**
+## Out of Scope
 
-| # | Milestone | Core | Accountable | Agent | Cycle |
-|---|---|---|---|---|---|
-| M1 | Windows-native app ✅ | done | Rodgi | pi | Z1 (done) |
-| M2 | Asset pipeline & animations | P1/P2 ✅ · **P3 parachute paused** | Vlady + Rodgi | Claude Code (+ pi) | ongoing |
-| M3 | Recording Agent & notifications | central Z1 feature: event detection (agent done/input needed), event↔animation strictly separated, safety mechanism; display initially via bubble/quip | **Jurij** | Claude Code | Z1 |
-| M4 | Level, XP & profile system | token tracking (aggregated/per model), XP prototype, level table 1–32, state logic of the stages, character-map JSON, local persistence, naming, achievements | **Rodgi** (Jurij advises on data model) | pi | Z1 |
-| M5 | Animations (rest) | formerly M2 P4–P15 — „one animation per phase"; WAVE-1 assets = Vlady + Claude Code, WAVE-2 runtime = Rodgi + pi | **Vlady** | Claude Code | Z1 (staggered) |
-| M6 | Contribution readiness & release | contributor/API/asset-builder docs, settings/tray, QA gates, release pipeline → **Z1 exit** | **Rodgi** (everyone reviews) | pi | Z1 |
-| — | Post-Cycle 1 | auth/account, prestige, monetization, MRR #26, quips/state machine extensions, owner decisions #3/#4b/#63/#64 | — | — | post |
+- pi-agent Token-Zähler-Fix (nur notiert; eigene Debug-Session später)
+- M4/P2 vollständig (Level-Up-Events, Unlocks, Quips-Anbindung)
+- M4/P3 (Naming-Flow, Achievements, Lifetime-Counter)
+- MRR-Modus-Änderungen (bestehendes Verhalten bleibt; Cursor-Disziplin in `mrr`-Mode
+  entfällt nicht — sie ist Teil der No-Double-Count-Invariante)
+- Prestige-System, Account-Linking (post-C1)
 
-**Procedure in the walkthrough (interactive with the team):**
-1. Confirm/adjust milestone order (table above).
-2. Per milestone: define purpose in 2–3 sentences (team-comprehensible) + phase list.
-   Phases stay deliberately coarse; detailed definition as usual at phase start.
-3. **Time estimate:** rough size per phase (S/M/L + day estimate), milestone duration
-   aggregated from that; reality check against the Z1 time horizon (~2 months per meeting).
-4. **Team matrix (binding):** see table — Jurij = M3, Rodgi = M4 + M6,
-   Vlady = M5. Rules: exactly one Accountable per phase; Rodgi helps everywhere
-   but is never a hidden second owner. **Agent rule: only Rodgi uses pi;
-   Vlady & Jurij work with Claude Code in all milestones.** Agents
-   work only on instruction from the respective phase owner.
-5. **Blocker/dependency documentation (mandatory, directly in Flightplan):**
-   - Every `PHASE.md` gets a mandatory **`Blocked by:`** field (phase list or „none", with reason).
-   - Every `MILESTONE.md` gets a **Dependencies** section (blocked by / blocks).
-   - `ROADMAP.md` contains a compact **dependency overview** (table) so the
-     team sees at a glance what blocks whom.
-   - The `STATE.md` blockers field remains the short operational view.
-6. Write the result into `ROADMAP.md` + `Planning/Milestone-N/MILESTONE.md` (Why/Phases/Success/
-   Owner/Duration/Dependencies); dissolve old M3/M4 and reassign items.
+## Akzeptanzkriterien
 
-## Step 4 — Verification & handoff
+- ~~`grep -ri "resetProgress\|reset-progress\|reset-hatch" src/` → keine Treffer.~~ ✅ (Wave A)
+- ~~Settings-Fenster zeigt keinen Reset-Button mehr~~ ✅ (Wave A)
+- Nach Migration: App-Start zeigt Level/Stufe passend zur gewichteten Token-Historie;
+  `xp-state.json` hat `schemaVersion: 2`, korrekten Cursor; kein erneutes Anrechnen
+  beim Folgestart (Idempotenz-Test).
+- Neue Token-Zuwächse werden ohne Cache-Anteil und modellgewichtet in XP umgerechnet
+  (Unit-Tests: Gewicht 1.78 Top-Modell, 0.5 Floor, unknown = 1.0, Cache ausgeschlossen).
+- 5 Stufen rendern korrekt; Evolutionen an L5/L9/L17/L25 feuern (Engine-Tests).
+- `npm run typecheck && npm run lint && npm test` grün.
+- Konzept-Dokument Aufgabe 2 liegt zur Owner-Freigabe vor.
 
-- Self-check: all `.fp-new-projekt` references resolved? ROADMAP lean? NOTE.md without
-  duplicates? STATE/HANDOFF consistent? Does every phase have exactly one owner?
-- `STATE.md` final: „re-onboarding done · Cycle 1 defined · M2/P3 paused" +
-  next = detail the first phase of the first new milestone.
-- No code changes, no git commits (planning files are gitignored).
+## Risiken / Offene Fragen
 
-## Execution
+1. ~~Scope-Frage Wave B~~ → **entschieden: komplett, jetzt** (Owner 2026-07-23).
+2. **Codex/pi-Logs ohne Model-Feld:** Fallback = 1.0 (neutral), im Konzept dokumentieren.
+3. **Historische Cache-Verschmutzung:** Der alte Cursor (7,2 Mrd.) enthält Cache-Anteile;
+   die Migration setzt ihn bewusst neu auf die bereinigte Summe — einmaliger, gewollter
+   Bruch der No-Double-Count-Historie (dokumentiert im Migrations-Code).
+4. M4/P1 läuft parallel (Cloud-Agent, WAVE-1) — **Abstimmung nötig**, damit deren Reader
+   und unser `model`-Feld/Storage nicht kollidieren (gleiche Dateien: usage/*).
 
-- Steps 0–2: `worker` subagent + `reviewer` check, orchestrator verifies references.
-- Step 3: interactive with the team (no subagent — decisions belong to the humans);
-  the agent writes the results into the files after approval.
-- Step 4: `reviewer` subagent as final consistency check.
+## Vorgehen
 
+Sequenziell mit Owner: Wave A ✅ → Wave B → Wave C (Konzept).
+Umsetzung je Wave via Worker-Subagent, Review via Reviewer, danach Owner-Test in der App.

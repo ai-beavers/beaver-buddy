@@ -36,3 +36,13 @@
   M6 Contribution readiness & release); clean up NOTE.md/STATE/HANDOFF.
   Status: **implemented** (2026-07-21: migration + ROADMAP/MILESTONE×5 + 11 PHASE stubs +
   STATE/HANDOFF/NOTE new; reviewer check passed after fixing dependency cross-check findings)
+
+## 2026-07-23 — Reset-Feature entfernen + XP-State-Migration mit Punkte-Matrix
+
+Vorhaben: „Reset Beaver XP + Hatch" vollständig aus Code/UI/Tests entfernen (Root Cause des
+0-XP-Befunds), einmalige idempotente Migration der `xp-state.json` mit Modellgewichtung (γ=2,
+Cache ausgeschlossen) inkl. Umstellung auf Spec-Kurve (5 Stufen), dazu Konzept für persistierten
+Tokenstand/24h-Start (Aufgabe 2). pi-agent-Zähler als offen notiert.
+Status: **Wave A implementiert** (Reset-Feature entfernt; typecheck/lint/610 Tests grün; Branch
+`feat/reset-removal-xp-migration`) · Wave B/C geplant (PLAN.md; Owner-Entscheid: Spec-Kurve +
+5 Stufen jetzt komplett)

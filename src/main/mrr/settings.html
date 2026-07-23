@@ -137,13 +137,6 @@
 
     <fieldset>
       <legend>Pet</legend>
-      <p class="hint">
-        Reset XP to level 1 (baby) and replay the hatch. Growth settings and API keys are kept; past token usage is
-        not re-counted — only new activity earns XP again.
-      </p>
-      <div class="row">
-        <button id="resetProgress" type="button">Reset beaver (XP &amp; hatch)</button>
-      </div>
       <p class="hint">Make the beaver stop and type on its laptop right now. The typing art exists on the adult beaver only.</p>
       <div class="row">
         <button id="forceWork" type="button">Make the beaver work 💻</button>
@@ -275,35 +268,6 @@
 
       document.getElementById('modeTokens').addEventListener('change', () => save({ mode: 'tokens' }));
       document.getElementById('modeMrr').addEventListener('change', () => save({ mode: 'mrr' }));
-
-      // Two-click arming instead of confirm(): deterministic, and guaranteed
-      // available in the sandboxed renderer. First click arms the button for
-      // 5s; only a second click inside that window actually resets.
-      const resetButton = document.getElementById('resetProgress');
-      const RESET_LABEL = 'Reset beaver (XP & hatch)';
-      let resetArmed = false;
-      let resetArmTimer = null;
-
-      function disarmReset() {
-        resetArmed = false;
-        resetButton.textContent = RESET_LABEL;
-        if (resetArmTimer !== null) {
-          clearTimeout(resetArmTimer);
-          resetArmTimer = null;
-        }
-      }
-
-      resetButton.addEventListener('click', async () => {
-        if (!resetArmed) {
-          resetArmed = true;
-          resetButton.textContent = 'Sure? Click again to reset';
-          resetArmTimer = setTimeout(disarmReset, 5000);
-          return;
-        }
-        disarmReset();
-        const result = await api.resetProgress();
-        setStatus(result && result.ok ? 'progress reset — hatch replaying' : `error: ${result && result.error}`);
-      });
 
       document.getElementById('forceWork').addEventListener('click', async () => {
         const result = await api.forceWork();

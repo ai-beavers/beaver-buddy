@@ -115,37 +115,17 @@ export class XpEngine {
     await this.applyState({ xp: this.state.xp + Math.max(0, xpAmount), lastMrrAwardDate: localDate });
   }
 
-  // User-visible progress reset (settings window danger zone): XP back to
-  // 0 (level 1 / baby), lastMrrAwardDate cleared so a same-day MRR poll can
-  // grant again after reset. Goes through applyState with allowStageSnap: a
-  // stage regression is not an evolution, so the emitted update must carry
-  // no evolvingTo (otherwise main.ts would fire the evolution quip and the
-  // renderer would start its evolution sequence instead of the hatch replay
-  // — callers send HATCH_START themselves before this notification lands).
-  // lastSeenLifetimeTokens stays untouched: it is the usage tracker's
-  // forward-only durable cursor, and resetting it would re-award the entire
-  // lifetime token history on the next tracker tick — silently undoing the
-  // reset.
-  async resetProgress(): Promise<void> {
-    await this.applyState({ xp: 0, lastMrrAwardDate: null }, { allowStageSnap: true });
-  }
-
   private async applyXp(deltaXp: number, lastSeenLifetimeTokens: number): Promise<void> {
     await this.applyState({ xp: this.state.xp + deltaXp, lastSeenLifetimeTokens });
   }
 
-  private async applyState(patch: Partial<XpState>, options: { allowStageSnap?: boolean } = {}): Promise<void> {
+  private async applyState(patch: Partial<XpState>): Promise<void> {
     const before = this.getState();
     this.state = { ...this.state, ...patch };
     await saveState(this.stateDir, this.state);
     const after = this.getState();
-    // Normal accrual: hold the pre-evolution stage and set evolvingTo so
-    // the renderer can play the transition. Hard reset snaps straight to
-    // the new stage (hatch owns the visual restart).
     const stageChanged = after.stage !== before.stage;
-    const update: PetUpdate = options.allowStageSnap
-      ? { level: after.level, stage: after.stage }
-      : { level: after.level, stage: stageChanged ? before.stage : after.stage, evolvingTo: stageChanged ? after.stage : undefined };
+    const update: PetUpdate = { level: after.level, stage: stageChanged ? before.stage : after.stage, evolvingTo: stageChanged ? after.stage : undefined };
     this.lastUpdate = update;
     for (const listener of this.listeners) listener(update);
   }

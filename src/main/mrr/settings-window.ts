@@ -14,7 +14,6 @@ import {
   SETTINGS_DISCONNECT_CHANNEL,
   SETTINGS_FORCE_WORK_CHANNEL,
   SETTINGS_READ_STATUS_CHANNEL,
-  SETTINGS_RESET_PROGRESS_CHANNEL,
   SETTINGS_SAVE_CHANNEL,
 } from '../ipc-channels';
 import { USAGE_SOURCE_IDS, type UsageSourceId } from '../usage/sources';
@@ -34,8 +33,6 @@ export interface SettingsWindowDeps {
   readonly keychainService: string;
   readonly getSettings: () => SettingsState;
   readonly onSettingsChanged: (next: SettingsState) => void;
-  // Wipes pet XP to level 1 / baby and replays hatch — growth keys/mode untouched.
-  readonly onProgressReset: () => Promise<void>;
   // Manually starts the beaver's "sit and type" working animation now.
   readonly onForceWork: () => void;
   // Re-scan logs + return per-source status (enabled is opt-in; tokens only when enabled).
@@ -76,7 +73,6 @@ export interface SettingsHandlers {
   readStatus(event: IpcMainInvokeEvent): unknown;
   save(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
   disconnect(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
-  resetProgress(event: IpcMainInvokeEvent): Promise<unknown>;
   connectUsage(event: IpcMainInvokeEvent, payload: unknown): Promise<unknown>;
   forceWork(event: IpcMainInvokeEvent): unknown;
 }
@@ -222,19 +218,6 @@ export function createSettingsHandlers(
       return { ok: true };
     },
 
-    // The reset orchestration itself (persist onboarding, hatch send, XP
-    // engine reset) lives with the dep's caller in main.ts — this handler
-    // only guards the sender and maps success/failure onto the result.
-    async resetProgress(event) {
-      if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };
-      try {
-        await deps.onProgressReset();
-        return { ok: true };
-      } catch {
-        return { ok: false, error: 'reset failed' };
-      }
-    },
-
     forceWork(event) {
       if (!isAuthorized(event)) return { ok: false, error: 'unauthorized' };
       deps.onForceWork();
@@ -271,7 +254,6 @@ function registerHandlers(deps: SettingsWindowDeps): void {
   ipcMain.handle(SETTINGS_READ_STATUS_CHANNEL, (event) => handlers.readStatus(event));
   ipcMain.handle(SETTINGS_SAVE_CHANNEL, (event, payload: unknown) => handlers.save(event, payload));
   ipcMain.handle(SETTINGS_DISCONNECT_CHANNEL, (event, payload: unknown) => handlers.disconnect(event, payload));
-  ipcMain.handle(SETTINGS_RESET_PROGRESS_CHANNEL, (event) => handlers.resetProgress(event));
   ipcMain.handle(SETTINGS_CONNECT_USAGE_CHANNEL, (event, payload: unknown) => handlers.connectUsage(event, payload));
   ipcMain.handle(SETTINGS_FORCE_WORK_CHANNEL, (event) => handlers.forceWork(event));
 }

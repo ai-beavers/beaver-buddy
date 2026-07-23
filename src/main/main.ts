@@ -170,15 +170,14 @@ app.whenReady().then(async () => {
 
   const stateDir = app.getPath('userData');
 
-  // --reset-hatch is the hidden QA reset: it bypasses the stored flag so the
-  // hatch replays immediately, without a separate clear-then-relaunch step.
+  // Hatch replay for QA: delete the onboarding-state.json file in the app's
+  // userData directory and relaunch. A missing/corrupt file loads as
+  // hatched:false, so the sequence plays again. Persisted at trigger time,
+  // not sequence completion, to guarantee exactly-once even if the app is
+  // killed mid-sequence (~6s window).
   const onboarding = loadOnboardingState(stateDir);
-  const shouldHatch = process.argv.includes('--reset-hatch') || !onboarding.hatched;
+  const shouldHatch = !onboarding.hatched;
   if (shouldHatch) {
-    // Persisted at trigger time, not sequence completion: guarantees
-    // exactly-once even if the app is killed mid-sequence (~6s window) —
-    // acceptable for a one-shot cosmetic onboarding, and --reset-hatch
-    // recovers it. Avoids adding a hatch:done renderer -> main channel.
     await saveOnboardingState(stateDir, { hatched: true });
   }
 
@@ -265,27 +264,6 @@ app.whenReady().then(async () => {
         applyUsageEnabled(growthSettings);
         tray.refresh();
         if (growthSettings.mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
-      },
-      onProgressReset: async () => {
-        // Persist before send: same exactly-once discipline as the launch
-        // hatch path — a kill mid-hatch must not re-hatch on next launch.
-        await saveOnboardingState(stateDir, { hatched: true });
-        // Hatch before the pet update, same ordering invariant as
-        // did-finish-load (the renderer suppresses evolution handling while
-        // a hatch is active).
-        mainWindow?.webContents.send(HATCH_START_CHANNEL);
-        // Emits the pet update through the onUpdate wiring above, which
-        // does tray.refresh() + PET_CHANGED — nothing else to notify.
-        try {
-          await xpEngine.resetProgress();
-        } catch {
-          // Persist failure (e.g. Windows transient rename lock from AV):
-          // the hatch already started, but the XP state did not actually
-          // change. Resync the renderer with the real current state so it
-          // does not stay stuck on a false reset.
-          const lastUpdate = xpEngine.getLastUpdate();
-          mainWindow?.webContents.send(PET_CHANGED_CHANNEL, lastUpdate);
-        }
       },
       onForceWork: () => {
         mainWindow?.webContents.send(FORCE_WORK_CHANNEL);
