@@ -678,20 +678,21 @@ describe('ingest-animation-frames speak regeneration', () => {
   });
 });
 
-// Final idle/walk (BL-6/T3): the teen-upscale placeholder rows are replaced
-// with reference-conditioned Comfy art via the same buildAdultRowSheet/
-// spliceRow path as watering/drink/sleep/stretch above. This is the
-// owner-taste item (BL-18 golden art was rejected as generic/off-model and
-// reverted to the placeholder) — the committed idle/walk bytes below are the
-// ONLY art this repo's history has ever passed the continuity gate on, so
-// they're pinned unconditionally (no gating on assets-src/, unlike the
-// regeneration block below): a future `assets:adult-placeholder` re-run
-// would silently clobber these rows with the teen upscale again, and this
-// hash pin is what turns that accidental commit into a failing test instead
-// of a silent regression. See assets/STYLE.md provenance for the generation
-// details (single-reference Comfy Cloud Nano Banana Pro run, conditioned on
-// the adult reference image every other adult row is already anchored to).
-describe('ingest-animation-frames idle/walk (adult, final art — BL-6/T3)', () => {
+// idle/walk (adult): the committed idle/walk bytes are pinned unconditionally
+// (no gating on assets-src/) so an accidental `assets:adult-placeholder` re-run
+// — or a re-bake from the dormant adult-idle/adult-walk Comfy source — turns
+// into a failing test instead of a silent regression.
+//
+// Provenance note (owner revert, 2026-07-23): BL-6/T3 had promoted these rows
+// to reference-conditioned Comfy "final art" (a more front-facing idle + a
+// near-static front-facing walk). Owner review reverted BOTH rows to the
+// prior art (the side-profile walk cycle + matching idle shipped through
+// 2026-07-21) — the front-facing walk didn't read as walking. The pins below
+// are the reverted (pre-BL-6/T3) tiles. The `buildAdultIdleSheet`/
+// `buildAdultWalkSheet` regeneration blocks stay gated on their now-absent
+// Comfy source dumps, so they skip everywhere; the committed tiles are the
+// sole source of truth. See assets/STYLE.md provenance.
+describe('ingest-animation-frames idle/walk (adult)', () => {
   const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
   const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
 
@@ -699,7 +700,7 @@ describe('ingest-animation-frames idle/walk (adult, final art — BL-6/T3)', () 
     return crypto.createHash('sha256').update(Buffer.from(bytes)).digest('hex');
   }
 
-  it('idle/walk frame counts are unchanged by the promotion (still 1/2, no tile-height override)', () => {
+  it('idle/walk frame counts are unchanged by the revert (still 1/2, no tile-height override)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { rows: readonly { name: string; frames: number; height?: number }[] };
     expect(meta.rows[0]).toEqual({ name: 'idle', frames: 1 });
     expect(meta.rows[1]).toEqual({ name: 'walk', frames: 2 });
@@ -713,13 +714,14 @@ describe('ingest-animation-frames idle/walk (adult, final art — BL-6/T3)', () 
     const walk0 = extractTile(decoded, 0, 1, meta.tile);
     const walk1 = extractTile(decoded, 1, 1, meta.tile);
 
-    // Pinned 2026-07-22 at promotion time (BL-6/T3). Bump ONLY on a
-    // deliberate, gated regeneration (see the block below) that was itself
-    // re-run through the continuity gate — never on an accidental rerun of
-    // the retired placeholder script.
-    expect(sha256(idle)).toBe('70271fd9ac013c29f70b837369483154ce8fcc65ad3b0d3ac6e5534f0db7ec78');
-    expect(sha256(walk0)).toBe('64e359cdfc08a2a303e0eb96aa89a45cc992ccab571573abdc05220dce37487f');
-    expect(sha256(walk1)).toBe('3df9c976efd1e14bf72ebb131a58f94f54a5936a0cab765f6f79adeedcee0177');
+    // Repinned 2026-07-23 on the owner revert (see this block's header):
+    // these are the pre-BL-6/T3 idle/walk tiles (side-profile walk cycle +
+    // matching idle), restored from the pre-promotion committed sheet. Bump
+    // ONLY on a deliberate owner-gated art change re-run through the
+    // continuity gate — never on an accidental placeholder/re-bake.
+    expect(sha256(idle)).toBe('33816470399329496c77d0315f935bda815279b39766e047bbb9aa3c9f031506');
+    expect(sha256(walk0)).toBe('ba515bc0c6854252d2267c21f936152c42947603c48e84cb3df13964c882e8b7');
+    expect(sha256(walk1)).toBe('d888dab1d3553650087900dc6967b077e339710e9d30e775c540f89f79d3b029');
   });
 });
 

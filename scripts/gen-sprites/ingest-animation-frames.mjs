@@ -55,8 +55,11 @@ export const BABY = {
 };
 
 // Adult frames are the same 3 poses on a bigger, wider-limbed rig (BL-18).
-// idle/walk are now final art (BL-6/T3, replacing the earlier teen-upscale
-// placeholder), sized to fill the full 96px tile, so the anim rows are
+// idle/walk were promoted to Comfy "final art" (BL-6/T3) then REVERTED by
+// owner decision (2026-07-23) to the prior side-profile walk cycle + matching
+// idle — the front-facing BL-6/T3 walk didn't read as walking; the committed
+// tiles are again the pre-BL-6 art and the ADULT_IDLE/ADULT_WALK configs below
+// are dormant (their Comfy source dumps are gone). anim rows are
 // targeted taller than baby's own heights to read as the same size beaver —
 // computeStageScale's width term remains the clipping guard (see
 // ingest-images.mjs) if a height gets bumped further.
@@ -398,8 +401,13 @@ export function buildAdultSpeakSheet(repoRoot) {
   return { png: encodeRgbaPng({ width, height, data }), meta, scale: 1 };
 }
 
-// Final idle/walk (BL-6/T3): replaces the teen-upscale placeholder rows
-// with authored-pixel art, via the SAME buildAdultRowSheet/spliceRow path as
+// idle/walk (BL-6/T3, since REVERTED — owner decision 2026-07-23): this path
+// promoted the placeholder rows to Comfy authored-pixel art, but the committed
+// idle/walk were reverted to the pre-BL-6 side-profile art (see the pin block
+// in ingest-animation-frames.test.ts). These configs are kept but DORMANT —
+// their adult-idle/adult-walk source dumps no longer exist, so re-baking is a
+// no-op in practice. Built, when a source is present, via the SAME
+// buildAdultRowSheet/spliceRow path as
 // watering/drink/sleep/stretch above (idle is a 1x1 "grid", walk a 2x1
 // grid) rather than a bespoke builder — spliceRow finds each row by name and
 // preserves the other 8 rows' bytes exactly, same as every prior append/

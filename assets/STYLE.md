@@ -102,13 +102,13 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
   `SPRITE_FPS` constant is 8 — see `src/renderer/pet-config.ts` for why that
   mismatch is cosmetic, not a bug).
-- Adult stage art: `idle`/`walk` are final generated art (BL-6/T3,
-  reference-conditioned on the adult sheet's own already-shipped rows — see
-  Provenance), replacing the earlier placeholder derived from the committed
-  teen sheet (`scripts/gen-sprites/build-adult-placeholder.ts`, `npm run
-  assets:adult-placeholder`; a first BL-18 attempt at golden generated art
-  was rejected by the owner as generic/off-model and reverted to that
-  placeholder before BL-6/T3 replaced it for good). `struggle`/
+- Adult stage art: `idle`/`walk` are the **side-profile walk cycle + matching
+  idle** shipped through 2026-07-21, RESTORED by owner revert (2026-07-23).
+  BL-6/T3 had briefly promoted them to reference-conditioned generated "final
+  art" (a more front-facing idle + near-static front-facing walk), but owner
+  review reverted both rows — the front-facing walk didn't read as walking (see
+  Provenance). The `adult-idle`/`adult-walk` ingest configs are kept but
+  dormant. `struggle`/
   `parachute-wind`/`land` are appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`) and remain reference-matched to the former
@@ -185,9 +185,20 @@ building one new figure doesn't require the other stages' gitignored source
 frames to also exist locally. No human cleanup beyond the mechanical
 pipeline.
 
-`idle(1)`/`walk(2)` (BL-6/T3, 2026-07-22, FINAL ART): reference-conditioned
-Comfy Cloud Nano Banana Pro (`GeminiImage2Node`) generations, replacing the
-teen-upscale placeholder for good. A first BL-18 pass at golden idle/walk art
+`idle(1)`/`walk(2)` (REVERTED by owner, 2026-07-23): the committed idle/walk
+tiles are the **pre-BL-6/T3 art** — a side-profile walk cycle (right-facing
+contact + passing poses) and a matching front idle, shipped through 2026-07-21
+and restored from the pre-promotion committed sheet. Owner review of the
+BL-6/T3 promotion (below) reverted both rows: the promoted walk was
+front-facing and near-static, so it didn't read as walking. The BL-6/T3
+`adult-idle`/`adult-walk` ingest configs remain in the tree but are DORMANT
+(their Comfy source dumps are gone; a re-bake would need them). The pin test in
+`ingest-animation-frames.test.ts` locks these reverted tiles. Historical record
+of the reverted promotion follows:
+
+`idle(1)`/`walk(2)` (BL-6/T3, 2026-07-22, superseded): reference-conditioned
+Comfy Cloud Nano Banana Pro (`GeminiImage2Node`) generations, that briefly
+replaced the teen-upscale placeholder. A first BL-18 pass at golden idle/walk art
 was rejected by the owner as generic and off-model and reverted to the
 placeholder (`scripts/gen-sprites/build-adult-placeholder.ts`,
 `npm run assets:adult-placeholder`); the root cause, per

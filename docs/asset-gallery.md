@@ -101,21 +101,17 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   friendly wave-goodbye), `flush` (8, ONE-SHOT, stylized toilet-flush gag),
   `toilet` (8, ONE-SHOT, 128px-tall, full toilet routine — sits on a stylized
   toilet, flushes, then a tile-scale wave sweeps toilet + beaver away)
-- **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
-  teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
-  Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
-  same adult reference image every other row below is anchored to. A prior
-  BL-18 attempt at golden idle/walk art was rejected by the owner as
-  generic/off-model and reverted to the placeholder
-  (`scripts/gen-sprites/build-adult-placeholder.ts`,
-  `npm run assets:adult-placeholder`) — root cause was insufficient reference
-  conditioning; BL-6/T3 fixed that. Ingested via
-  `scripts/gen-sprites/ingest-animation-frames.mjs adult-idle` /
-  `adult-walk` (`buildAdultRowSheet`/`spliceRow`, byte-preserving for every
-  other row) and pinned by an unconditional committed-sheet byte-pin test
-  (`ingest-animation-frames.test.ts`) so CI fails if
-  `npm run assets:adult-placeholder` is ever re-run against the committed
-  sheet — that command must NOT be re-run now that idle/walk are final (see
+- **Provenance:** `idle`/`walk` are the **side-profile walk cycle + matching
+  idle** shipped through 2026-07-21, RESTORED by owner revert (2026-07-23).
+  BL-6/T3 had briefly promoted these rows to reference-conditioned Comfy Cloud
+  Nano Banana Pro (`GeminiImage2Node`) "final art" (a more front-facing idle +
+  a near-static front-facing walk), but owner review reverted both rows — the
+  front-facing walk didn't read as walking. The committed tiles are again the
+  pre-BL-6 art, pinned by an unconditional committed-sheet byte-pin test
+  (`ingest-animation-frames.test.ts`) so CI fails if a placeholder/re-bake ever
+  clobbers them; the `adult-idle`/`adult-walk` ingest configs are kept but
+  DORMANT (their Comfy source dumps are gone). Do NOT re-run
+  `npm run assets:adult-placeholder` against the committed sheet (see
   STYLE.md). `struggle`/`parachute-wind`/`land` appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`); `type` appended via `scripts/gen-sprites/ingest-typing.mjs`
