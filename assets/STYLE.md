@@ -518,6 +518,25 @@ Evidence: `docs/design-reviews/BL-11-brainrot-contact.png`,
 assets:adult-brainrot`), growing the sheet to 768×1504. No human cleanup
 beyond the mechanical pipeline.
 
+`wave(8)` / `flush(8)` (BL-10, 2026-07-23): owner-scoped as BOTH rows —
+`wave` is a friendly wave-goodbye LOOP (right-facing, one paw raised,
+~2 wave cycles); `flush` is a ONE-SHOT toilet-flush gag compressed into 8
+frames (sheet width is fixed at 8 tiles): stylized pixel water sweeps the
+beaver out, near-empty splash beat, wet return, wet-dog shake, dry idle
+settle. No toilet bowl prop; no photoreal water.
+
+**Generation** — same `partner_generate` (`vertexai/nano-banana-pro`) +
+public adult-sheet raw URL path as BL-8/BL-9/BL-11. `wave` needed one
+content retry (first attempt left-facing / binary poses); the accepted
+grid still half-split, so the body-consistent top half is ping-ponged via
+`ADULT_WAVE.frameOrder = [0, 1, 2, 3, 3, 2, 1, 0]`. `flush` accepted on
+first content attempt (natural grid order). Both default 96px rows.
+Evidence: `docs/design-reviews/BL-10-{wave,flush}-{contact,wraparound}.png`
++ GIFs — see `docs/design-reviews/BL-10-toilet-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-wave` /
+`adult-flush` (`npm run assets:adult-wave` / `assets:adult-flush`), growing
+the sheet to 768×1696. No human cleanup beyond the mechanical pipeline.
+
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
 independent prompts, via Comfy Cloud Nano Banana Pro (`vertexai/nano-banana-pro`
