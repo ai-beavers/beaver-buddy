@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 1504,
+  "sheetHeight": 1696,
   "rows": [
     {
       "name": "idle",
@@ -64,6 +64,14 @@
     },
     {
       "name": "brainrot",
+      "frames": 8
+    },
+    {
+      "name": "wave",
+      "frames": 8
+    },
+    {
+      "name": "flush",
       "frames": 8
     }
   ]

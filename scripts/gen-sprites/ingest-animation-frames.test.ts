@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_BRAINROT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_EXERCISE, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, BABY, buildAdultBrainrotSheet, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultExerciseSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_BRAINROT, ADULT_COLLECT_STICKS, ADULT_DRINK, ADULT_EXERCISE, ADULT_FLUSH, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_THROW_STICK, ADULT_WALK, ADULT_WATERING, ADULT_WAVE, BABY, buildAdultBrainrotSheet, buildAdultCollectSticksSheet, buildAdultDrinkSheet, buildAdultExerciseSheet, buildAdultFlushSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultThrowStickSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildAdultWaveSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -24,6 +24,8 @@ const hasThrowStickSource = fs.existsSync(new URL(`../../assets-src/comfyui/${AD
 const hasCollectSticksSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_COLLECT_STICKS.sourceDir}/sheet.png`, import.meta.url));
 const hasExerciseSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_EXERCISE.sourceDir}/sheet.png`, import.meta.url));
 const hasBrainrotSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_BRAINROT.sourceDir}/sheet.png`, import.meta.url));
+const hasWaveSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WAVE.sourceDir}/sheet.png`, import.meta.url));
+const hasFlushSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_FLUSH.sourceDir}/sheet.png`, import.meta.url));
 // speak (BL-7) has no ComfyUI source dir to gate on — it's mechanically
 // composited from the committed idle tile, so its regeneration test runs
 // unconditionally (see below).
@@ -150,6 +152,8 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'collect-sticks', frames: 8 },
       { name: 'exercise', frames: 8, height: 128 },
       { name: 'brainrot', frames: 8 },
+      { name: 'wave', frames: 8 },
+      { name: 'flush', frames: 8 },
     ]);
   });
 
@@ -176,13 +180,13 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // flat 8-col grid at the 96px tile — only row height varies, never column
   // width. buildAdultBrainrotSheet appends a plain 96px `brainrot` row ->
   // 1504; its height-bound pose fits the default tile.
-  it('is a 768x1504 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96/96/96/128/96)', () => {
+  it('is a 768x1696 sheet (8 cols at the 96px tile; row heights … + wave/flush)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(1504);
+    expect(decoded.height).toBe(1696);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(1504);
+    expect(meta.sheetHeight).toBe(1696);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -997,3 +1001,111 @@ describe.skipIf(!hasBrainrotSource)('ingest-animation-frames brainrot regenerati
     expect(buildAdultBrainrotSheet(repoRoot).png.equals(buildAdultBrainrotSheet(repoRoot).png)).toBe(true);
   });
 });
+
+
+describe('ingest-animation-frames wave row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a wave row, found by name, 8 frames, 96px tall', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'wave');
+    expect(row).toEqual({ name: 'wave', frames: 8 });
+  });
+
+  it('every wave frame has content, is grounded, and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'wave');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      let bottomOpaque = false;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const a = decoded.data[i + 3];
+          if (a > 0) {
+            opaque += 1;
+            if (y === tile - 1) bottomOpaque = true;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at wave[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      expect(opaque, `wave[${frame}] is empty`).toBeGreaterThan(0);
+      expect(bottomOpaque, `wave[${frame}] not grounded`).toBe(true);
+    }
+  });
+});
+
+describe.skipIf(!hasWaveSource)('ingest-animation-frames wave regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultWaveSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+});
+
+describe('ingest-animation-frames flush row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  it('has a flush row, found by name, 8 frames, 96px tall', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const row = meta.rows.find((r) => r.name === 'flush');
+    expect(row).toEqual({ name: 'flush', frames: 8 });
+  });
+
+  it('every flush frame has content and has no surviving green', () => {
+    const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'flush');
+    const { tile } = meta;
+
+    for (let frame = 0; frame < 8; frame += 1) {
+      const originX = frame * tile;
+      let opaque = 0;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          const i = ((originY + y) * decoded.width + originX + x) * 4;
+          const a = decoded.data[i + 3];
+          if (a > 0) {
+            opaque += 1;
+            const r = decoded.data[i];
+            const g = decoded.data[i + 1];
+            const b = decoded.data[i + 2];
+            expect(g > 90 && g > r * 1.3 && g > b * 1.3, `green survived at flush[${frame}] ${x},${y}`).toBe(false);
+          }
+        }
+      }
+      // near-empty splash beat still has water pixels; require some content
+      expect(opaque, `flush[${frame}] is empty`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe.skipIf(!hasFlushSource)('ingest-animation-frames flush regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultFlushSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+});
+

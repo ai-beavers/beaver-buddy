@@ -547,10 +547,49 @@ export function buildAdultBrainrotSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_BRAINROT);
 }
 
+// Friendly wave-goodbye LOOP. Reference-conditioned Nano Banana Pro grid is
+// right-facing and on-model, but the raw 4x2 still splits into two slightly
+// different body halves and ends on a hand-down idle that breaks the loop.
+// The top row (cells 0-3) is the body-consistent waving half, so the baked
+// row ping-pongs that half: 0,1,2,3 up then 3,2,1,0 back — turn points are
+// same-cell zero-diff. Default 96px row.
+export const ADULT_WAVE = {
+  rowName: 'wave',
+  sourceDir: 'adult-wave',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+  frameOrder: [0, 1, 2, 3, 3, 2, 1, 0],
+};
+
+export function buildAdultWaveSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_WAVE);
+}
+
+// Toilet-flush gag ONE-SHOT (sheet width is fixed at 8 tiles, so the full
+// sweep→return→shake→dry narrative is compressed into 8 frames rather than
+// a wider 12–16 frame row). Natural grid order, no frameOrder. Last frame
+// settles to a dry idle-like stance for a clean handoff. Default 96px row;
+// water FX may bind height — verify after bake.
+export const ADULT_FLUSH = {
+  rowName: 'flush',
+  sourceDir: 'adult-flush',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultFlushSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_FLUSH);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, throw-stick,
-// collect-sticks, exercise, brainrot, future items just add a config here).
+// collect-sticks, exercise, brainrot, wave, flush, future items just add a
+// config here).
 // adult-speak is deliberately NOT in this map: it has no ComfyUI grid/config
 // (buildAdultRowSheet doesn't apply), it's dispatched as its own CLI branch
 // below.
@@ -565,6 +604,8 @@ const ADULT_ROWS = {
   'adult-exercise': ADULT_EXERCISE,
   'adult-walk': ADULT_WALK,
   'adult-brainrot': ADULT_BRAINROT,
+  'adult-wave': ADULT_WAVE,
+  'adult-flush': ADULT_FLUSH,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

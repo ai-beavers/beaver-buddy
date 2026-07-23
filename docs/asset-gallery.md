@@ -86,7 +86,7 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1504 sheet,
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1696 sheet,
   96×96 tiles (`exercise` and `parachute-wind` are 128px-tall rows), fps
   hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
@@ -97,7 +97,8 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   `collect-sticks` (8, ONE-SHOT, gathers 2-3 sticks into a bundle, ends
   holding the bundle — an intentionally non-idle end pose), `exercise` (8,
   LOOP, lifts a short log overhead like a dumbbell, two full reps),
-  `brainrot` (8, LOOP, glazed phone-scroll, thumb flick)
+  `brainrot` (8, LOOP, glazed phone-scroll, thumb flick), `wave` (8, LOOP,
+  friendly wave-goodbye), `flush` (8, ONE-SHOT, stylized toilet-flush gag)
 - **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
   teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
   Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
@@ -165,7 +166,14 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   4×2 grid had two slightly different body halves, so the body-consistent
   bottom half is ping-ponged via `frameOrder` (BL-7-class mechanical fix for
   loop seams) — see STYLE.md provenance and
-  `docs/design-reviews/BL-11-brainrot-verdict.md`.
+  `docs/design-reviews/BL-11-brainrot-verdict.md`. `wave` and `flush`
+  (BL-10) are appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-wave` /
+  `adult-flush` (`npm run assets:adult-wave` / `assets:adult-flush`) —
+  owner-scoped as both a wave-goodbye LOOP and a compressed flush gag
+  ONE-SHOT; `wave` uses `frameOrder` ping-pong on its body-consistent half
+  — see STYLE.md provenance and
+  `docs/design-reviews/BL-10-toilet-verdict.md`.
 - **Status:** final
 
 ### Tree — growth stages
