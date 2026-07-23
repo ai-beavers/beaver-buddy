@@ -86,12 +86,15 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1088 sheet,
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1280 sheet,
   96×96 tiles, fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
   `stretch` (8, ONE-SHOT wake-up transition, not a loop), `speak` (8,
-  forward-facing talking loop, mouth cycling open/closed)
+  forward-facing talking loop, mouth cycling open/closed), `throw-stick` (8,
+  ONE-SHOT, picks up and throws a stick, settles back toward idle),
+  `collect-sticks` (8, ONE-SHOT, gathers 2-3 sticks into a bundle, ends
+  holding the bundle — an intentionally non-idle end pose)
 - **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
   teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
   Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
@@ -132,7 +135,17 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   replaced with a bespoke builder that mechanically patches only a small
   mouth-region box on the committed idle tile, so every frame is
   byte-identical outside that box by construction — see STYLE.md provenance
-  for the full before/after.
+  for the full before/after. `throw-stick` and `collect-sticks` (BL-9) are
+  appended via `scripts/gen-sprites/ingest-animation-frames.mjs
+  adult-throw-stick` / `adult-collect-sticks` (`npm run
+  assets:adult-throw-stick` / `assets:adult-collect-sticks`) — both ONE-SHOT
+  action rows, reference-conditioned Comfy Cloud Nano Banana Pro generations
+  (via `partner_generate`, a same-session deviation from the usual
+  `submit_workflow`+`upload_file` path — see STYLE.md provenance), green
+  chroma-key background, same `buildAdultRowSheet` ingestion as
+  watering/drink/sleep/stretch. Both passed the pose-coherence gate
+  (consistent tail side/palette, no independent-cell redraw flicker) on the
+  first generation attempt.
 - **Status:** final
 
 ### Tree — growth stages
