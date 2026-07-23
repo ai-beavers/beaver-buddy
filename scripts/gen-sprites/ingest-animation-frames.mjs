@@ -55,8 +55,11 @@ export const BABY = {
 };
 
 // Adult frames are the same 3 poses on a bigger, wider-limbed rig (BL-18).
-// idle/walk are now final art (BL-6/T3, replacing the earlier teen-upscale
-// placeholder), sized to fill the full 96px tile, so the anim rows are
+// idle/walk were promoted to Comfy "final art" (BL-6/T3) then REVERTED by
+// owner decision (2026-07-23) to the prior side-profile walk cycle + matching
+// idle — the front-facing BL-6/T3 walk didn't read as walking; the committed
+// tiles are again the pre-BL-6 art and the ADULT_IDLE/ADULT_WALK configs below
+// are dormant (their Comfy source dumps are gone). anim rows are
 // targeted taller than baby's own heights to read as the same size beaver —
 // computeStageScale's width term remains the clipping guard (see
 // ingest-images.mjs) if a height gets bumped further.
@@ -205,28 +208,46 @@ export function buildAdultRowSheet(repoRoot, config) {
   const shipped = decodePng(fs.readFileSync(pngPath));
   const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
-  // Invariant: config.frames must match the grid cell count — buildAdultRowSheet
-  // reads every cell (gridCols*gridRows), so a stale/typo'd frames field would
-  // otherwise silently bake the wrong frame count with no error.
-  if (config.gridCols * config.gridRows !== config.frames) {
+  // The grid always holds gridCols*gridRows source cells. `frameOrder`, when
+  // present, selects/reorders those cells into the baked row (indices into the
+  // grid-order cell list) — used when a raw generation's cell sequence isn't
+  // itself a clean loop but a body-consistent subset of its cells is (BL-11:
+  // the model split the 4x2 grid into two slightly different halves, so the
+  // brainrot row loops one stable half ping-ponged). Without frameOrder the
+  // baked frame count must equal the grid cell count (every prior row).
+  const sourceCells = config.gridCols * config.gridRows;
+  const order = config.frameOrder ?? [...Array(sourceCells).keys()];
+  if (config.frameOrder) {
+    if (order.length !== config.frames) {
+      throw new Error(`${config.rowName}: frames (${config.frames}) !== frameOrder length (${order.length})`);
+    }
+    for (const i of order) {
+      if (!Number.isInteger(i) || i < 0 || i >= sourceCells) {
+        throw new Error(`${config.rowName}: frameOrder index ${i} out of range 0..${sourceCells - 1}`);
+      }
+    }
+  } else if (sourceCells !== config.frames) {
     throw new Error(`${config.rowName}: frames (${config.frames}) !== gridCols*gridRows (${config.gridCols}x${config.gridRows})`);
   }
 
   const sheetPath = path.join(repoRoot, 'assets-src', 'comfyui', config.sourceDir, 'sheet.png');
   const grid = decodePng(fs.readFileSync(sheetPath));
-  const cropped = [];
+  const cells = [];
   for (let row = 0; row < config.gridRows; row += 1) {
     for (let col = 0; col < config.gridCols; col += 1) {
       const cell = extractGridCell(grid, col, row, config.gridCols, config.gridRows);
-      cropped.push(cropToBbox(chromaKeyGreen(cell)));
+      cells.push(cropToBbox(chromaKeyGreen(cell)));
     }
   }
+  const cropped = order.map((i) => cells[i]);
   const rowHeight = config.rowHeight ?? TILE;
   const scale = computeStageScale(cropped, TILE, config.targetContentHeightPx);
+  // Area averaging can create green-dominant fringe pixels from transparent
+  // keyed pixels and opaque neighbors, so key once more after resizing.
   const tiles = cropped.map((img) => {
     const destW = Math.max(1, Math.round(img.width * scale));
     const destH = Math.max(1, Math.round(img.height * scale));
-    return placeOnTile(resizeAreaAverage(img, destW, destH), TILE, rowHeight);
+    return placeOnTile(chromaKeyGreen(resizeAreaAverage(img, destW, destH)), TILE, rowHeight);
   });
 
   const { width, height, data, meta } = spliceRow(shipped, shippedMeta, config.rowName, tiles, rowHeight);
@@ -380,8 +401,13 @@ export function buildAdultSpeakSheet(repoRoot) {
   return { png: encodeRgbaPng({ width, height, data }), meta, scale: 1 };
 }
 
-// Final idle/walk (BL-6/T3): replaces the teen-upscale placeholder rows
-// with authored-pixel art, via the SAME buildAdultRowSheet/spliceRow path as
+// idle/walk (BL-6/T3, since REVERTED — owner decision 2026-07-23): this path
+// promoted the placeholder rows to Comfy authored-pixel art, but the committed
+// idle/walk were reverted to the pre-BL-6 side-profile art (see the pin block
+// in ingest-animation-frames.test.ts). These configs are kept but DORMANT —
+// their adult-idle/adult-walk source dumps no longer exist, so re-baking is a
+// no-op in practice. Built, when a source is present, via the SAME
+// buildAdultRowSheet/spliceRow path as
 // watering/drink/sleep/stretch above (idle is a 1x1 "grid", walk a 2x1
 // grid) rather than a bespoke builder — spliceRow finds each row by name and
 // preserves the other 8 rows' bytes exactly, same as every prior append/
@@ -503,10 +529,113 @@ export function buildAdultExerciseSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_EXERCISE);
 }
 
+// Phone-scroll loop (glazed "brain rot" stare). The reference-conditioned
+// Nano Banana Pro grid keeps the beaver on-model and body-stable, but the
+// model drew the 4x2 grid as two slightly different halves (a body shift at
+// the row boundary and the wraparound), so the raw cell sequence isn't a
+// clean loop. The bottom row (cells 4-7) is the body-consistent half (measured
+// <1% body-region delta between its consecutive cells) with a subtle thumb
+// scroll, so the row loops that half ping-ponged: cells 4,5,6,7 up then
+// 7,6,5,4 back down. The two turn points (4->5 = cell7->cell7, seam 8->1 =
+// cell4->cell4) are the SAME cell, i.e. zero-diff, so the loop is smooth at
+// exactly the two transitions the first generation stuttered on. Widest crop
+// binds height at targetContentHeightPx=96; the default 96px row fits without
+// clipping.
+export const ADULT_BRAINROT = {
+  rowName: 'brainrot',
+  sourceDir: 'adult-brainrot',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+  frameOrder: [4, 5, 6, 7, 7, 6, 5, 4],
+};
+
+export function buildAdultBrainrotSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_BRAINROT);
+}
+
+// Friendly wave-goodbye LOOP. Reference-conditioned Nano Banana Pro grid is
+// right-facing and on-model, but the raw 4x2 still splits into two slightly
+// different body halves and ends on a hand-down idle that breaks the loop.
+// The top row (cells 0-3) is the body-consistent waving half, so the baked
+// row ping-pongs that half: 0,1,2,3 up then 3,2,1,0 back — turn points are
+// same-cell zero-diff. Default 96px row.
+export const ADULT_WAVE = {
+  rowName: 'wave',
+  sourceDir: 'adult-wave',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+  frameOrder: [0, 1, 2, 3, 3, 2, 1, 0],
+};
+
+export function buildAdultWaveSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_WAVE);
+}
+
+// Toilet-flush gag ONE-SHOT (sheet width is fixed at 8 tiles, so the full
+// sweep→return→shake→dry narrative is compressed into 8 frames rather than
+// a wider 12–16 frame row). Natural grid order, no frameOrder. Last frame
+// settles to a dry idle-like stance for a clean handoff. Default 96px row;
+// water FX may bind height — verify after bake.
+export const ADULT_FLUSH = {
+  rowName: 'flush',
+  sourceDir: 'adult-flush',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultFlushSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_FLUSH);
+}
+
+// Full toilet routine ONE-SHOT (BL-14): the complete bit the short `flush`
+// gag only hinted at — beaver sits on a stylized toilet, does its business,
+// flushes, then a tile-scale water wave sweeps it (and the toilet) away to
+// the side it faces, leaving a wet, receding wash that settles back toward a
+// dry idle stance. Natural 4x2 grid order (no frameOrder); the beaver stays
+// clearly visible in every frame (owner acceptance bar — an earlier take
+// dropped the beaver on the sweep frames and was rejected). Reference-
+// conditioned Nano Banana Pro generation on a green (#00FF00) chroma-key
+// background, same convention as every other adult row.
+//
+// rowHeight: 128 (parachute-wind/exercise precedent): the tallest raw content
+// is the toilet-tank + seated beaver (early frames) and the cresting sweep
+// wave (frame 7), both taller than a bare standing beaver. At the default
+// 96px tile computeStageScale would lock the whole row's scale off that
+// tallest silhouette and shrink the beaver noticeably below idle size; the
+// taller tile lets the tank/wave extend upward past the base tile (drawFrame
+// bottom-anchors every row to the shared ground line) while the beaver's body
+// renders at a readable size. targetContentHeightPx: 112 matches the
+// exercise row's tuned value for the same 128px-tile tradeoff. LOOP-vs-one-
+// shot is a WAVE-2 runtime concern (documented in STYLE.md), not encoded here.
+//
+// Scope note: the "huge, full-screen wall of water" version of the sweep is a
+// separate WAVE-2 runtime effect (canvas draw across the whole overlay, not a
+// tile) — deferred by owner decision; this row ships the tile-scale sweep only.
+export const ADULT_TOILET = {
+  rowName: 'toilet',
+  sourceDir: 'adult-toilet',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 112,
+  rowHeight: 128,
+};
+
+export function buildAdultToiletSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_TOILET);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, throw-stick,
-// collect-sticks, exercise, future items just add a config here).
+// collect-sticks, exercise, brainrot, wave, flush, future items just add a
+// config here).
 // adult-speak is deliberately NOT in this map: it has no ComfyUI grid/config
 // (buildAdultRowSheet doesn't apply), it's dispatched as its own CLI branch
 // below.
@@ -520,6 +649,10 @@ const ADULT_ROWS = {
   'adult-collect-sticks': ADULT_COLLECT_STICKS,
   'adult-exercise': ADULT_EXERCISE,
   'adult-walk': ADULT_WALK,
+  'adult-brainrot': ADULT_BRAINROT,
+  'adult-wave': ADULT_WAVE,
+  'adult-flush': ADULT_FLUSH,
+  'adult-toilet': ADULT_TOILET,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

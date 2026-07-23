@@ -102,13 +102,13 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   noted in `lodge.json`). fps hint: 10 (unchanged; the renderer's shared
   `SPRITE_FPS` constant is 8 — see `src/renderer/pet-config.ts` for why that
   mismatch is cosmetic, not a bug).
-- Adult stage art: `idle`/`walk` are final generated art (BL-6/T3,
-  reference-conditioned on the adult sheet's own already-shipped rows — see
-  Provenance), replacing the earlier placeholder derived from the committed
-  teen sheet (`scripts/gen-sprites/build-adult-placeholder.ts`, `npm run
-  assets:adult-placeholder`; a first BL-18 attempt at golden generated art
-  was rejected by the owner as generic/off-model and reverted to that
-  placeholder before BL-6/T3 replaced it for good). `struggle`/
+- Adult stage art: `idle`/`walk` are the **side-profile walk cycle + matching
+  idle** shipped through 2026-07-21, RESTORED by owner revert (2026-07-23).
+  BL-6/T3 had briefly promoted them to reference-conditioned generated "final
+  art" (a more front-facing idle + near-static front-facing walk), but owner
+  review reverted both rows — the front-facing walk didn't read as walking (see
+  Provenance). The `adult-idle`/`adult-walk` ingest configs are kept but
+  dormant. `struggle`/
   `parachute-wind`/`land` are appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`) and remain reference-matched to the former
@@ -185,9 +185,20 @@ building one new figure doesn't require the other stages' gitignored source
 frames to also exist locally. No human cleanup beyond the mechanical
 pipeline.
 
-`idle(1)`/`walk(2)` (BL-6/T3, 2026-07-22, FINAL ART): reference-conditioned
-Comfy Cloud Nano Banana Pro (`GeminiImage2Node`) generations, replacing the
-teen-upscale placeholder for good. A first BL-18 pass at golden idle/walk art
+`idle(1)`/`walk(2)` (REVERTED by owner, 2026-07-23): the committed idle/walk
+tiles are the **pre-BL-6/T3 art** — a side-profile walk cycle (right-facing
+contact + passing poses) and a matching front idle, shipped through 2026-07-21
+and restored from the pre-promotion committed sheet. Owner review of the
+BL-6/T3 promotion (below) reverted both rows: the promoted walk was
+front-facing and near-static, so it didn't read as walking. The BL-6/T3
+`adult-idle`/`adult-walk` ingest configs remain in the tree but are DORMANT
+(their Comfy source dumps are gone; a re-bake would need them). The pin test in
+`ingest-animation-frames.test.ts` locks these reverted tiles. Historical record
+of the reverted promotion follows:
+
+`idle(1)`/`walk(2)` (BL-6/T3, 2026-07-22, superseded): reference-conditioned
+Comfy Cloud Nano Banana Pro (`GeminiImage2Node`) generations, that briefly
+replaced the teen-upscale placeholder. A first BL-18 pass at golden idle/walk art
 was rejected by the owner as generic and off-model and reverted to the
 placeholder (`scripts/gen-sprites/build-adult-placeholder.ts`,
 `npm run assets:adult-placeholder`); the root cause, per
@@ -495,6 +506,84 @@ checkerboard-backdrop playback) — see
 `scripts/gen-sprites/ingest-animation-frames.mjs adult-exercise` (`npm run
 assets:adult-exercise`), growing the sheet to 768×1408 (the 128px
 `rowHeight`). No human cleanup beyond the mechanical pipeline.
+
+`brainrot(8)` (BL-11, 2026-07-23): a LOOP — beaver stands slightly slouched,
+holds a small plain phone in both paws at chest height, half-lidded glazed
+stare toward the screen, thumb scrolling. Phone fully in-frame, no readable
+UI/logo. Same pose-coherence gate as throw-stick/collect-sticks/exercise.
+
+**Generation** — same environment constraint forced `partner_generate`
+(`vertexai/nano-banana-pro`) with the public committed `beaver-adult.png`
+raw URL and a copy-the-idle-tile instruction (green `#00FF00`, 4×2 grid).
+The accepted grid is on-model with a subtle thumb-scroll, but the model drew
+two slightly different body halves across the 4×2, so the raw cell order is
+not a clean loop. Mechanical fix (BL-7 mouth-patch class): bake only the
+body-consistent bottom half ping-ponged via
+`ADULT_BRAINROT.frameOrder = [4, 5, 6, 7, 7, 6, 5, 4]` — the two former
+failure seams (4→5 and 8→1) become same-cell repeats (zero-diff). RGB→RGBA
+normalization scratch-only. Default 96px row (`targetContentHeightPx: 96`).
+Evidence: `docs/design-reviews/BL-11-brainrot-contact.png`,
+`BL-11-brainrot-wraparound.png`, `BL-11-brainrot.gif` — see
+`docs/design-reviews/BL-11-brainrot-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-brainrot` (`npm run
+assets:adult-brainrot`), growing the sheet to 768×1504. No human cleanup
+beyond the mechanical pipeline.
+
+`wave(8)` / `flush(8)` (BL-10, 2026-07-23): owner-scoped as BOTH rows —
+`wave` is a friendly wave-goodbye LOOP (right-facing, one paw raised,
+~2 wave cycles); `flush` is a ONE-SHOT toilet-flush gag compressed into 8
+frames (sheet width is fixed at 8 tiles): stylized pixel water sweeps the
+beaver out, near-empty splash beat, wet return, wet-dog shake, dry idle
+settle. No toilet bowl prop; no photoreal water.
+
+**Generation** — same `partner_generate` (`vertexai/nano-banana-pro`) +
+public adult-sheet raw URL path as BL-8/BL-9/BL-11. `wave` needed one
+content retry (first attempt left-facing / binary poses); the accepted
+grid still half-split, so the body-consistent top half is ping-ponged via
+`ADULT_WAVE.frameOrder = [0, 1, 2, 3, 3, 2, 1, 0]`. `flush` accepted on
+first content attempt (natural grid order). Both default 96px rows.
+Evidence: `docs/design-reviews/BL-10-{wave,flush}-{contact,wraparound}.png`
++ GIFs — see `docs/design-reviews/BL-10-toilet-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-wave` /
+`adult-flush` (`npm run assets:adult-wave` / `assets:adult-flush`), growing
+the sheet to 768×1696. No human cleanup beyond the mechanical pipeline.
+
+`toilet(8)` (BL-14, 2026-07-23): owner-scoped as the FULL toilet routine the
+short `flush` gag only hinted at — a ONE-SHOT: beaver sits on a stylized
+toilet bowl + tank, does its business, flushes (water swirl), then a
+tile-scale water wave sweeps the toilet AND beaver away to the side it faces,
+leaving a small swept-away silhouette. The beaver stays clearly visible in
+every frame (owner acceptance bar — a first take that dropped the beaver on
+the sweep frames was rejected and regenerated). Natural 4×8 → 4×2 grid order,
+no `frameOrder`. Distinct from the shipped `flush` gag (no toilet prop) — both
+ship; `flush` is the quick bit, `toilet` the full routine.
+
+**Generation** — same `partner_generate` (`vertexai/nano-banana-pro`) + public
+adult-sheet raw-URL reference path as BL-8/BL-9/BL-10/BL-11, green (`#00FF00`)
+chroma-key background, RGB output normalized to RGBA before ingest. Regenerated
+once for the beaver-visibility gate above; accepted take then ingested
+unmodified.
+
+**Row height** — `rowHeight: 128` (parachute-wind/exercise precedent),
+`targetContentHeightPx: 112`. The tallest raw content is the toilet-tank +
+seated beaver (early frames, ~292×381) and the cresting sweep wave (frame 7,
+~344×355), both taller than a bare standing beaver; at the default 96px tile
+`computeStageScale` would lock the whole row's scale off that tallest
+silhouette and shrink the beaver below idle size. The taller tile lets the
+tank/wave extend upward past the base tile (drawFrame bottom-anchors every row
+to the shared ground line) while the beaver renders at a readable size. The
+WIDTH term binds at scale 0.2791 (max content 96px wide — fills the tile, no
+horizontal clip; max content height 106px, inside the 128px tile). LOOP-vs-
+one-shot is a WAVE-2 runtime concern, not encoded in the sheet meta.
+
+**Scope note** — the "huge, full-screen wall of water" version of the sweep
+(a canvas draw spanning the whole overlay, not a tile) is a separate WAVE-2
+runtime effect, deferred by owner decision; this row ships the tile-scale
+sweep only. Evidence: `docs/design-reviews/BL-14-toilet-contact.png` + GIF —
+see `docs/design-reviews/BL-14-toilet-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-toilet`
+(`npm run assets:adult-toilet`), growing the sheet to 768×1824. No human
+cleanup beyond the mechanical pipeline.
 
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three

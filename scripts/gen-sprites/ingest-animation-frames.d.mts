@@ -37,6 +37,10 @@ export interface AdultRowConfig {
   readonly gridRows: number;
   readonly targetContentHeightPx: number;
   readonly rowHeight?: number;
+  /** Optional reorder/subset of grid cells into the baked row (indices into
+   *  grid-order cells). Used when a raw generation's cell sequence isn't a
+   *  clean loop but a body-consistent subset is. */
+  readonly frameOrder?: readonly number[];
 }
 
 export interface AdultRowResult {
@@ -54,6 +58,10 @@ export const ADULT_WALK: AdultRowConfig;
 export const ADULT_THROW_STICK: AdultRowConfig;
 export const ADULT_COLLECT_STICKS: AdultRowConfig;
 export const ADULT_EXERCISE: AdultRowConfig;
+export const ADULT_BRAINROT: AdultRowConfig;
+export const ADULT_WAVE: AdultRowConfig;
+export const ADULT_FLUSH: AdultRowConfig;
+export const ADULT_TOILET: AdultRowConfig;
 
 export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
 export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
@@ -65,6 +73,10 @@ export function buildAdultWalkSheet(repoRoot: string): AdultRowResult;
 export function buildAdultThrowStickSheet(repoRoot: string): AdultRowResult;
 export function buildAdultCollectSticksSheet(repoRoot: string): AdultRowResult;
 export function buildAdultExerciseSheet(repoRoot: string): AdultRowResult;
+export function buildAdultBrainrotSheet(repoRoot: string): AdultRowResult;
+export function buildAdultWaveSheet(repoRoot: string): AdultRowResult;
+export function buildAdultFlushSheet(repoRoot: string): AdultRowResult;
+export function buildAdultToiletSheet(repoRoot: string): AdultRowResult;
 
 // speak (BL-7) is mechanically composited from the committed idle tile, not
 // a ComfyUI grid — its config shape is just the row name and the mouth

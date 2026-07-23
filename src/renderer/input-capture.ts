@@ -49,7 +49,7 @@ export function isPointOverPet(x: number, y: number, petX: number, petY: number)
   return x >= petX && x < petX + size && y >= petY && y < petY + size;
 }
 
-import { capabilities } from './stage-capabilities';
+import { capabilities } from './stage-capabilities.js';
 
 // The parachute interaction needs struggle/parachute-wind/land rows, which
 // are gated by StageCapabilities.canGrab per stage. The renderer queries

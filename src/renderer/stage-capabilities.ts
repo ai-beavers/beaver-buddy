@@ -6,7 +6,7 @@
 // The module is pure data (no canvas/DOM); the renderer queries it at
 // runtime instead of hard-coding stage names.
 
-import type { Stage } from './sprites';
+import type { Stage } from './sprites.js';
 
 export interface StageCapabilities {
   readonly stage: Stage;
