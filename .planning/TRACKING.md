@@ -50,4 +50,16 @@ entfernt; typecheck/lint/610 Tests).
 Kurve quadratisch 120k XP, XpState v2 mit per-Modell-Cursor, idempotente Migration schemaVersion: 2,
 Renderer 5 Stufen + stageHasInteraction korrekt + tray-Labels; typecheck/lint/647 Tests grün).
 Auf Branch `feat/reset-removal-xp-migration`, noch zu committen + pushen (PR-Update).
-**Wave C** Konzept-Doc für 24h-Start ausstehend.
+**Wave C** XP-Cap-Entfernung (unlimited Level via Formel) Code partiell geschrieben (uncommitted).
+**Wave D-F** geplant in PLAN.md (Settings XP/Level/Token-Anzeige, Alterslogik-Fundament, Animations-Crosscheck, UI-Konzept).
+Neuer Subbranch `feat/xp-cap-and-settings` vorgesehen.
+
+## 2026-07-23 — Gesamtplan Wave C–F: Cap-Entfernung + Settings + Alterslogik + Animationsabgleich
+
+Vorhaben: XP-Cap (L32) entfernen — quadratische Formel läuft unendlich weiter, L25+ dauerhaft Adult.
+Settings-Fenster um Beaver-Status-Section (XP, Level, Stage, Fortschrittsbalken, per-Modell-Token-Cursor)
+erweitern. Stage-Capabilities-Modul als Fundament für stufenspezifisches Verhalten (Grab, Type, Roam-Pace)
+— reiner Prebuild, keine neuen Assets. M5-Phasenliste (12 Phasen, alle not-started) gegen Planung
+abgeglichen: adult-Rows existieren bereits für P1–P8 via build-loop; young-baby/older-teen/adult
+brauchen noch volle Rows (M5/P12). Settings-UI-Konzept wartet auf Owner-Transkript.
+Status: **geplant** (PLAN.md; Subbranch `feat/xp-cap-and-settings` abzweigend von `feat/reset-removal-xp-migration`)
