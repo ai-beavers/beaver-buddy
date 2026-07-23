@@ -51,6 +51,7 @@ export const ADULT_SLEEP: AdultRowConfig;
 export const ADULT_STRETCH: AdultRowConfig;
 export const ADULT_IDLE: AdultRowConfig;
 export const ADULT_WALK: AdultRowConfig;
+export const ADULT_SPEAK: AdultRowConfig;
 
 export function buildAdultRowSheet(repoRoot: string, config: AdultRowConfig): AdultRowResult;
 export function buildAdultWateringSheet(repoRoot: string): AdultRowResult;
@@ -59,3 +60,4 @@ export function buildAdultSleepSheet(repoRoot: string): AdultRowResult;
 export function buildAdultStretchSheet(repoRoot: string): AdultRowResult;
 export function buildAdultIdleSheet(repoRoot: string): AdultRowResult;
 export function buildAdultWalkSheet(repoRoot: string): AdultRowResult;
+export function buildAdultSpeakSheet(repoRoot: string): AdultRowResult;

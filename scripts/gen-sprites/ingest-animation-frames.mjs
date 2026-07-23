@@ -308,6 +308,25 @@ export function buildAdultStretchSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_STRETCH);
 }
 
+// Speak LOOP (BL-7): forward-facing beaver, mouth cycling open/half/closed
+// with a small head/chin emphasis, designed so runtime (WAVE-2, out of
+// scope here) can loop it under any quip duration — this item only has to
+// make the frame-8-to-frame-1 seam read as continuous, not wire quip sync
+// itself. Same reference-conditioned green chroma-key 4x2 grid convention as
+// watering/drink/sleep/stretch above.
+export const ADULT_SPEAK = {
+  rowName: 'speak',
+  sourceDir: 'adult-speak',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 88,
+};
+
+export function buildAdultSpeakSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_SPEAK);
+}
+
 // Final idle/walk (BL-6/T3): replaces the teen-upscale placeholder rows
 // with authored-pixel art, via the SAME buildAdultRowSheet/spliceRow path as
 // watering/drink/sleep/stretch above (idle is a 1x1 "grid", walk a 2x1
@@ -359,6 +378,7 @@ const ADULT_ROWS = {
   'adult-stretch': ADULT_STRETCH,
   'adult-idle': ADULT_IDLE,
   'adult-walk': ADULT_WALK,
+  'adult-speak': ADULT_SPEAK,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);

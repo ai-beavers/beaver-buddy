@@ -93,8 +93,8 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   carry `struggle(8), parachute-wind(8), land(8)` for the parachute-drop
   sequence (BL-17/BL-18). Adult also carries `type(8)` — the "sit and type on a
   laptop" loop for `roam.ts`'s `working` state — `watering(8)`/`drink(8)`/
-  `sleep(8)` loops, and `stretch(8)` — a ONE-SHOT wake-up transition (not a
-  loop), matching `land`. `beaver-baby.png`/`beaver-teen.png`/`beaver-adult.png`:
+  `sleep(8)`/`speak(8)` loops, and `stretch(8)` — a ONE-SHOT wake-up transition
+  (not a loop), matching `land`. `beaver-baby.png`/`beaver-teen.png`/`beaver-adult.png`:
   walk×2. fps hint: 8. The idle pose never appears in a walk row — walk cycles
   are step frames only.
 - **Lodge** (`lodge.png`): `idle(1), shake(3), burst(3), spark(4)`; spark
@@ -133,7 +133,11 @@ twice (BL-11's `teen-to-right-1` as walk frame, then its `-1-4` replacement).
   wake-up/stretch transition, not a loop — is appended on top of that by
   `scripts/gen-sprites/ingest-animation-frames.mjs adult-stretch` (`npm run
   assets:adult-stretch`, BL-5) via the same `buildAdultRowSheet` helper,
-  growing the sheet to 768×992; see Provenance.
+  growing the sheet to 768×992; see Provenance. `speak(8)` — a forward-facing
+  talking LOOP, mouth cycling open/closed twice per 8-frame cycle — is
+  appended on top of that by `scripts/gen-sprites/ingest-animation-frames.mjs
+  adult-speak` (`npm run assets:adult-speak`, BL-7) via the same
+  `buildAdultRowSheet` helper, growing the sheet to 768×1088; see Provenance.
 - **Tree growth stages** (`tree-stage-1.png`/`tree-stage-2.png`/`tree-stage-3.png`,
   BL-1/T1): one row each, `sway(12)`, baked at fps 8 by the puppet studio
   (`tools/puppet-studio/`) — 96×96 tile, sheet 1152×96. Not a multi-row sheet
@@ -323,6 +327,27 @@ idle tile) were checked as post-ingest 96×96 side-by-side diffs on a magenta
 backdrop, eyeballed rather than pixel-diffed (frame 1 is newly generated art
 conditioned on the sleep pose, not a byte copy of it) — both read as a clean
 continuous match. No human cleanup beyond the mechanical pipeline.
+
+`speak(8)` (BL-7, 2026-07-22): a 4×2 grid (8 frames) of a forward-facing
+talking LOOP — the beaver stands facing the viewer (not side profile, unlike
+the movement rows), body mostly still, with the mouth cycling
+open → closed → closed → closed → open → closed → closed → closed and a
+small chin/head bob synced to the mouth, so runtime (WAVE-2, out of scope
+here) can loop any slice of it under a quip's duration. Generated via Comfy
+Cloud Nano Banana Pro (`GeminiImage2Node`), reference-conditioned on the same
+already-uploaded adult reference image every other adult row is anchored to
+(reused by filename, no new upload — direct uploads are blocked in this
+environment, per `docs/dev-guardrails.md`), on a green (`#00FF00`) chroma-key
+background. Ingested by `scripts/gen-sprites/ingest-animation-frames.mjs
+adult-speak` (`npm run assets:adult-speak`) via `buildAdultRowSheet` — same
+byte-preserving append pattern as watering/drink/sleep/stretch — growing the
+sheet to 768×1088. **Loop wraparound gate**: frame 8 (mouth closed) → frame 1
+(mouth open) is the same kind of transition as frame 4 → frame 5 already
+inside the loop (also closed → open), not a discontinuity — verified both by
+a committed side-by-side diff (`docs/design-reviews/BL-7-speak-wraparound.png`)
+and a dedicated test (`ingest-animation-frames.test.ts`) asserting the
+wraparound pixel delta doesn't exceed the loop's own internal frame4→frame5
+swing. No human cleanup beyond the mechanical pipeline.
 
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three

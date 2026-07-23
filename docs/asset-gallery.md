@@ -86,11 +86,12 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×992 sheet,
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1088 sheet,
   96×96 tiles, fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
-  `stretch` (8, ONE-SHOT wake-up transition, not a loop)
+  `stretch` (8, ONE-SHOT wake-up transition, not a loop), `speak` (8,
+  forward-facing talking loop, mouth cycling open/closed)
 - **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
   teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
   Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
@@ -121,7 +122,12 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   `assets-src/reference/adult-sleep-pose.png` (frame 8 of 8, fewest zzz
   wisps). `stretch` wakes up from that same sleep-pose tile (dual
   reference-conditioned on it AND the adult idle tile) and settles back to
-  the idle stance — see STYLE.md provenance.
+  the idle stance. `speak` (BL-7) is appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-speak`
+  (`npm run assets:adult-speak`) via the same `buildAdultRowSheet` builder —
+  forward-facing (not side profile, unlike the movement rows), mouth cycling
+  open/closed twice per 8-frame loop, reference-conditioned the same way,
+  green chroma-key background — see STYLE.md provenance.
 - **Status:** final
 
 ### Tree — growth stages
