@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ADULT, ADULT_DRINK, ADULT_IDLE, ADULT_SLEEP, ADULT_STRETCH, ADULT_WALK, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultStretchSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
+import { ADULT, ADULT_DRINK, ADULT_IDLE, ADULT_SLEEP, ADULT_SPEAK, ADULT_STRETCH, ADULT_WALK, ADULT_WATERING, BABY, buildAdultDrinkSheet, buildAdultIdleSheet, buildAdultSleepSheet, buildAdultSpeakSheet, buildAdultStretchSheet, buildAdultWalkSheet, buildAdultWateringSheet, buildBabySheet, buildStageSheet } from './ingest-animation-frames.mjs';
 import { decodePng, ingestStage } from './ingest-images.mjs';
 
 const repoRoot = fileURLToPath(new URL('../..', import.meta.url));
@@ -20,6 +20,9 @@ const hasSleepSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_S
 const hasStretchSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_STRETCH.sourceDir}/sheet.png`, import.meta.url));
 const hasIdleSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_IDLE.sourceDir}/sheet.png`, import.meta.url));
 const hasWalkSource = fs.existsSync(new URL(`../../assets-src/comfyui/${ADULT_WALK.sourceDir}/sheet.png`, import.meta.url));
+// speak (BL-7) has no ComfyUI source dir to gate on — it's mechanically
+// composited from the committed idle tile, so its regeneration test runs
+// unconditionally (see below).
 
 // Cumulative y-offset of a row found by name, not position — rows keep
 // getting appended after each other (watering, then drink, ...), so no test
@@ -121,9 +124,9 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
     };
     // idle/walk/struggle/parachute-wind/land are the golden BL-18 sheet; `type`
     // is appended by ingest-typing.mjs (see ingest-typing); `watering`,
-    // `drink`, `sleep`, and `stretch` are appended by buildAdultWateringSheet /
-    // buildAdultDrinkSheet / buildAdultSleepSheet / buildAdultStretchSheet
-    // (see below).
+    // `drink`, `sleep`, `stretch`, and `speak` are appended by
+    // buildAdultWateringSheet / buildAdultDrinkSheet / buildAdultSleepSheet /
+    // buildAdultStretchSheet / buildAdultSpeakSheet (see below).
     expect(meta.rows).toEqual([
       { name: 'idle', frames: 1 },
       { name: 'walk', frames: 2 },
@@ -135,6 +138,7 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'drink', frames: 8 },
       { name: 'sleep', frames: 8 },
       { name: 'stretch', frames: 8 },
+      { name: 'speak', frames: 8 },
     ]);
   });
 
@@ -146,15 +150,16 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // tallest raw content is the standing frames' own tail-to-ear span, shared
   // evenly between arms-up and arms-down poses, so it fits the default 96px
   // tile at targetContentHeightPx 96 with no rowHeight override needed — see
-  // STYLE.md provenance). Width stays a flat 8-col grid at the 96px tile —
-  // only row height varies, never column width.
-  it('is a 768x992 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96)', () => {
+  // STYLE.md provenance); buildAdultSpeakSheet appends a 96px `speak` row →
+  // 1088 (default 96px tile, targetContentHeightPx 88). Width stays a flat
+  // 8-col grid at the 96px tile — only row height varies, never column width.
+  it('is a 768x1088 sheet (8 cols at the 96px tile; row heights 96/96/96/128/96/96/96/96/96/96/96)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(992);
+    expect(decoded.height).toBe(1088);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(992);
+    expect(meta.sheetHeight).toBe(1088);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {
@@ -221,6 +226,7 @@ describe.skipIf(!hasAdultComfyui)('ingest-animation-frames pipeline (adult)', ()
     expect(committedMeta.rows.find((row) => row.name === 'drink')).toMatchObject({ name: 'drink', frames: 8 });
     expect(committedMeta.rows.find((row) => row.name === 'sleep')).toMatchObject({ name: 'sleep', frames: 8 });
     expect(committedMeta.rows.find((row) => row.name === 'stretch')).toMatchObject({ name: 'stretch', frames: 8 });
+    expect(committedMeta.rows.find((row) => row.name === 'speak')).toMatchObject({ name: 'speak', frames: 8 });
   }, 15_000);
 });
 
@@ -538,6 +544,101 @@ describe.skipIf(!hasStretchSource)('ingest-animation-frames stretch regeneration
 
   it('is deterministic: re-running the bake is byte-identical', () => {
     expect(buildAdultStretchSheet(repoRoot).png.equals(buildAdultStretchSheet(repoRoot).png)).toBe(true);
+  });
+});
+
+// Speak row (BL-7, redone): a first attempt generated a full 8-frame AI
+// grid (same convention as watering/drink/sleep/stretch) and FAILED the
+// design gate — independent per-frame generations redrew the tail/pose/
+// shading, reading as whole-body flicker rather than a talking mouth (see
+// git history and the superseded docs/design-reviews/BL-7-speak-verdict.md
+// entry). The redo derives every frame MECHANICALLY from the committed idle
+// tile, patching only ADULT_SPEAK.mouthBox — so the real invariant to test
+// isn't "is the wraparound delta plausible" (that passed the broken art
+// too), it's "are the two derived states byte-identical to their source
+// outside the patched box", which is now directly provable.
+describe('ingest-animation-frames speak row (adult)', () => {
+  const pngPath = new URL('../../assets/sprites/beaver-adult.png', import.meta.url);
+  const metaPath = new URL('../../assets/sprites/beaver-adult.json', import.meta.url);
+
+  function readMeta() {
+    return JSON.parse(fs.readFileSync(metaPath, 'utf8')) as {
+      tile: number;
+      rows: readonly { name: string; frames: number; height?: number }[];
+    };
+  }
+
+  function extractFrame(decoded: ReturnType<typeof decodePng>, originY: number, tile: number, frame: number): Uint8ClampedArray {
+    const out = new Uint8ClampedArray(tile * tile * 4);
+    for (let y = 0; y < tile; y += 1) {
+      const srcStart = ((originY + y) * decoded.width + frame * tile) * 4;
+      out.set(decoded.data.subarray(srcStart, srcStart + tile * 4), y * tile * 4);
+    }
+    return out;
+  }
+
+  it('has a speak row, found by name, 8 frames, 96px tall (no over-tile pose)', () => {
+    const row = readMeta().rows.find((r) => r.name === 'speak');
+    expect(row).toEqual({ name: 'speak', frames: 8 });
+  });
+
+  it('idle-tile-derived frames (2, 3, 4, 6, 7, 8 — 1-indexed) are byte-identical to the committed idle tile', () => {
+    const meta = readMeta();
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'speak');
+    const { tile } = meta;
+    const idle = extractFrame(decoded, 0, tile, 0); // idle row is always frame 0 at sheet origin
+
+    for (const frame of [1, 2, 3, 5, 6, 7]) {
+      const f = extractFrame(decoded, originY, tile, frame);
+      expect(Buffer.from(f).equals(Buffer.from(idle)), `speak[${frame}] (closed) should equal the idle tile`).toBe(true);
+    }
+  });
+
+  // The real jitter invariant (this is what the discarded AI-grid approach
+  // could never guarantee): for every adjacent frame pair, including the
+  // 8->1 wraparound, every pixel OUTSIDE the mouth patch box must be
+  // BYTE-IDENTICAL — not just "similar", zero tolerance. This is only
+  // provable because every frame derives from one shared base tile.
+  it('every adjacent frame pair (including 8->1) is byte-identical outside the mouth box — zero body jitter', () => {
+    const meta = readMeta();
+    const decoded = decodePng(fs.readFileSync(pngPath));
+    const originY = rowOffset(meta, 'speak');
+    const { tile } = meta;
+    const { x0, y0, x1, y1 } = ADULT_SPEAK.mouthBox;
+
+    function diffOutsideBox(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
+      let n = 0;
+      for (let y = 0; y < tile; y += 1) {
+        for (let x = 0; x < tile; x += 1) {
+          if (x >= x0 && x < x1 && y >= y0 && y < y1) continue;
+          const i = (y * tile + x) * 4;
+          if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) n += 1;
+        }
+      }
+      return n;
+    }
+
+    const frames = Array.from({ length: 8 }, (_, i) => extractFrame(decoded, originY, tile, i));
+    for (let i = 0; i < 8; i += 1) {
+      const next = (i + 1) % 8; // wraps 8->1 at i=7
+      expect(diffOutsideBox(frames[i], frames[next]), `frame ${i + 1}->${next + 1} differs outside the mouth box`).toBe(0);
+    }
+  });
+});
+
+// speak has no ComfyUI source dir — buildAdultSpeakSheet only reads the
+// already-committed idle tile, so its regeneration check has nothing to
+// gate on and always runs.
+describe('ingest-animation-frames speak regeneration', () => {
+  it('committed sheet matches the build output byte-for-byte and matches its JSON', () => {
+    const { png, meta } = buildAdultSpeakSheet(repoRoot);
+    expect(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.png', import.meta.url)).equals(png)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(new URL('../../assets/sprites/beaver-adult.json', import.meta.url), 'utf8'))).toEqual(meta);
+  });
+
+  it('is deterministic: re-running the bake is byte-identical', () => {
+    expect(buildAdultSpeakSheet(repoRoot).png.equals(buildAdultSpeakSheet(repoRoot).png)).toBe(true);
   });
 });
 

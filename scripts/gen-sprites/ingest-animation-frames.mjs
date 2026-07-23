@@ -308,6 +308,78 @@ export function buildAdultStretchSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_STRETCH);
 }
 
+// Speak LOOP (BL-7, redone after design-gate FAIL): a first attempt
+// generated a full 8-frame AI grid the same way as watering/drink/sleep/
+// stretch — but each cell is an INDEPENDENT generation, and nothing forces
+// independent generations to agree on body/tail/shading, so the row read as
+// whole-body flicker at playback speed, not a talking mouth (see git history
+// on this constant for the discarded grid approach and
+// docs/design-reviews/BL-7-speak-verdict.md for the FAIL writeup).
+//
+// Fix: derive every frame MECHANICALLY from the single already-accepted
+// idle tile, patching ONLY a small mouth-region bounding box (an open-mouth
+// cavity + outline + teeth, colors resampled from the idle tile's own nose/
+// outline/tooth pixels — no new art, no palette drift). Every pixel outside
+// `mouthBox` is byte-identical across every frame BY CONSTRUCTION (both
+// states start from a clone of the same idle tile), so body jitter is
+// structurally impossible, not just visually absent — verified by a
+// dedicated test in ingest-animation-frames.test.ts. No ComfyUI run/raw
+// dump is involved at all.
+export const ADULT_SPEAK = {
+  rowName: 'speak',
+  mouthBox: { x0: 54, y0: 34, x1: 86, y1: 52 },
+};
+
+// Draws a small open-mouth cavity (ellipse fill + outline ring) plus a
+// short row of teeth into a clone of `tile`, entirely within
+// ADULT_SPEAK.mouthBox. Colors are sampled from the idle tile itself: the
+// nose's own dark-maroon fill for the cavity, the art's pure-black outline,
+// and the existing visible tooth's white — so the patch matches the
+// existing rendering style with zero new palette entries.
+function drawOpenMouth(tile) {
+  const data = new Uint8ClampedArray(tile.data);
+  const { x0, y0, x1, y1 } = ADULT_SPEAK.mouthBox;
+  const cx = 69;
+  const cy = 43;
+  const rx = 10;
+  const ry = 7;
+  for (let y = y0; y < y1; y += 1) {
+    for (let x = x0; x < x1; x += 1) {
+      const nx = (x - cx) / rx;
+      const ny = (y - cy) / ry;
+      const dist = Math.sqrt(nx * nx + ny * ny);
+      const i = (y * TILE + x) * 4;
+      if (dist <= 0.78) {
+        data[i] = 15; data[i + 1] = 9; data[i + 2] = 9; data[i + 3] = 255;
+      } else if (dist <= 1.0) {
+        data[i] = 0; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 255;
+      }
+    }
+  }
+  for (const [x, y] of [[63, 39], [66, 38], [69, 38], [72, 39]]) {
+    const i = (y * TILE + x) * 4;
+    data[i] = 255; data[i + 1] = 255; data[i + 2] = 255; data[i + 3] = 255;
+  }
+  return { width: TILE, height: TILE, data };
+}
+
+// Two-pulse talking cadence (open/closed/closed/closed twice), built from
+// exactly two derived states — no per-frame generation to drift.
+export function buildAdultSpeakSheet(repoRoot) {
+  const pngPath = path.join(repoRoot, 'assets', 'sprites', ADULT.shippedPng);
+  const jsonPath = pngPath.replace(/\.png$/, '.json');
+  const shipped = decodePng(fs.readFileSync(pngPath));
+  const shippedMeta = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+
+  const idle = extractTile(shipped, 0, 0); // idle is always the sheet's first row, first (only) frame
+  const closed = { width: TILE, height: TILE, data: new Uint8ClampedArray(idle.data) };
+  const open = drawOpenMouth(idle);
+  const tiles = [open, closed, closed, closed, open, closed, closed, closed];
+
+  const { width, height, data, meta } = spliceRow(shipped, shippedMeta, ADULT_SPEAK.rowName, tiles, TILE);
+  return { png: encodeRgbaPng({ width, height, data }), meta, scale: 1 };
+}
+
 // Final idle/walk (BL-6/T3): replaces the teen-upscale placeholder rows
 // with authored-pixel art, via the SAME buildAdultRowSheet/spliceRow path as
 // watering/drink/sleep/stretch above (idle is a 1x1 "grid", walk a 2x1
@@ -352,6 +424,9 @@ export function buildAdultWalkSheet(repoRoot) {
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, future BL-8..12 rows
 // just add a config here).
+// adult-speak is deliberately NOT in this map: it has no ComfyUI grid/config
+// (buildAdultRowSheet doesn't apply), it's dispatched as its own CLI branch
+// below.
 const ADULT_ROWS = {
   'adult-watering': ADULT_WATERING,
   'adult-drink': ADULT_DRINK,
@@ -365,7 +440,12 @@ const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   const repoRoot = path.join(import.meta.dirname, '..', '..');
   const stageArg = process.argv[2] ?? 'baby';
-  if (ADULT_ROWS[stageArg]) {
+  if (stageArg === 'adult-speak') {
+    const { png, meta } = buildAdultSpeakSheet(repoRoot);
+    fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.png'), png);
+    fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.json'), `${JSON.stringify(meta, null, 2)}\n`);
+    console.log(`appended beaver-adult speak row (${meta.sheetWidth}x${meta.sheetHeight}, mechanical mouth-patch)`);
+  } else if (ADULT_ROWS[stageArg]) {
     const rowConfig = ADULT_ROWS[stageArg];
     const { png, meta, scale } = buildAdultRowSheet(repoRoot, rowConfig);
     fs.writeFileSync(path.join(repoRoot, 'assets', 'sprites', 'beaver-adult.png'), png);
@@ -374,7 +454,7 @@ if (isMain) {
   } else {
     const config = STAGES[stageArg];
     if (!config) {
-      throw new Error(`unknown stage "${stageArg}" (expected one of: ${[...Object.keys(STAGES), ...Object.keys(ADULT_ROWS)].join(', ')})`);
+      throw new Error(`unknown stage "${stageArg}" (expected one of: ${[...Object.keys(STAGES), ...Object.keys(ADULT_ROWS), 'adult-speak'].join(', ')})`);
     }
     const { png, meta, scales } = buildStageSheet(repoRoot, config);
     const outDir = path.join(repoRoot, 'assets-src', 'baked', config.bakedDirName);
