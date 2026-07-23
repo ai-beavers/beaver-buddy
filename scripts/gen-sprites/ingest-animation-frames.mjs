@@ -486,7 +486,7 @@ export function buildAdultCollectSticksSheet(repoRoot) {
 // without the width term taking over (96/318=0.3019 vs 112/380=0.2947 —
 // HEIGHT still binds, width lands at a max of 93.7px across all 8 frames,
 // under the 96px tile) — this scales the standing/chest-height frame (raw
-// 344x325, no this row's frame 0 is 296x325) to ~96px tall, matching idle's
+// 318×380 widest crop) to ~96px tall, matching idle's
 // own measured full-tile content height, while the overhead frames extend
 // up into the taller tile instead of shrinking everything to fit.
 export const ADULT_EXERCISE = {
