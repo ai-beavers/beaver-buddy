@@ -437,6 +437,65 @@ temporal flicker a static contact sheet can miss) — see
 `assets:adult-collect-sticks`), growing the sheet to 768×1184 then
 768×1280. No human cleanup beyond the mechanical pipeline.
 
+`exercise(8)` (BL-8, 2026-07-23): a LOOP — beaver holds a SHORT log
+horizontally in both paws (deliberately short: the plan's core constraint is
+that a wide log binds `computeStageScale`'s WIDTH term and shrinks the whole
+character, the same trap a too-tall pose triggers on the HEIGHT term) and
+lifts it from chest height to overhead and back down, two full reps across
+the 8 frames (chest → rising → overhead → lowering, twice), frame 8 flowing
+back into frame 1 for a seamless loop. Both paws keep two-point contact with
+the log in every frame; the log's length/diameter reads constant frame to
+frame (no independent-cell redraw — same pose-coherence gate as
+throw-stick/collect-sticks, PASS on the accepted generation).
+
+**Generation** — same environment constraint as throw-stick/collect-sticks
+forced the same workaround: `upload_file`'s emitted upload command was
+tried live this session (a `curl` POST to `cloud.comfy.org/api/upload/image`
+with the session's bearer credential) and was blocked by the sandbox's
+command classifier, confirming the `submit_workflow`+`GeminiImage2Node`+
+`upload_file` path is still unavailable here — `partner_generate`
+(`vertexai/nano-banana-pro`) was used instead, referencing the same
+already-public `beaver-adult.png` raw URL with a copy-the-idle-tile
+instruction. Two attempts were needed before an acceptable result: the
+first generation's log was clearly wider than the beaver's shoulders (the
+width-bind trap this row's plan called out); a second attempt with an
+explicit "log ≤ shoulder width" constraint also asked for "thin black grid
+lines between cells" (matching the reference's own look) — this
+accidentally produced real 3px-wide black divider lines at every cell
+boundary, which `cropToBbox` picked up as opaque content touching the full
+cell edge and would have corrupted the per-frame scale measurement. A third
+attempt dropped the grid-line instruction (green runs edge-to-edge, no
+dividers) and kept the short-log constraint; this one generated cleanly
+(two silently-dropped MCP transport calls in between returned no output and
+were re-sent, not counted as content retries). RGB→RGBA normalization
+(opaque, alpha=255) was needed again, same reason and same scratch-only
+one-off script as throw-stick/collect-sticks.
+
+**Scale trap, resolved**: the accepted generation's widest raw crop is
+318×380 (the overhead-lift frames — arms and log reaching above the head).
+At the default `targetContentHeightPx: 96` the HEIGHT term binds without
+clipping the width, but the tallest raw content is the arms-up-and-log
+silhouette, not the standing body itself, so locking the row's one scale
+factor off it undersized the standing/chest-height frames to ~82px tall —
+visibly smaller than idle. Fix (parachute-wind precedent, BL-19):
+`rowHeight: 128` lets `targetContentHeightPx` go to 112 without the WIDTH
+term taking over (96/318=0.3019 vs 112/380=0.2947 — HEIGHT still binds, max
+content width across all 8 frames is 93.7px, comfortably under the 96px
+tile) — this scales the chest-height frames to ~96px tall, matching idle's
+own measured full-tile content height, while the overhead frames extend up
+into the taller tile instead of shrinking everything to fit. Green
+(`#00FF00`) chroma-key background, 4×2 grid, same `buildAdultRowSheet`
+ingestion as watering/drink/sleep/stretch/throw-stick/collect-sticks.
+Evidence: `docs/design-reviews/BL-8-exercise-contact.png` (contact sheet, 4×
+nearest-neighbor, magenta backdrop — no transparency holes),
+`docs/design-reviews/BL-8-exercise-wraparound.png` (frame 1 vs frame 8, the
+loop-seam check), and `docs/design-reviews/BL-8-exercise.gif` (8fps
+checkerboard-backdrop playback) — see
+`docs/design-reviews/BL-8-exercise-verdict.md`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-exercise` (`npm run
+assets:adult-exercise`), growing the sheet to 768×1408 (the 128px
+`rowHeight`). No human cleanup beyond the mechanical pipeline.
+
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
 independent prompts, via Comfy Cloud Nano Banana Pro (`vertexai/nano-banana-pro`
