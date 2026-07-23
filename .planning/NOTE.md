@@ -31,6 +31,7 @@
 - 2026-07-21 **[note]** DECIDED (Owner 2026-07-21): **XP and lifetime stay separate for now.** Main logic = XP from tokens → level. Lifetime (screen display time/total lifetime) is tracked separately and should later feed in as an additional XP source (conversion logic post-P2). Spec: `Planning/Milestone-4/Phase-2/XP-LEVEL-MODEL.md`
 
 <!-- /fp-note appends here, newest last -->
+- 2026-07-22 **[task]** Onboarding-Hinweis „Wachstum braucht Connect“: Debug-Befund (DEBUG-beaver-growth.md) — XP-Quellen sind Opt-in (claudeEnabled/codexEnabled default false) → Neue Nutzer sehen nie ein Wachsen und halten die App ggf. für kaputt. Im Onboarding/Tray klarstellen, dass der Biber erst nach Connect Claude Code/Codex wächst
 
 ## Classified
 
@@ -45,3 +46,5 @@
 | Animation authoring docs | task | implemented | `docs/animation-authoring.md` | contributor/agent docs | 2026-07-19 | commit 9ff5e0a on `feature/animation-authoring-docs`; PR open |
 | F1 beaver not clickable | bug | implemented | M2/P3 WAVE-2 | expected behavior; solved by C3/C4 | 2026-07-20 | 2026-07-20: WAVE-2 |
 | F2 bubble artifacts | bug | implemented | M2/P3 WAVE-2 | bubbleDirtyRect + forceFullClear | 2026-07-20 | 2026-07-20: WAVE-2 F2 chunk |
+| Onboarding hint "growth needs connect" | task | idea | M4/P2 + onboarding flow (M1) | From DEBUG-beaver-growth.md: explain opt-in sources, otherwise the app looks broken | 2026-07-22 | |
+

@@ -12,6 +12,7 @@ function entry(overrides: Partial<UsageEntry>): UsageEntry {
   };
 }
 
+
 describe('aggregate', () => {
   it('sums input/output/cache splits into totalTokens', () => {
     const { lifetime } = aggregate([
@@ -53,10 +54,25 @@ describe('aggregate', () => {
     expect(lifetime.inputTokens).toBe(15);
   });
 
-  it('empty input produces zero totals', () => {
-    const { daily, lifetime } = aggregate([]);
+  it('empty input produces zero totals and an empty lifetimeByModel', () => {
+    const { daily, lifetime, lifetimeByModel } = aggregate([]);
     expect(daily.size).toBe(0);
     expect(lifetime.totalTokens).toBe(0);
+    expect(lifetimeByModel.size).toBe(0);
+  });
+
+  it('aggregates real tokens per model into lifetimeByModel, excluding cache', () => {
+    const { lifetimeByModel } = aggregate([
+      entry({ inputTokens: 10, outputTokens: 20, model: 'claude-opus-4-8' }),
+      entry({ inputTokens: 5, outputTokens: 7, cacheCreationTokens: 100, cacheReadTokens: 50, model: 'claude-opus-4-8' }),
+      entry({ inputTokens: 1, outputTokens: 1, model: 'gpt-5.6-sol' }),
+      entry({ inputTokens: 3, outputTokens: 4 }), // no model -> unknown
+    ]);
+
+    expect(lifetimeByModel.size).toBe(3);
+    expect(lifetimeByModel.get('claude-opus-4-8')).toEqual({ inputTokens: 15, outputTokens: 27 });
+    expect(lifetimeByModel.get('gpt-5.6-sol')).toEqual({ inputTokens: 1, outputTokens: 1 });
+    expect(lifetimeByModel.get('unknown')).toEqual({ inputTokens: 3, outputTokens: 4 });
   });
 });
 

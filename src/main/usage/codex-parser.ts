@@ -62,6 +62,16 @@ interface TokenEvent {
   readonly timestampMs: number;
   readonly total: NormalizedUsage | null;
   readonly last: NormalizedUsage | null;
+  readonly model: string | undefined;
+}
+
+function extractCodexModel(parsed: RawCodexLine): string | undefined {
+  const info = parsed.payload?.info;
+  if (info && typeof info === 'object') {
+    const raw = (info as Record<string, unknown>).model;
+    if (typeof raw === 'string') return raw;
+  }
+  return undefined;
 }
 
 // readBoundedLines enforces the MAX_LINE_BYTES bound — oversized lines
@@ -88,7 +98,7 @@ function readTokenEvents(filePath: string): TokenEvent[] {
     const last = normalizeUsage(info.last_token_usage);
     if (!total && !last) continue;
 
-    events.push({ timestamp, timestampMs, total, last });
+    events.push({ timestamp, timestampMs, total, last, model: extractCodexModel(parsed) });
   }
   return events;
 }
@@ -151,6 +161,7 @@ export function parseCodexFile(filePath: string): UsageEntry[] {
     cached = Math.min(cached, input);
     entries.push({
       timestampMs: event.timestampMs,
+      model: event.model,
       inputTokens: input - cached,
       outputTokens: output,
       cacheCreationTokens: 0,

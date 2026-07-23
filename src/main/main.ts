@@ -16,13 +16,14 @@ import { createPauseState, isPaused, setSystemPause, toggleManualPause, type Pau
 import { createTray, formatPetLabel } from './tray';
 import { configureAlwaysOnTop, fitWindowToWorkArea, getOverlayWindowBounds, getPrimaryWorkAreaInfo, onWorkAreaChanged, setCaptureMode, type CaptureMode } from './overlay-adapter';
 import { XpEngine, type PetUpdate } from './xp/engine';
+import { migrateIfNeeded } from './xp/migrate';
 import { UsageTracker } from './usage/tracker';
 import { todayTotalTokens } from './usage/totals';
 import { createDetectorState, detectEvents } from './quips/detectors';
 import { QUIP_DISPLAY_DURATION_MS } from './quips/quip-config';
 import { type QuipTrigger } from './quips/quips';
 import { createSchedulerState, schedule, type SchedulerState } from './quips/scheduler';
-import type { Stage } from './xp/curve';
+import { xpForLevel, type Stage } from './xp/curve';
 import { MrrEngine } from './mrr/mrr-engine';
 import { loadSettingsState, saveSettingsState, type SettingsState } from './mrr/settings-store';
 import { openSettingsWindow } from './mrr/settings-window';
@@ -170,15 +171,14 @@ app.whenReady().then(async () => {
 
   const stateDir = app.getPath('userData');
 
-  // --reset-hatch is the hidden QA reset: it bypasses the stored flag so the
-  // hatch replays immediately, without a separate clear-then-relaunch step.
+  // Hatch replay for QA: delete the onboarding-state.json file in the app's
+  // userData directory and relaunch. A missing/corrupt file loads as
+  // hatched:false, so the sequence plays again. Persisted at trigger time,
+  // not sequence completion, to guarantee exactly-once even if the app is
+  // killed mid-sequence (~6s window).
   const onboarding = loadOnboardingState(stateDir);
-  const shouldHatch = process.argv.includes('--reset-hatch') || !onboarding.hatched;
+  const shouldHatch = !onboarding.hatched;
   if (shouldHatch) {
-    // Persisted at trigger time, not sequence completion: guarantees
-    // exactly-once even if the app is killed mid-sequence (~6s window) —
-    // acceptable for a one-shot cosmetic onboarding, and --reset-hatch
-    // recovers it. Avoids adding a hatch:done renderer -> main channel.
     await saveOnboardingState(stateDir, { hatched: true });
   }
 
@@ -223,11 +223,26 @@ app.whenReady().then(async () => {
     unsubscribeWorkArea();
   });
 
-  const xpEngine = new XpEngine(stateDir);
-
   const keychainService = parseKeychainService(process.argv);
   const mrrPollNowOnModeSwitch = hasMrrPollNowFlag(process.argv);
   let growthSettings: SettingsState = loadSettingsState(stateDir);
+
+  // Prime the usage tracker first so migration can read the latest,
+  // cache-free lifetime-by-model totals before the engine ever loads state.
+  // The tracker is created here and reused for the settings window, tray,
+  // and the engine's attach below.
+  let usageTracker: UsageTracker = new UsageTracker();
+  usageTracker.setEnabledSources({
+    claude: growthSettings.claudeEnabled,
+    codex: growthSettings.codexEnabled,
+    pi: growthSettings.piEnabled ?? false,
+    kimi: growthSettings.kimiEnabled ?? false,
+    opencode: growthSettings.opencodeEnabled ?? false,
+  });
+  usageTracker.refresh();
+  await migrateIfNeeded(stateDir, usageTracker.getTotals());
+
+  const xpEngine = new XpEngine(stateDir);
   xpEngine.setMode(growthSettings.mode);
 
   const mrrEngine = new MrrEngine({
@@ -243,8 +258,6 @@ app.whenReady().then(async () => {
   // invoke the exact same code path the tray's Connect… / Settings… clicks
   // do — a native tray menu item can't be clicked via CDP, so a
   // scriptable flag is the only way to drive it, same family as --quip.
-  // usageTracker is assigned below; getUsageSources reads the live ref.
-  let usageTracker: UsageTracker | null = null;
   function applyUsageEnabled(next: SettingsState): void {
     usageTracker?.setEnabledSources({
       claude: next.claudeEnabled,
@@ -259,33 +272,23 @@ app.whenReady().then(async () => {
       stateDir,
       keychainService,
       getSettings: () => growthSettings,
+      getXpState: () => {
+        const state = xpEngine.getState();
+        return {
+          xp: state.xp,
+          level: state.level,
+          stage: state.stage,
+          currentLevelXp: xpForLevel(state.level),
+          nextLevelXp: xpForLevel(state.level + 1),
+          lastSeenByModel: xpEngine.getLastSeenByModel(),
+        };
+      },
       onSettingsChanged: (next) => {
         growthSettings = next;
         xpEngine.setMode(growthSettings.mode);
         applyUsageEnabled(growthSettings);
         tray.refresh();
         if (growthSettings.mode === 'mrr' && mrrPollNowOnModeSwitch) void mrrEngine.pollNow();
-      },
-      onProgressReset: async () => {
-        // Persist before send: same exactly-once discipline as the launch
-        // hatch path — a kill mid-hatch must not re-hatch on next launch.
-        await saveOnboardingState(stateDir, { hatched: true });
-        // Hatch before the pet update, same ordering invariant as
-        // did-finish-load (the renderer suppresses evolution handling while
-        // a hatch is active).
-        mainWindow?.webContents.send(HATCH_START_CHANNEL);
-        // Emits the pet update through the onUpdate wiring above, which
-        // does tray.refresh() + PET_CHANGED — nothing else to notify.
-        try {
-          await xpEngine.resetProgress();
-        } catch {
-          // Persist failure (e.g. Windows transient rename lock from AV):
-          // the hatch already started, but the XP state did not actually
-          // change. Resync the renderer with the real current state so it
-          // does not stay stuck on a false reset.
-          const lastUpdate = xpEngine.getLastUpdate();
-          mainWindow?.webContents.send(PET_CHANGED_CHANNEL, lastUpdate);
-        }
       },
       onForceWork: () => {
         mainWindow?.webContents.send(FORCE_WORK_CHANNEL);
@@ -347,23 +350,14 @@ app.whenReady().then(async () => {
     await xpEngine.injectXp(injectXpAmount);
   }
 
-  const usageTrackerInstance = new UsageTracker();
-  usageTracker = usageTrackerInstance;
-  usageTrackerInstance.setEnabledSources({
-    claude: growthSettings.claudeEnabled,
-    codex: growthSettings.codexEnabled,
-    pi: growthSettings.piEnabled ?? false,
-    kimi: growthSettings.kimiEnabled ?? false,
-    opencode: growthSettings.opencodeEnabled ?? false,
-  });
-  usageTrackerInstance.start();
-  await xpEngine.attachTracker(usageTrackerInstance);
+  usageTracker.start();
+  await xpEngine.attachTracker(usageTracker);
 
   // codingSession/spend-tier/idle detection rides the tracker's own refresh
   // cadence via onTick (fires whether usage changed or not — idle detection
   // needs the zero-delta ticks too) rather than a second polling loop.
   let detectorState = createDetectorState();
-  usageTrackerInstance.onTick((totals) => {
+  usageTracker.onTick((totals) => {
     const nowMs = Date.now();
     const result = detectEvents(detectorState, {
       nowMs,

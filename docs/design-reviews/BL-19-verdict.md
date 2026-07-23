@@ -101,8 +101,8 @@ matches.)
 ## Manual trigger (settings button)
 
 A **"Make the beaver work 💻"** button in the settings Pet section triggers the
-working state on demand (testing + a fun manual control). It reuses the exact
-reset-progress IPC path: `beaverBuddySettings.forceWork()` invoke →
+working state on demand (testing + a fun manual control). It uses the
+`force-work` IPC path: `beaverBuddySettings.forceWork()` invoke →
 `SETTINGS_FORCE_WORK_CHANNEL` handler (sender-guarded) →
 `main` forwards `FORCE_WORK_CHANNEL` to the overlay → renderer sets a
 `pendingForceWork` flag → `forceWorking(roamState, bounds, rng)` on the next

@@ -1,53 +1,86 @@
 // Atomic JSON persistence for XP state in the app's single state directory
 // (CLAUDE.md: one app-support dir; deleting it = factory reset). Missing or
-// corrupt file is treated as fresh state — never crashes the app.
+// corrupt file is treated as fresh v2 state — never crashes the app.
+//
+// v2 stores per-model forward-only cursors so log rotation and cache tokens
+// can never pollute the delta calculation. v1 files (lastSeenLifetimeTokens,
+// no schemaVersion) are loaded as a migration sentinel and then rewritten by
+// migrate.ts.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { atomicWriteFile } from '../atomic-file';
 
-export interface XpState {
+export interface XpStateV2 {
   readonly xp: number;
-  readonly lastSeenLifetimeTokens: number;
+  readonly lastSeenByModel: Record<string, number>;
   // Local date ("YYYY-MM-DD") the MRR growth mode last awarded XP, or null
   // if it never has. Persists across mode switches so tokens<->mrr can
   // never re-award the same day's MRR twice (see mrr-engine.ts).
   readonly lastMrrAwardDate: string | null;
+  readonly schemaVersion: 2;
 }
+
+// Loader-internal sentinel for a pre-v2 file that needs migration.
+export interface XpStateV1 {
+  readonly xp: number;
+  readonly lastSeenLifetimeTokens: number;
+  readonly lastMrrAwardDate: string | null;
+  readonly schemaVersion: 1;
+}
+
+export type XpState = XpStateV2 | XpStateV1;
 
 const FILE_NAME = 'xp-state.json';
 
-function freshState(): XpState {
-  return { xp: 0, lastSeenLifetimeTokens: 0, lastMrrAwardDate: null };
+function freshV2State(): XpStateV2 {
+  return { xp: 0, lastSeenByModel: {}, lastMrrAwardDate: null, schemaVersion: 2 };
 }
 
-// Old files predate lastMrrAwardDate; missing means "never awarded", not
-// "invalid" — the field is optional on read and always written back below.
-function isValidState(value: unknown): value is Omit<XpState, 'lastMrrAwardDate'> & { lastMrrAwardDate?: string | null } {
+function isXpStateV2(value: unknown): value is XpStateV2 {
   if (typeof value !== 'object' || value === null) return false;
-  const { xp, lastSeenLifetimeTokens, lastMrrAwardDate } = value as Record<string, unknown>;
-  return (
-    typeof xp === 'number' &&
-    Number.isFinite(xp) &&
-    xp >= 0 &&
-    typeof lastSeenLifetimeTokens === 'number' &&
-    Number.isFinite(lastSeenLifetimeTokens) &&
-    lastSeenLifetimeTokens >= 0 &&
-    (lastMrrAwardDate === undefined || lastMrrAwardDate === null || typeof lastMrrAwardDate === 'string')
-  );
+  const record = value as Record<string, unknown>;
+  if (record.schemaVersion !== 2) return false;
+  if (typeof record.xp !== 'number' || !Number.isFinite(record.xp) || record.xp < 0) return false;
+  if (typeof record.lastMrrAwardDate !== 'string' && record.lastMrrAwardDate !== null) return false;
+  if (typeof record.lastSeenByModel !== 'object' || record.lastSeenByModel === null) return false;
+  for (const cursor of Object.values(record.lastSeenByModel)) {
+    if (typeof cursor !== 'number' || !Number.isFinite(cursor) || cursor < 0) return false;
+  }
+  return true;
+}
+
+function isXpStateV1(value: unknown): value is Omit<XpStateV1, 'schemaVersion'> & { schemaVersion?: number } {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  // v1 files have no schemaVersion (or a non-2 value) and carry the old
+  // single cursor. They must be migrated before the engine can ingest deltas.
+  if (record.schemaVersion === 2) return false;
+  if (typeof record.xp !== 'number' || !Number.isFinite(record.xp) || record.xp < 0) return false;
+  if (typeof record.lastSeenLifetimeTokens !== 'number' || !Number.isFinite(record.lastSeenLifetimeTokens) || record.lastSeenLifetimeTokens < 0) return false;
+  if (record.lastMrrAwardDate !== undefined && record.lastMrrAwardDate !== null && typeof record.lastMrrAwardDate !== 'string') return false;
+  return true;
 }
 
 export function loadState(stateDir: string): XpState {
   const filePath = path.join(stateDir, FILE_NAME);
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    if (!isValidState(parsed)) return freshState();
-    return { xp: parsed.xp, lastSeenLifetimeTokens: parsed.lastSeenLifetimeTokens, lastMrrAwardDate: parsed.lastMrrAwardDate ?? null };
+    if (isXpStateV2(parsed)) return parsed;
+    if (isXpStateV1(parsed)) {
+      return {
+        xp: parsed.xp,
+        lastSeenLifetimeTokens: parsed.lastSeenLifetimeTokens,
+        lastMrrAwardDate: parsed.lastMrrAwardDate ?? null,
+        schemaVersion: 1,
+      };
+    }
+    return freshV2State();
   } catch {
-    return freshState();
+    return freshV2State();
   }
 }
 
-export async function saveState(stateDir: string, state: XpState): Promise<void> {
+export async function saveState(stateDir: string, state: XpStateV2): Promise<void> {
   await atomicWriteFile(stateDir, FILE_NAME, JSON.stringify(state));
 }

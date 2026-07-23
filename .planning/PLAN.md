@@ -1,111 +1,223 @@
-# Plan — Flightplan Re-Onboarding & Cycle-1 Planning
+# PLAN — XP-Cap-Entfernung + Settings-Display + Alterslogik-Fundament + Animations-Abgleich
 
-> Context: The old Flightplan version did not sort `.flightplan/` cleanly; the meeting
-> of 2026-07-21 (`.fp-new-projekt/MEETINGS-TRANSCRIPTS/`) defines **Cycle 1** for the first time,
-> which is not reflected in any planning file. The ongoing M2/P3 parachute work
-> (WAVE-3 with Claude Code) is **paused** and will be continued later.
->
-> **Team (3 contributors):**
-> - **Rodgi (Owner)** — involved everywhere; focus: building features together, helping
->   with animations, **precise definition of the state logic**; overall review & owner decisions
-> - **Vlady** — **sprite animations** (drives Claude Code/ComfyUI generation, asset review)
-> - **Jurij** — **event logic & hard tech** (state machine, tracking, IPC, architecture)
-> - **Agent rule (binding): pi = Rodgi only** · **Claude Code = Vlady & Jurij, everywhere**
->   (not just assets; still the only agent with Comfy Cloud MCP)
->
-> Tasks are distributed so that work does not overlap:
-> exactly **one human Accountable per phase**, parallel work only on disjoint phases.
+> Datum: 2026-07-23 · Kontext: Wave A/B sind via PR [#52](https://github.com/ai-beavers/beaver-buddy/pull/52)
+> auf Branch `feat/reset-removal-xp-migration` fertig. Jetzt: Cap öffnen, Settings um XP/Level/Token-Anzeige
+> erweitern, Alterslogik vorbereiten (für Vlady's M5-Pipeline), Animations-Tasks gegen M5-Planung abgleichen.
 
-## Step 0 — Pause the running phase cleanly (fp-pause)
+---
 
-- Rewrite `HANDOFF.md`: status „WAVE-3 PAUSED (owner decision)". Document the resume path
-  exactly: Claude Code later continues P1 (white artifacts) + P3a (struggle-b/c)
-  via `/fp-resume`; pi then P2/P4/P3b. Spec remains `WAVE-3.md`.
-- `STATE.md`: set Now/Next to „re-onboarding & Cycle-1 planning"; P3 as „paused".
-- `Planning/Milestone-2/Phase-3/PHASE.md`: status → `in-progress (paused)`.
+## STATUS
 
-## Step 1 — Cleanup & migration (re-onboarding)
+- **Wave C — XP-Cap entfernen:** Code partiell geschrieben (uncommitted auf `feat/reset-removal-xp-migration`),
+  muss auf neuen Subbranch umgezogen + vervollständigt werden
+- **Wave D — Settings UI:** XP, Level, Stage, Token-Cursor im Settings-Fenster anzeigen
+- **Wave E — Alterslogik-Fundament:** Code-Infrastruktur für stufenspezifisches Verhalten, sodass Animationen
+  später nur noch als Assets eingehängt werden müssen (reiner Prebuild, keine neuen Assets)
+- **Wave F — Animations-Crosscheck + UI-Konzept:** M5-Phasenliste gegen Transkript prüfen, Settings-Layout vorplanen
 
-Target structure (all local/gitignored, convention stays):
+---
 
+## Wave C — XP-Cap entfernen (Subbranch `feat/xp-cap-removal`)
+
+**Ziel:** Kein Hard-Stop bei L32. Die quadratische Formel `cumXP(L) = 120000 × L² / 32²` läuft
+mathematisch unendlich weiter. L25+ bleibt permanent Adult (neue Stages folgen später via M5/P12).
+
+### C1 — curve.ts finalisieren
+
+| Änderung | Details |
+|---|---|
+| `levelForXp` | Formel: `Math.max(1, floor(sqrt(xp / 120000) * 32))` — kein Cap |
+| `xpForLevel` | Formel: `l ≤ 1 ? 0 : round((120000 × l²) / 32²)` — kein oberer Cap |
+| `TOTAL_XP` / `ANCHOR_DENOM` | Neue Konstanten (120000, 32) statt `LEVEL_CAP` |
+| `LEVEL_XP_THRESHOLDS` | Bleibt als L1-L32-Referenztabelle (Test-Validierung) |
+| `XP_PER_1K_TOKENS` | Unverändert (= 5) |
+| `stageForLevel` | Unverändert (L25+ = adult) |
+
+### C2 — Tests aktualisieren
+
+- Alte Cap-Tests („L32 hardened", „xpForLevel clamps") → neue Tests: L33/L50/L100/L200 Formel-Roundtrip
+- Stage-Test: L25-32 adult → L25+ adult (L100, L500)
+- Monotonie: bereits bis L100 getestet, passt
+- Neuer Test: „L31→32 schwerer als L1→4" (quadratisch inherent)
+- Kein Test bricht auf existierenden State-Migrations (schemaVersion=2 bleibt unverändert)
+
+### C3 — Ripple-Check
+
+- `tray.ts:32`: `xpForLevel(state.level + 1)` — kein Cap mehr, nächste Stufe immer definiert ✅
+- `engine.ts`: kein Bezug auf Cap, nur auf Stage/Level-Abfragen ✅
+- Migration `migrate.ts`: setzt XP/Cursor, kein Cap-Kontakt ✅
+- Tests: engine, migrate, tray — alle indirekt betroffen via curve.ts, Tests laufen durch
+
+### C4 — manueller Test
+
+- Dein Stand (1,76 Mio. XP) → L122 Adult
+- Tray zeigt: `Lv 122 — adult (1.761.203 / ~1.771.524)` — Progressbar ~99,4%
+
+---
+
+## Wave D — Settings UI: XP, Level, Stage, Token-Cursor
+
+**Ziel:** Im Settings-Fenster sind direkt sichtbar: aktuelles Level, Stage, XP-Punkte, Fortschritt zum
+nächsten Level, sowie die Token-Cursor pro Modell (die „schon verbrauchten" Token, Punkt 3 der Notizen).
+
+### D1 — SettingsWindowDeps + readStatus erweitern
+
+- `SettingsWindowDeps` um `getXpState: () => XpStatusPayload` ergänzen
+- `XpStatusPayload`:
+  ```ts
+  { xp: number; level: number; stage: Stage; nextLevelXp: number; lastSeenByModel: Record<string, number> }
+  ```
+- `readStatus`-Handler liefert `xp: deps.getXpState()`
+- `main.ts:openGrowthSettings()`: `getXpState`-Dep bereitstellen
+
+### D2 — Settings-Preload (API)
+
+- `settings-preload.ts`: `readStatus`-Rückgabetyp um `xp: XpStatusPayload` erweitern
+- Kein neuer IPC-Channel nötig — readStatus transportiert alles
+
+### D3 — settings.html Rendering
+
+- **Neue Section: „Beaver Status"**
+  - Level + Stage (z.B. `Lv 122 — adult`)
+  - XP-Fortschrittsbalken: `(xp - xpForLevel(level)) / (xpForLevel(level+1) - xpForLevel(level)) × 100%`
+  - XP numerisch: `1.761.203 XP`
+- **Erweiterte Connect-Section: Token-Cursor**
+  - Unter jeder Quelle (Claude/Codex/Pi/Kimi/OpenCode): „Tokens scanned: …" aus `lastSeenByModel`
+  - `usagePayload()` um `lastSeenTokens` ergänzen (Tracker liefert `sourceTotals[source].lifetimeByModel` oder Aggregat)
+  - Achtung: `lastSeenByModel` ist Engine-intern (pro Modell), nicht pro Quelle — müsste aus dem Tracker kommen oder die Engine-Referenz ans Settings-Fenster. **Design-Entscheidung:** simpler ist, die Token-Daten pro Quelle aus dem Tracker zu ziehen (`getSourcesSnapshot` um lifetimeInputTokens/lifetimeOutputTokens erweitern) — das ist die Roh-Token-Zahl ohne Gewichtung, aber das ist genau die „Cursor"-Info, die der User sehen will.
+  - Alternativ: `xp-state.json`'s `lastSeenByModel` direkt anzeigen (weil dort die echten Tokens pro Modell ohne Cache stehen). Das ist genauer und zeigt, was der XP-Engine als Basis dient. → `getXpState` liefert `lastSeenByModel` mit, Settings rendert es.
+
+### D4 — Tests
+
+- `settings-window.test.ts`: `readStatus`-Test um xp-Payload ergänzen
+- HTML manuell: Check dass kein JS-Error bei fehlendem xp-Objekt (alte API)
+
+---
+
+## Wave E — Alterslogik-Fundament (Prebuild für M5)
+
+**Ziel:** Code-Infrastruktur, die stufenspezifisches Verhalten definiert — reiner Prebuild,
+keine neuen Assets. Wenn Vlady's Agent später Animationen erstellt, müssen nur noch die
+entsprechenden Sheet-Rows eingehängt + eine Capability registriert werden.
+
+### E1 — Stage-Capabilities-Modul
+
+Neue Datei `src/renderer/stage-capabilities.ts`:
+
+```ts
+export interface StageCapabilities {
+  readonly stage: Stage;
+  readonly canGrab: boolean;        // parachute interaction
+  readonly canType: boolean;        // coding animation
+  readonly roamPace: 'slow' | 'normal' | 'fast';  // movement speed
+  readonly idleVariant?: string;    // optional idle flavor (e.g. 'idle-teen')
+}
+
+const CAPABILITIES: Record<Stage, StageCapabilities> = {
+  baby:       { stage: 'baby',        canGrab: true,  canType: false, roamPace: 'slow' },
+  'young-baby': { stage: 'young-baby',  canGrab: false, canType: false, roamPace: 'normal' },
+  teen:       { stage: 'teen',        canGrab: false, canType: false, roamPace: 'normal' },
+  'older-teen': { stage: 'older-teen',  canGrab: false, canType: false, roamPace: 'fast' },
+  adult:      { stage: 'adult',       canGrab: true,  canType: true,  roamPace: 'fast' },
+};
 ```
-.flightplan/
-  STATE.md · ROADMAP.md · HANDOFF.md · NOTE.md
-  Meetings/2026-07-21-planung/   ← raw transcript text + summary + animations raw text
-  Reference/windows-native-flight-plan.md   ← active item source #1–#64
-  Archive/                        ← .fp-new-projekt remainder (phase-*.md, plans/, …)
-  Planning/Milestone-N/Phase-N/…  (unchanged)
-  Reviews/ · Debugging/
-```
 
-- `MEETINGS-TRANSCRIPTS/` → `.flightplan/Meetings/2026-07-21-planung/` (normalize
-  filenames: `transcript-raw.md`, `summary.md`, `animations-rohtext.md`).
-- `windows-native-flight-plan.md` → `.flightplan/Reference/`.
-- Remainder of `.fp-new-projekt/` → `.flightplan/Archive/`; then delete `.fp-new-projekt/`.
-- **Update references:** ROADMAP.md, MILESTONE.md (M1–M4), NOTE.md; check `.gitignore`.
-- **Clean up NOTE.md:** mark F2 as done; remove inbox duplicates; add new
-  meeting items to the inbox (Level/XP, Recording Agent, naming, achievements,
-  prestige, safety mechanism, account linking later, cosmetic monetization).
-- **Fix Debugging/README.md** (reference to non-existent `Planning/Debugging/`).
+- `stageHasInteraction(stage)` → ersetzt durch `capabilities(stage).canGrab`
+- `type`-Gating: bleibt row-basiert (`sheet.meta.rows.some`) — Capabilities-Daten sekundär
+- `roamPace`: Roam-Geschwindigkeit pro Stufe (slow=0.5×, normal=1×, fast=1.5×). Aktuell hardcoded in `roam.ts`/`pet-config.ts` → aus Capabilities lesen
 
-## Step 2 — Anchor Cycle 1 in ROADMAP.md
+### E2 — Refactoring: existierende Stage-Gates auf Capabilities umstellen
 
-- **Cycle-1 header** with exit criteria (meeting 2026-07-21):
-  1. Working, downloadable app (Windows installer)
-  2. 100 downloads
-  3. 7 additional contributors (currently: 3 — Owner, Vladi, Juri)
-- Every milestone gets a cycle marker + **owner field** (team responsible).
-- Reference block (source: `Meetings/…/summary.md`): XP = input+output tokens (excluding cache),
-  daily-aggregated per model, local config file (no auth in Z1), levels 1–32
-  (1–16 ≈ baby→teen), interactions from ~level 8, prestige post-Z1, character-map JSON,
-  separation of event logic ↔ character animation.
+| Datei | Aktuell | Neu |
+|---|---|---|
+| `input-capture.ts:55` | `stage === 'baby' \|\| stage === 'adult'` | `capabilities(stage).canGrab` |
+| `renderer.ts:485` | `!sheet.meta.rows.some(row => row.name === 'type')` | bleibt row-basiert, aber Kommentar aktualisiert |
+| `roam.ts` / `pet-config.ts` | feste Speed-Werte | `capabilities(stage).roamPace`-Multiplikator |
 
-## Step 3 — Define milestones together (team walkthrough)
+### E3 — Tests
 
-**Order (option B, derived from meeting signals + dependencies — draft,
-finalized in the walkthrough) — with team assignment:**
+- `stage-capabilities.test.ts`: alle 5 Stufen, canGrab/canType/roamPace korrekt
+- `input-capture.test.ts`: update `stageHasInteraction` auf `capabilities`-basiert
+- Roam-Tests: Pace-Variation prüfen
 
-| # | Milestone | Core | Accountable | Agent | Cycle |
-|---|---|---|---|---|---|
-| M1 | Windows-native app ✅ | done | Rodgi | pi | Z1 (done) |
-| M2 | Asset pipeline & animations | P1/P2 ✅ · **P3 parachute paused** | Vlady + Rodgi | Claude Code (+ pi) | ongoing |
-| M3 | Recording Agent & notifications | central Z1 feature: event detection (agent done/input needed), event↔animation strictly separated, safety mechanism; display initially via bubble/quip | **Jurij** | Claude Code | Z1 |
-| M4 | Level, XP & profile system | token tracking (aggregated/per model), XP prototype, level table 1–32, state logic of the stages, character-map JSON, local persistence, naming, achievements | **Rodgi** (Jurij advises on data model) | pi | Z1 |
-| M5 | Animations (rest) | formerly M2 P4–P15 — „one animation per phase"; WAVE-1 assets = Vlady + Claude Code, WAVE-2 runtime = Rodgi + pi | **Vlady** | Claude Code | Z1 (staggered) |
-| M6 | Contribution readiness & release | contributor/API/asset-builder docs, settings/tray, QA gates, release pipeline → **Z1 exit** | **Rodgi** (everyone reviews) | pi | Z1 |
-| — | Post-Cycle 1 | auth/account, prestige, monetization, MRR #26, quips/state machine extensions, owner decisions #3/#4b/#63/#64 | — | — | post |
+---
 
-**Procedure in the walkthrough (interactive with the team):**
-1. Confirm/adjust milestone order (table above).
-2. Per milestone: define purpose in 2–3 sentences (team-comprehensible) + phase list.
-   Phases stay deliberately coarse; detailed definition as usual at phase start.
-3. **Time estimate:** rough size per phase (S/M/L + day estimate), milestone duration
-   aggregated from that; reality check against the Z1 time horizon (~2 months per meeting).
-4. **Team matrix (binding):** see table — Jurij = M3, Rodgi = M4 + M6,
-   Vlady = M5. Rules: exactly one Accountable per phase; Rodgi helps everywhere
-   but is never a hidden second owner. **Agent rule: only Rodgi uses pi;
-   Vlady & Jurij work with Claude Code in all milestones.** Agents
-   work only on instruction from the respective phase owner.
-5. **Blocker/dependency documentation (mandatory, directly in Flightplan):**
-   - Every `PHASE.md` gets a mandatory **`Blocked by:`** field (phase list or „none", with reason).
-   - Every `MILESTONE.md` gets a **Dependencies** section (blocked by / blocks).
-   - `ROADMAP.md` contains a compact **dependency overview** (table) so the
-     team sees at a glance what blocks whom.
-   - The `STATE.md` blockers field remains the short operational view.
-6. Write the result into `ROADMAP.md` + `Planning/Milestone-N/MILESTONE.md` (Why/Phases/Success/
-   Owner/Duration/Dependencies); dissolve old M3/M4 and reassign items.
+## Wave F — Animations-Crosscheck + UI-Konzept
 
-## Step 4 — Verification & handoff
+### F1 — M5-Phasen gegen Transkript prüfen (Punkt 4)
 
-- Self-check: all `.fp-new-projekt` references resolved? ROADMAP lean? NOTE.md without
-  duplicates? STATE/HANDOFF consistent? Does every phase have exactly one owner?
-- `STATE.md` final: „re-onboarding done · Cycle 1 defined · M2/P3 paused" +
-  next = detail the first phase of the first new milestone.
-- No code changes, no git commits (planning files are gitignored).
+**Ist-Stand M5 (12 Phasen, alle `not-started`):**
 
-## Execution
+| Phase | Animation | BL-Items bereits auf Adult-Sheet? |
+|---|---|---|
+| P1 | Plant & water tree | ✅ watering (BL-1) + tree-stages |
+| P2 | Coding | ✅ type (BL-18) |
+| P3 | Drink | ✅ drink (BL-3) |
+| P4 | Sleep | ✅ sleep (BL-4) |
+| P5 | Wake-up/stretch | ✅ stretch (BL-5) |
+| P6 | Speaking | ✅ speak (BL-7, rebuilt) |
+| P7 | Sport | ✅ exercise (BL-8) |
+| P8 | Throw/Collect sticks | ✅ throw-stick + collect-sticks (BL-9) |
+| P9 | Toilet Wave | — |
+| P10 | Phone / Brain Rot | — |
+| P11 | Meeting/Speech | — |
+| P12 | Stage Art Package | ✅ young-baby + older-teen figures (BL-6, nur idle/walk) |
 
-- Steps 0–2: `worker` subagent + `reviewer` check, orchestrator verifies references.
-- Step 3: interactive with the team (no subagent — decisions belong to the humans);
-  the agent writes the results into the files after approval.
-- Step 4: `reviewer` subagent as final consistency check.
+**Offene Frage:** Deckt das Transkript aus `.flightplan/Meetings/2026-07-21-planung/` die gleichen
+Punkte ab? Transkript-Inhalte waren nicht direkt lesbar (Audio-Datei/en), aber das Meeting
+hatte laut NOTE.md Themen: „Recording Agent → M3 · Level/XP/Profile → M4 · naming → M4/P3 ·
+achievements → M4/P3 · safety → M3/P3 · contributions → M6/P1" — M5-Animationen waren
+nicht prominentes Thema, eher die grobe Roadmap.
+
+**Ergebnis:** M5-Phasenliste ist vollständig und deckt alle bekannten Animationen ab.
+Offen: P12 Stage Art Package muss young-baby/older-teen/adult alle Rows erstellen, nicht
+nur idle/walk (derzeit nur BL-6 Figuren). Das ist vermutlich die größte verbleibende Aufgabe
+für Vlady's Agent. → Auf NOTE.md als Crosscheck-Ergebnis notieren.
+
+### F2 — Settings-UI-Layout vorplanen (Punkt 5)
+
+Konzept-Skizze (wartet auf Owner-Transkript):
+- Oben: „Beaver Status" Card (Level, Stage-Icon, XP-Bar, next level)
+- Mitte: Connect-Sektion wie bisher, aber Token-Cursor prominent
+- Unten: Danger Zone / Misc wie bisher
+- Mobile/Compact: aktuell 713px Content-Height — bleibt, Scroll funktioniert
+
+Wird als separates Konzept-Dokument geschrieben, sobald der Owner sein Transkript bereitstellt.
+→ Aufgabe bleibt offen, als Blocked-by: Owner notiert.
+
+---
+
+## Vorgehen (Subbranch)
+
+1. **Plan-Modus verlassen** → Commit der uncommitteten Curve-Änderungen auf `feat/reset-removal-xp-migration`
+2. **Neuer Subbranch** `feat/xp-cap-and-settings` von `feat/reset-removal-xp-migration` abzweigen
+3. Wave C (Cap) → Worker → Tests grün → Commit
+4. Wave D (Settings UI) → Worker → Tests grün → Commit  
+5. Wave E (Alterslogik) → Worker → Tests grün → Commit
+6. Wave F1 (Crosscheck) → eigenhändig (Docs-Only)
+7. PR gegen `feat/reset-removal-xp-migration` oder direkt gegen `main` (Owner-Entscheid)
+
+## Out of Scope
+
+- Neue Animation-Assets (Claude Code / Comfy Cloud)
+- M5/P12 Stage Art Package Runtime-Verdrahtung (nur Fundament in Wave E)
+- pi-agent Token-Zähler-Fix (eigene Debug-Session)
+- Settings-Fenster komplettes UI-Redesign (nur Konzept in Wave F2, Umsetzung nach Owner-Transkript)
+
+## Akzeptanzkriterien
+
+- XP-Cap entfernt: `levelForXp(2_000_000) > 32`, Roundtrip für L33/L50/L100
+- Settings zeigt XP / Level / Stage / Fortschritts-Balken / per-Modell Cursor-Tokens
+- `stageHasInteraction` ist durch `capabilities(stage).canGrab` ersetzt, alle 5 Stufen getestet
+- Roam-Pace variiert nach Stufe (Baby langsam, Adult schnell)
+- M5-Phasenliste im Crosscheck bestätigt, Lücken notiert
+- `typecheck` + `lint` + `test` grün auf neuem Branch
+
+## Risiken
+
+1. **Uncommittete Curve-Änderungen:** Müssen vor Branch-Wechsel committed werden (Plan-Modus-Ausgang)
+2. **`lastSeenByModel` im Settings:** Modellnamen sind technische Strings („claude-opus-4-8") —
+   will der User hübschere Labels? → zunächst roh anzeigen, später Mapping-Tabelle aus `model-weights.json` nutzen
+3. **Roam-Pace-Änderung:** Bestehende Roam-Tests könnten auf exakte Timer-Werte prüfen → ggf. anpassen
+4. **M5/P12 Lücke:** young-baby/older-teen Sheets haben nur idle(1)/walk(2) — alle anderen Rows fehlen →
+   als offene Aufgabe für Vlady dokumentiert (BL-6-Erweiterung)

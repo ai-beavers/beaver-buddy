@@ -45,4 +45,11 @@ for (const { src, dst } of assets) {
 // Copy sprites recursively.
 copyDir(spritesSrc, spritesDst);
 
+// Copy JSON data tables used by the main process. TypeScript imports them at
+// compile time, but tsc only emits .js/.ts files, so the runtime source must
+// be copied alongside the compiled output.
+const xpWeightsSrc = path.join(root, 'src', 'main', 'xp', 'model-weights.json');
+const xpWeightsDst = path.join(root, 'dist', 'main', 'xp', 'model-weights.json');
+copyFile(xpWeightsSrc, xpWeightsDst);
+
 console.log('Assets built successfully.');

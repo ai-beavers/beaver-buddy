@@ -224,10 +224,9 @@ baby sprite below it — bubble layout math (`layoutBubble`) is parameterized
 off the drawn tile size (`sheet.meta.tile * PET_SCALE`), so it holds
 automatically at the new 96px size; visually confirmed, not just inferred.
 
-### Hatch still plays, lodge + idle-frame baby-appear (`--reset-hatch`)
+### Hatch still plays, lodge + idle-frame baby-appear (replay via `onboarding-state.json` deletion)
 
-Third isolated launch (no `hatched` pre-seed override needed —
-`--reset-hatch` forces the sequence regardless). Full phase sequence
+Third isolated launch (no `hatched` pre-seed override needed — the sequence was forced by deleting `onboarding-state.json` first). Full phase sequence
 observed via `__debugHatch` polling: **`lodge-idle → shake → burst →
 baby-appear → done`** — the complete sequence, lodge art untouched and
 still playing correctly at its `LODGE_SCALE`-scaled 96px on-screen size.

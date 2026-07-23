@@ -22,7 +22,6 @@ export const FORCE_WORK_CHANNEL = 'state:force-work';
 export const SETTINGS_SAVE_CHANNEL = 'settings:save';
 export const SETTINGS_READ_STATUS_CHANNEL = 'settings:read-status';
 export const SETTINGS_DISCONNECT_CHANNEL = 'settings:disconnect';
-export const SETTINGS_RESET_PROGRESS_CHANNEL = 'settings:reset-progress';
 // Settings-window-only: re-scan local Claude Code / Codex usage logs
 // (booleans only — never paths). "Connect" = detect logs on this machine.
 export const SETTINGS_CONNECT_USAGE_CHANNEL = 'settings:connect-usage';

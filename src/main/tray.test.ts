@@ -88,11 +88,16 @@ function withPlatform(platform: string, fn: () => void): void {
 
 describe('formatPetLabel', () => {
   it('formats level, stage, and progress toward the next level', () => {
-    expect(formatPetLabel({ level: 15, stage: 'baby', xp: 1400 })).toBe('Lv 15 — baby (1400/1500)');
+    expect(formatPetLabel({ level: 15, stage: 'baby', xp: 1400 })).toBe('Lv 15 — baby (1400/30000)');
   });
 
   it('floors fractional xp for display', () => {
-    expect(formatPetLabel({ level: 16, stage: 'teen', xp: 1523.7 })).toBe('Lv 16 — teen (1523/1600)');
+    expect(formatPetLabel({ level: 16, stage: 'teen', xp: 1523.7 })).toBe('Lv 16 — teen (1523/33867)');
+  });
+
+  it('pretty-prints the two hyphenated stages', () => {
+    expect(formatPetLabel({ level: 6, stage: 'young-baby', xp: 0 })).toBe('Lv 6 — young baby (0/5742)');
+    expect(formatPetLabel({ level: 18, stage: 'older-teen', xp: 0 })).toBe('Lv 18 — older teen (0/42305)');
   });
 });
 

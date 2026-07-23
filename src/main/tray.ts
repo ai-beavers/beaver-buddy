@@ -20,9 +20,17 @@ export interface TrayCallbacks {
   onOpenConnect: () => void;
 }
 
+const STAGE_LABELS: Record<Stage, string> = {
+  baby: 'baby',
+  'young-baby': 'young baby',
+  teen: 'teen',
+  'older-teen': 'older teen',
+  adult: 'adult',
+};
+
 export function formatPetLabel(state: { readonly level: number; readonly stage: Stage; readonly xp: number }): string {
   const nextLevelXp = xpForLevel(state.level + 1);
-  return `Lv ${state.level} — ${state.stage} (${Math.floor(state.xp)}/${nextLevelXp})`;
+  return `Lv ${state.level} — ${STAGE_LABELS[state.stage]} (${Math.floor(state.xp)}/${nextLevelXp})`;
 }
 
 // Pure menu-shape builder — no Electron Menu/Tray construction, so it is

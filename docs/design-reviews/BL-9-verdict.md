@@ -73,7 +73,7 @@ compiled JS path directly — `app.getAppPath()` needs the app root for
 `loadFile` to resolve correctly) with
 `--keychain-service beaver-buddy-qa-<random>` (a fresh random suffix
 each run — never the real `beaver-buddy` service),
-`--mrr-poll-now --debug-tray-menu --open-growth-settings --reset-hatch`.
+`--mrr-poll-now --debug-tray-menu --open-growth-settings` (hatch replayed by deleting `onboarding-state.json`).
 A throwaway Node 24 script (not part of the repo) drove the settings
 window over CDP (`Runtime.evaluate` to fill the key field and click
 Save/the MRR radio, `Page.captureScreenshot` for the capture), while
@@ -252,7 +252,7 @@ oversize/garbage payloads, multi-page Stripe pagination, etc.).
    introspection or debug hook" as the intended mechanism for tray-state
    evidence — a native Tray context menu has no other external readback,
    and a native menu item can't be clicked via CDP at all, so a
-   scriptable flag (same family as `--quip`/`--inject-xp`/`--reset-hatch`)
+   scriptable flag (same family as `--quip`/`--inject-xp`; the former `--reset-hatch` flag was removed — replay the hatch by deleting `onboarding-state.json`).
    is the only way to both observe and drive it non-interactively.
 2. **`MRR_XP_PER_DOLLAR = 10`**: the plan doesn't pin a conversion rate,
    only "floor(mrr_dollars × rate)". Picked a round, clearly-a-placeholder
