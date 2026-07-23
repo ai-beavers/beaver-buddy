@@ -220,17 +220,6 @@ fixed or documented as known limitations.
   100 % and at least one HiDPI scaling (preferably 200 %). Automated packaging
   (`electron-builder --win`) is required, but cannot replace the visual gate.
 
-## Agent hygiene
-
-- **Never `taskkill /f /im electron.exe` globally** — the dev machine runs multiple
-  Electron apps (UltraWhisperFlow etc.). Always filter by the beaver-buddy path:
-  ```powershell
-  Get-CimInstance Win32_Process -Filter "name='electron.exe'" |
-    Where-Object { $_.CommandLine -like '*beaver-buddy*' } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-  ```
-  This kills only the beaver-buddy instance and leaves other Electron apps untouched.
-
 ## Git & PRs
 
 - Never commit directly to `main`. One branch/PR per build-loop item

@@ -55,3 +55,15 @@ https://cloud.comfy.org/mcp`, then `/mcp` → Authenticate.
   propose alternatives with the existing stack, and wait for approval.
 - This applies to all agents (Codex, Kimi Code, etc.) and all subagents.
   No exceptions.
+
+## Agent hygiene — Electron process handling
+
+**Never `taskkill /f /im electron.exe` globally.** The dev machine runs multiple
+Electron apps (UltraWhisperFlow etc.). Always filter by the beaver-buddy path:
+```powershell
+Get-CimInstance Win32_Process -Filter "name='electron.exe'" |
+  Where-Object { $_.CommandLine -like '*beaver-buddy*' } |
+  ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+This kills only the beaver-buddy instance and leaves other Electron apps untouched.
+Applies to pi, Codex, Kimi Code, and all subagents.
