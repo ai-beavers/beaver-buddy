@@ -16,6 +16,7 @@ import { createPauseState, isPaused, setSystemPause, toggleManualPause, type Pau
 import { createTray, formatPetLabel } from './tray';
 import { configureAlwaysOnTop, fitWindowToWorkArea, getOverlayWindowBounds, getPrimaryWorkAreaInfo, onWorkAreaChanged, setCaptureMode, type CaptureMode } from './overlay-adapter';
 import { XpEngine, type PetUpdate } from './xp/engine';
+import { migrateIfNeeded } from './xp/migrate';
 import { UsageTracker } from './usage/tracker';
 import { todayTotalTokens } from './usage/totals';
 import { createDetectorState, detectEvents } from './quips/detectors';
@@ -222,11 +223,26 @@ app.whenReady().then(async () => {
     unsubscribeWorkArea();
   });
 
-  const xpEngine = new XpEngine(stateDir);
-
   const keychainService = parseKeychainService(process.argv);
   const mrrPollNowOnModeSwitch = hasMrrPollNowFlag(process.argv);
   let growthSettings: SettingsState = loadSettingsState(stateDir);
+
+  // Prime the usage tracker first so migration can read the latest,
+  // cache-free lifetime-by-model totals before the engine ever loads state.
+  // The tracker is created here and reused for the settings window, tray,
+  // and the engine's attach below.
+  let usageTracker: UsageTracker = new UsageTracker();
+  usageTracker.setEnabledSources({
+    claude: growthSettings.claudeEnabled,
+    codex: growthSettings.codexEnabled,
+    pi: growthSettings.piEnabled ?? false,
+    kimi: growthSettings.kimiEnabled ?? false,
+    opencode: growthSettings.opencodeEnabled ?? false,
+  });
+  usageTracker.refresh();
+  await migrateIfNeeded(stateDir, usageTracker.getTotals());
+
+  const xpEngine = new XpEngine(stateDir);
   xpEngine.setMode(growthSettings.mode);
 
   const mrrEngine = new MrrEngine({
@@ -242,8 +258,6 @@ app.whenReady().then(async () => {
   // invoke the exact same code path the tray's Connect… / Settings… clicks
   // do — a native tray menu item can't be clicked via CDP, so a
   // scriptable flag is the only way to drive it, same family as --quip.
-  // usageTracker is assigned below; getUsageSources reads the live ref.
-  let usageTracker: UsageTracker | null = null;
   function applyUsageEnabled(next: SettingsState): void {
     usageTracker?.setEnabledSources({
       claude: next.claudeEnabled,
@@ -325,23 +339,14 @@ app.whenReady().then(async () => {
     await xpEngine.injectXp(injectXpAmount);
   }
 
-  const usageTrackerInstance = new UsageTracker();
-  usageTracker = usageTrackerInstance;
-  usageTrackerInstance.setEnabledSources({
-    claude: growthSettings.claudeEnabled,
-    codex: growthSettings.codexEnabled,
-    pi: growthSettings.piEnabled ?? false,
-    kimi: growthSettings.kimiEnabled ?? false,
-    opencode: growthSettings.opencodeEnabled ?? false,
-  });
-  usageTrackerInstance.start();
-  await xpEngine.attachTracker(usageTrackerInstance);
+  usageTracker.start();
+  await xpEngine.attachTracker(usageTracker);
 
   // codingSession/spend-tier/idle detection rides the tracker's own refresh
   // cadence via onTick (fires whether usage changed or not — idle detection
   // needs the zero-delta ticks too) rather than a second polling loop.
   let detectorState = createDetectorState();
-  usageTrackerInstance.onTick((totals) => {
+  usageTracker.onTick((totals) => {
     const nowMs = Date.now();
     const result = detectEvents(detectorState, {
       nowMs,

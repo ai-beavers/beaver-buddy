@@ -49,9 +49,10 @@ export function isPointOverPet(x: number, y: number, petX: number, petY: number)
   return x >= petX && x < petX + size && y >= petY && y < petY + size;
 }
 
-// BL-17/BL-18: the parachute interaction needs struggle/parachute-wind/land
-// rows, which only baby and adult sheets ship — teen's sheet lacks them
-// (sprites.ts frameRect throws on a missing row).
+// BL-17/BL-18/Wave-B: the parachute interaction needs struggle/parachute-
+// wind/land rows. Only baby and adult ship those rows; young-baby, teen, and
+// older-teen sheets are idle/walk only, so they correctly fall through to
+// false here and stay click-through.
 export function stageHasInteraction(stage: Stage): boolean {
   return stage === 'baby' || stage === 'adult';
 }

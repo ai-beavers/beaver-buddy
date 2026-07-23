@@ -43,6 +43,11 @@ Vorhaben: „Reset Beaver XP + Hatch" vollständig aus Code/UI/Tests entfernen (
 0-XP-Befunds), einmalige idempotente Migration der `xp-state.json` mit Modellgewichtung (γ=2,
 Cache ausgeschlossen) inkl. Umstellung auf Spec-Kurve (5 Stufen), dazu Konzept für persistierten
 Tokenstand/24h-Start (Aufgabe 2). pi-agent-Zähler als offen notiert.
-Status: **Wave A implementiert** (Reset-Feature entfernt; typecheck/lint/610 Tests grün; Branch
-`feat/reset-removal-xp-migration`) · Wave B/C geplant (PLAN.md; Owner-Entscheid: Spec-Kurve +
-5 Stufen jetzt komplett)
+
+**Wave A** implementiert (PR #52: Reset-Button, IPC, Engine-Methode, --reset-hatch, allowStageSnap
+entfernt; typecheck/lint/610 Tests).
+**Wave B** implementiert (B1–B7: model-Feld + lifetimeByModel, Gewichtstabelle γ=2 REF=45, 5-Stufen-
+Kurve quadratisch 120k XP, XpState v2 mit per-Modell-Cursor, idempotente Migration schemaVersion: 2,
+Renderer 5 Stufen + stageHasInteraction korrekt + tray-Labels; typecheck/lint/647 Tests grün).
+Auf Branch `feat/reset-removal-xp-migration`, noch zu committen + pushen (PR-Update).
+**Wave C** Konzept-Doc für 24h-Start ausstehend.

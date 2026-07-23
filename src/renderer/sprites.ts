@@ -3,7 +3,7 @@
 // package.json). No sprite library (ADR 001 §Animation/roaming): plain
 // canvas drawImage with a manual frame-rect lookup.
 
-export type Stage = 'baby' | 'teen' | 'adult';
+export type Stage = 'baby' | 'young-baby' | 'teen' | 'older-teen' | 'adult';
 
 export interface SheetRow {
   readonly name: string;

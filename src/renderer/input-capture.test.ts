@@ -63,8 +63,10 @@ describe('stageHasInteraction', () => {
     expect(stageHasInteraction('adult')).toBe(true);
   });
 
-  it('is disabled for teen (its sheet lacks the rows)', () => {
+  it('is disabled for young-baby, teen, and older-teen (idle/walk only sheets)', () => {
+    expect(stageHasInteraction('young-baby')).toBe(false);
     expect(stageHasInteraction('teen')).toBe(false);
+    expect(stageHasInteraction('older-teen')).toBe(false);
   });
 });
 
