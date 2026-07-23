@@ -86,9 +86,9 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1408 sheet,
-  96×96 tiles (`exercise` and `parachute-wind` are 128px-tall rows), fps
-  hint 8
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1824 sheet,
+  96×96 tiles (`exercise`, `parachute-wind`, and `toilet` are 128px-tall rows),
+  fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
   `stretch` (8, ONE-SHOT wake-up transition, not a loop), `speak` (8,
@@ -96,22 +96,22 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   ONE-SHOT, picks up and throws a stick, settles back toward idle),
   `collect-sticks` (8, ONE-SHOT, gathers 2-3 sticks into a bundle, ends
   holding the bundle — an intentionally non-idle end pose), `exercise` (8,
-  LOOP, lifts a short log overhead like a dumbbell, two full reps)
-- **Provenance:** `idle`/`walk` are FINAL ART (BL-6/T3, replacing the
-  teen-upscale placeholder for good): reference-conditioned Comfy Cloud Nano
-  Banana Pro (`GeminiImage2Node`) generations, strictly conditioned on the
-  same adult reference image every other row below is anchored to. A prior
-  BL-18 attempt at golden idle/walk art was rejected by the owner as
-  generic/off-model and reverted to the placeholder
-  (`scripts/gen-sprites/build-adult-placeholder.ts`,
-  `npm run assets:adult-placeholder`) — root cause was insufficient reference
-  conditioning; BL-6/T3 fixed that. Ingested via
-  `scripts/gen-sprites/ingest-animation-frames.mjs adult-idle` /
-  `adult-walk` (`buildAdultRowSheet`/`spliceRow`, byte-preserving for every
-  other row) and pinned by an unconditional committed-sheet byte-pin test
-  (`ingest-animation-frames.test.ts`) so CI fails if
-  `npm run assets:adult-placeholder` is ever re-run against the committed
-  sheet — that command must NOT be re-run now that idle/walk are final (see
+  LOOP, lifts a short log overhead like a dumbbell, two full reps),
+  `brainrot` (8, LOOP, glazed phone-scroll, thumb flick), `wave` (8, LOOP,
+  friendly wave-goodbye), `flush` (8, ONE-SHOT, stylized toilet-flush gag),
+  `toilet` (8, ONE-SHOT, 128px-tall, full toilet routine — sits on a stylized
+  toilet, flushes, then a tile-scale wave sweeps toilet + beaver away)
+- **Provenance:** `idle`/`walk` are the **side-profile walk cycle + matching
+  idle** shipped through 2026-07-21, RESTORED by owner revert (2026-07-23).
+  BL-6/T3 had briefly promoted these rows to reference-conditioned Comfy Cloud
+  Nano Banana Pro (`GeminiImage2Node`) "final art" (a more front-facing idle +
+  a near-static front-facing walk), but owner review reverted both rows — the
+  front-facing walk didn't read as walking. The committed tiles are again the
+  pre-BL-6 art, pinned by an unconditional committed-sheet byte-pin test
+  (`ingest-animation-frames.test.ts`) so CI fails if a placeholder/re-bake ever
+  clobbers them; the `adult-idle`/`adult-walk` ingest configs are kept but
+  DORMANT (their Comfy source dumps are gone). Do NOT re-run
+  `npm run assets:adult-placeholder` against the committed sheet (see
   STYLE.md). `struggle`/`parachute-wind`/`land` appended via
   `scripts/gen-sprites/ingest-animation-frames.mjs adult` (`npm run
   assets:adult-anims`); `type` appended via `scripts/gen-sprites/ingest-typing.mjs`
@@ -157,7 +157,26 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   off it at the plain 96px tile undersized the standing body relative to
   idle — see STYLE.md provenance for the full scale-trap writeup and the
   generation-attempt history (a self-inflicted grid-line artifact on attempt
-  2 was corrected on attempt 3).
+  2 was corrected on attempt 3). `brainrot` (BL-11) is appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-brainrot`
+  (`npm run assets:adult-brainrot`) — a LOOP phone-scroll with glazed stare.
+  Same `partner_generate` + public raw-URL path as BL-8/BL-9; the accepted
+  4×2 grid had two slightly different body halves, so the body-consistent
+  bottom half is ping-ponged via `frameOrder` (BL-7-class mechanical fix for
+  loop seams) — see STYLE.md provenance and
+  `docs/design-reviews/BL-11-brainrot-verdict.md`. `wave` and `flush`
+  (BL-10) are appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-wave` /
+  `adult-flush` (`npm run assets:adult-wave` / `assets:adult-flush`) —
+  owner-scoped as both a wave-goodbye LOOP and a compressed flush gag
+  ONE-SHOT; `wave` uses `frameOrder` ping-pong on its body-consistent half
+  — see STYLE.md provenance and
+  `docs/design-reviews/BL-10-toilet-verdict.md`. `toilet` (BL-14) is appended
+  via `scripts/gen-sprites/ingest-animation-frames.mjs adult-toilet`
+  (`npm run assets:adult-toilet`) — the FULL toilet routine (sit → flush →
+  tile-scale sweep) at `rowHeight: 128`; the full-screen wall-of-water version
+  of the sweep is deferred to a WAVE-2 runtime effect — see STYLE.md
+  provenance and `docs/design-reviews/BL-14-toilet-verdict.md`.
 - **Status:** final
 
 ### Tree — growth stages
