@@ -32,6 +32,8 @@ import {
   SPRITE_FPS,
 } from './pet-config.js';
 import { loadSheet, loadLodgeSheet, drawFrame, frameRect, type Sheet, type Stage } from './sprites.js';
+import { toiletRoutineFrameIndex } from './toilet-routine.js';
+import { capabilities } from './stage-capabilities.js';
 import {
   isFlashVisible,
   shakeOffset,
@@ -388,7 +390,14 @@ function draw(petDrawX: number, petDrawY: number): void {
     return;
   }
   const anim = roamState.anim;
-  drawFrame(ctx, sheet, anim, frameIndex, petDrawX, petDrawY, {
+  const rowMeta = sheet.meta.rows.find((row) => row.name === anim);
+  const rowFrames = rowMeta?.frames ?? 1;
+  let drawFrameIndex = frameIndex;
+  if (roamState.phase === 'toiletRoutine' && roamState.toiletRoutine) {
+    const local = toiletRoutineFrameIndex(roamState.toiletRoutine, SPRITE_FPS, rowFrames);
+    drawFrameIndex = roamState.toiletReverse ? rowFrames - 1 - local : local;
+  }
+  drawFrame(ctx, sheet, anim, drawFrameIndex, petDrawX, petDrawY, {
     mirror: roamState.facing === 'left',
     rotationDeg: roamState.rotation,
     scale: PET_SCALE,
@@ -404,7 +413,7 @@ function draw(petDrawX: number, petDrawY: number): void {
   // height extends upward past petDrawY. Compute the current frame's actual
   // drawn top/height so the dirty rect still covers it; square frames
   // (frameSh === meta.tile) reduce to the old petDrawY/tile values exactly.
-  const frameSh = frameRect(sheet.meta, anim, frameIndex).sh;
+  const frameSh = frameRect(sheet.meta, anim, drawFrameIndex).sh;
   const frameTop = petDrawY - (frameSh - sheet.meta.tile) * PET_SCALE;
   const frameHeight = frameSh * PET_SCALE;
   if (evolutionState && isFlashVisible(evolutionState)) {
@@ -484,6 +493,26 @@ function frame(timestampMs: number): void {
   // makes the next idle tick pick a normal roam behavior immediately.
   if (roamState.phase === 'working' && sheet !== null && !sheet.meta.rows.some((row) => row.name === 'type')) {
     roamState = { ...roamState, phase: 'idle', anim: 'idle', timer: 0, frameHold: false };
+  }
+  // Toilet gag is adult-only (needs toilet-read/flush/wave/shake-dry rows).
+  if (roamState.phase === 'toiletRoutine') {
+    const activeSheet = sheet;
+    const hasRows =
+      activeSheet !== null &&
+      ['toilet-read', 'flush', 'wave', 'shake-dry'].every((name) =>
+        activeSheet.meta.rows.some((row) => row.name === name),
+      );
+    if (!capabilities(stage).canToiletRoutine || !hasRows) {
+      roamState = {
+        ...roamState,
+        phase: 'idle',
+        anim: 'idle',
+        timer: 0,
+        frameHold: false,
+        toiletRoutine: null,
+        toiletReverse: false,
+      };
+    }
   }
   window.__debugRoam = roamState;
 

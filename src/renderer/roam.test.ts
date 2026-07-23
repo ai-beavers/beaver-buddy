@@ -4,6 +4,8 @@ import {
   createRoamState,
   createSeededRng,
   defaultRoamInput,
+  enterToiletRoutine,
+  forceToiletRoutine,
   forceWorking,
   tick,
   type Bounds,
@@ -112,9 +114,9 @@ describe('roam: climb only at edges', () => {
 
   it('does climb when the idle timer expires at a side edge with a climb-range roll', () => {
     // createRoamState consumes 2 rng() calls (initial x, initial idle pause).
-    // decideNext then rolls the work chance first (3rd call, kept high to skip
-    // it) and the climb roll second (4th call, below CLIMB_PROBABILITY 0.35).
-    const rng = scriptedRng([0.9, 0.9, 0.9, 0.2, 0.5, 0.5]);
+    // decideNext then rolls work (3rd, high to skip), toilet routine (4th, high
+    // to skip), then climb (5th, below CLIMB_PROBABILITY 0.35).
+    const rng = scriptedRng([0.9, 0.9, 0.9, 0.9, 0.2, 0.5, 0.5]);
     let state: RoamState = { ...createRoamState(bounds, rng), phase: 'idle', x: 0, y: bounds.height - SCALED_TILE_PX, timer: 0.01 };
     state = tick(state, 1, bounds, false, rng);
     expect(state.phase).toBe('climbUp');
@@ -193,6 +195,56 @@ describe('roam: working (sit and type)', () => {
     state = tick(state, 0.1, bounds, false, rng, grab);
     expect(state.phase).toBe('grabbed');
     expect(state.anim).toBe('struggle');
+  });
+});
+
+describe('roam: toilet routine', () => {
+  it('enterToiletRoutine starts on toilet-read', () => {
+    const start = createRoamState(bounds, createSeededRng(1));
+    const next = enterToiletRoutine(start);
+    expect(next.phase).toBe('toiletRoutine');
+    expect(next.anim).toBe('toilet-read');
+    expect(next.toiletRoutine?.step).toBe('toilet-read');
+    expect(next.toiletReverse).toBe(false);
+  });
+
+  it('forceToiletRoutine snaps to ground and is a no-op mid interaction', () => {
+    const rng = createSeededRng(1);
+    const groundY = bounds.height - SCALED_TILE_PX;
+    const walk: RoamState = { ...createRoamState(bounds, rng), phase: 'walk', anim: 'walk', x: 250, y: 10 };
+    const next = forceToiletRoutine(walk, bounds);
+    expect(next.phase).toBe('toiletRoutine');
+    expect(next.y).toBe(groundY);
+
+    for (const phase of ['grabbed', 'gliding', 'landing'] as const) {
+      const busy: RoamState = { ...createRoamState(bounds, rng), phase, anim: 'struggle' };
+      expect(forceToiletRoutine(busy, bounds)).toBe(busy);
+    }
+  });
+
+  it('advances through the gag and returns to idle', () => {
+    const rng = createSeededRng(1);
+    let state = enterToiletRoutine(createRoamState(bounds, rng));
+    // 5 steps × 1s each = 5s to reach done → idle
+    for (let i = 0; i < 50; i += 1) {
+      state = tick(state, 0.1, bounds, false, rng);
+    }
+    expect(state.phase).toBe('idle');
+    expect(state.anim).toBe('idle');
+    expect(state.toiletRoutine).toBeNull();
+  });
+
+  it('marks wave-back as reverse while in that step', () => {
+    const rng = createSeededRng(1);
+    let state = enterToiletRoutine(createRoamState(bounds, rng));
+    // toilet-read (1s) + flush (1s) + wave-away (1s) → wave-back.
+    // tick clamps dt to MAX_DT_S, so advance in small slices.
+    for (let i = 0; i < 30; i += 1) {
+      state = tick(state, 0.1, bounds, false, rng);
+    }
+    expect(state.toiletRoutine?.step).toBe('wave-back');
+    expect(state.anim).toBe('wave');
+    expect(state.toiletReverse).toBe(true);
   });
 });
 

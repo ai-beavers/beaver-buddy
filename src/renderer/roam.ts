@@ -13,9 +13,11 @@
 //
 // Transition table:
 //   idle        --timer expires, work roll-->              working
+//   idle        --timer expires, toilet roll-->            toiletRoutine
 //   idle        --timer expires, not at edge-->            walk
 //   idle        --timer expires, at edge, climb roll-->     climbUp
 //   working     --typing-loop timer expires-->              idle
+//   toiletRoutine --sequencer done-->                       idle
 //   walk        --reaches target-->                          idle
 //   climbUp     --reaches climb height-->                     climbPause
 //   climbPause  --timer expires-->                            climbDown
@@ -53,16 +55,43 @@ import {
   WORK_DURATION_MAX_S,
   WORK_DURATION_MIN_S,
   WORK_PROBABILITY,
+  TOILET_ROUTINE_PROBABILITY,
 } from './pet-config.js';
+import {
+  startToiletRoutine,
+  tickToiletRoutine,
+  toiletRoutineAnim,
+  type ToiletRoutineState,
+} from './toilet-routine.js';
 
 export interface Bounds {
   readonly width: number;
   readonly height: number;
 }
 
-export type AnimName = 'idle' | 'walk' | 'struggle' | 'parachute-wind' | 'land' | 'type';
+export type AnimName =
+  | 'idle'
+  | 'walk'
+  | 'struggle'
+  | 'parachute-wind'
+  | 'land'
+  | 'type'
+  | 'toilet-read'
+  | 'flush'
+  | 'wave'
+  | 'shake-dry';
 export type Facing = 'left' | 'right';
-type Phase = 'idle' | 'walk' | 'climbUp' | 'climbPause' | 'climbDown' | 'grabbed' | 'gliding' | 'landing' | 'working';
+type Phase =
+  | 'idle'
+  | 'walk'
+  | 'climbUp'
+  | 'climbPause'
+  | 'climbDown'
+  | 'grabbed'
+  | 'gliding'
+  | 'landing'
+  | 'working'
+  | 'toiletRoutine';
 
 export type Rng = () => number; // uniform [0, 1)
 
@@ -86,6 +115,10 @@ export interface RoamState {
   readonly glideSwayAmp: number;
   readonly glideRotationAmp: number;
   readonly landingTimer: number;
+  /** Active only while phase === 'toiletRoutine'; null otherwise. */
+  readonly toiletRoutine: ToiletRoutineState | null;
+  /** When true, draw the current anim's frames in reverse (wave-back). */
+  readonly toiletReverse: boolean;
 }
 
 export interface RoamInput {
@@ -166,26 +199,73 @@ function isAtEdge(x: number, bounds: Bounds): boolean {
 // Shared by the random idle trigger (decideNext) and the manual settings
 // trigger (forceWorking) so both build the state identically.
 export function enterWorking(state: RoamState, rng: Rng): RoamState {
-  return { ...state, phase: 'working', anim: 'type', rotation: 0, timer: pickWorkDuration(rng), frameHold: false };
+  return {
+    ...state,
+    phase: 'working',
+    anim: 'type',
+    rotation: 0,
+    timer: pickWorkDuration(rng),
+    frameHold: false,
+    toiletRoutine: null,
+    toiletReverse: false,
+  };
 }
 
 // Manual trigger (the settings "make the beaver work" button). Snaps the pet to
 // the ground where it stands and starts typing — unless it's mid-interaction
 // (grabbed / gliding / landing), which is never interrupted.
 export function forceWorking(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
-  if (state.phase === 'grabbed' || state.phase === 'gliding' || state.phase === 'landing') {
+  if (state.phase === 'grabbed' || state.phase === 'gliding' || state.phase === 'landing' || state.phase === 'toiletRoutine') {
     return state;
   }
   return enterWorking({ ...state, x: clamp(state.x, 0, maxX(bounds)), y: groundY(bounds), rotation: 0 }, rng);
 }
 
+function animFromToilet(routine: ToiletRoutineState): { anim: AnimName; reverse: boolean } {
+  const mapped = toiletRoutineAnim(routine);
+  if (!mapped) {
+    return { anim: 'idle', reverse: false };
+  }
+  return { anim: mapped.anim, reverse: mapped.reverse };
+}
+
+export function enterToiletRoutine(state: RoamState): RoamState {
+  const toiletRoutine = startToiletRoutine();
+  const { anim, reverse } = animFromToilet(toiletRoutine);
+  return {
+    ...state,
+    phase: 'toiletRoutine',
+    anim,
+    rotation: 0,
+    timer: 0,
+    frameHold: false,
+    toiletRoutine,
+    toiletReverse: reverse,
+  };
+}
+
+/** Manual / debug trigger. Same interrupt rules as forceWorking. */
+export function forceToiletRoutine(state: RoamState, bounds: Bounds): RoamState {
+  if (state.phase === 'grabbed' || state.phase === 'gliding' || state.phase === 'landing') {
+    return state;
+  }
+  return enterToiletRoutine({
+    ...state,
+    x: clamp(state.x, 0, maxX(bounds)),
+    y: groundY(bounds),
+    rotation: 0,
+  });
+}
+
 // Called when the idle pause timer expires: decides the next behavior.
-// The work roll comes first so "sit and type" can trigger anywhere the beaver
-// happens to be idling (including at an edge); it's a stationary state, so x/y
-// are left untouched and roaming resumes via idle when the loop ends.
+// The work / toilet-routine rolls come first so stationary gags can trigger
+// anywhere the beaver happens to be idling; x/y are left untouched.
 function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
   if (rng() < WORK_PROBABILITY) {
     return enterWorking(state, rng);
+  }
+  if (rng() < TOILET_ROUTINE_PROBABILITY) {
+    return enterToiletRoutine(state);
   }
 
   const roll = rng();
@@ -200,6 +280,8 @@ function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
       rotation: onLeftEdge ? ROTATION_LEFT_CLIMB_DEG : ROTATION_RIGHT_CLIMB_DEG,
       climbTargetY: Math.max(0, state.y - pickClimbHeight(rng)),
       frameHold: false,
+      toiletRoutine: null,
+      toiletReverse: false,
     };
   }
 
@@ -212,6 +294,8 @@ function decideNext(state: RoamState, bounds: Bounds, rng: Rng): RoamState {
     rotation: 0,
     targetX,
     frameHold: false,
+    toiletRoutine: null,
+    toiletReverse: false,
   };
 }
 
@@ -274,6 +358,8 @@ export function createRoamState(bounds: Bounds, rng: Rng): RoamState {
     glideSwayAmp: 0,
     glideRotationAmp: 0,
     landingTimer: 0,
+    toiletRoutine: null,
+    toiletReverse: false,
   };
 }
 
@@ -289,6 +375,8 @@ function enterGrabbed(state: RoamState, bounds: Bounds, input: RoamInput): RoamS
     clickCount: 0,
     clickWindowRemaining: 0,
     frameHold: false,
+    toiletRoutine: null,
+    toiletReverse: false,
   };
 }
 
@@ -315,16 +403,17 @@ function releaseToGlide(state: RoamState, bounds: Bounds, input: RoamInput, rng:
 }
 
 function isRoamingPhase(phase: Phase): boolean {
-  // 'working' counts as roaming for input: the beaver can still be grabbed
-  // mid-type (a playful interruption), and click-window bookkeeping keeps
-  // ticking while it sits.
+  // 'working' / 'toiletRoutine' count as roaming for input: the beaver can
+  // still be grabbed mid-gag (a playful interruption), and click-window
+  // bookkeeping keeps ticking while it sits.
   return (
     phase === 'idle' ||
     phase === 'walk' ||
     phase === 'climbUp' ||
     phase === 'climbPause' ||
     phase === 'climbDown' ||
-    phase === 'working'
+    phase === 'working' ||
+    phase === 'toiletRoutine'
   );
 }
 
@@ -411,6 +500,34 @@ export function tick(
         return { ...inputState, timer, frameHold: false };
       }
       return { ...inputState, phase: 'idle', anim: 'idle', timer: pickIdlePause(rng), frameHold: false };
+    }
+
+    case 'toiletRoutine': {
+      if (!inputState.toiletRoutine) {
+        return { ...inputState, phase: 'idle', anim: 'idle', timer: pickIdlePause(rng), frameHold: false, toiletReverse: false };
+      }
+      const nextRoutine = tickToiletRoutine(inputState.toiletRoutine, dt);
+      if (nextRoutine.step === 'done') {
+        return {
+          ...inputState,
+          phase: 'idle',
+          anim: 'idle',
+          timer: pickIdlePause(rng),
+          frameHold: false,
+          toiletRoutine: null,
+          toiletReverse: false,
+        };
+      }
+      const { anim, reverse } = animFromToilet(nextRoutine);
+      return {
+        ...inputState,
+        toiletRoutine: nextRoutine,
+        anim,
+        toiletReverse: reverse,
+        y: ground,
+        rotation: 0,
+        frameHold: false,
+      };
     }
 
     case 'climbUp': {
