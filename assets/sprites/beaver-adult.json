@@ -2,7 +2,7 @@
   "tile": 96,
   "fps": 8,
   "sheetWidth": 768,
-  "sheetHeight": 1696,
+  "sheetHeight": 1824,
   "rows": [
     {
       "name": "idle",
@@ -73,6 +73,11 @@
     {
       "name": "flush",
       "frames": 8
+    },
+    {
+      "name": "toilet",
+      "frames": 8,
+      "height": 128
     }
   ]
 }
