@@ -426,17 +426,98 @@ outfit manifest; anything absent = not drawn.
 
 ## 6. Production plan
 
+### 6.0 Regeneration campaign — scope and sequencing (owner, 2026-07-27)
+
+**Every existing character row is regenerated, not just the missing ones.** The
+shipped rows were produced over many sessions from different references and do
+not read as one consistent character; the turnaround pipeline exists to fix
+exactly that. This supersedes the earlier assumption that shipped art stays.
+
+**One figure at a time, completed before the next starts.** All of the baby's
+animations are planned first (§6.0.1), then generated sequentially, and only
+when the baby is finished does the next age stage begin. No parallel work
+across figures — a wrong call in a figure's base would otherwise propagate into
+work already done elsewhere.
+
+Inventory to regenerate: **29 existing rows** — baby 5, young-baby 2, teen 2,
+older-teen 2, adult 18 — plus the planned new rows and four more turnarounds.
+
+**Not decided yet:** whether the lodge and the three tree stages are in scope.
+They are not characters, the lodge is the only remaining fully palette-bound,
+deterministically reproducible asset, and the trees are their own consistent
+lineage. Parked until the beaver figures are done.
+
+**Order within a figure is forced by the reference chain.** Nearly every row is
+conditioned on the figure's committed idle tile, so: turnaround → idle → walk →
+everything else. Mixing rows built on the old base with rows built on the new
+one reproduces the very inconsistency this campaign removes.
+
+**Carry the hard-won fixes forward.** Regenerating does not re-solve these for
+free — each is documented in `assets/STYLE.md` and must be applied again:
+`exercise` and `toilet` need a 128 px `rowHeight` or the scale lock shrinks the
+whole row; `brainrot` and `wave` are only usable because `frameOrder`
+ping-pongs their body-consistent half; `speak` must NOT be generated at all
+(see §6.0.1).
+
+**Byte-pin tests will fail, by design.** `ingest-animation-frames.test.ts` pins
+the committed tiles byte-for-byte because a placeholder script once clobbered
+eight finished rows. Re-pin deliberately, row by row after acceptance — never
+blanket-delete the pins.
+
+**Branch model:** one long-lived integration branch for the campaign, with a
+sub-branch per figure. A figure's sub-branch carries several commits (one per
+animation or small group), and merges into the campaign branch when that figure
+is complete.
+
+#### 6.0.1 Baby — complete animation plan
+
+The baby stage is L1–L4 ≈ **1.5 days** of exposure at the calibrated rate, but
+it is also the stage *every* user sees. Scope is set accordingly: complete
+daily loop, nothing decorative.
+
+| # | Row | Frames | Type | Status | Runtime today | Notes |
+|---|---|---|---|---|---|---|
+| 1 | `idle` | 1 | pose | regenerate | ✅ active | sitting pose — the anchor every other row conditions on. Do this one first and accept it before anything else runs. |
+| 2 | `walk` | 2 | loop | regenerate | ✅ active | quadruped crawl, side view, right-facing. Step frames only — never the idle pose in a walk row. |
+| 3 | `struggle` | 8 | loop | regenerate | ✅ active | grabbed, kicking |
+| 4 | `parachute-wind` | 8 | loop | regenerate | ✅ active | 128 px row — canopy extends upward, feet stay on the ground line |
+| 5 | `land` | 8 | one-shot | regenerate | ✅ active | touchdown → settles into `idle` |
+| 6 | `sleep` | 8 | loop | **new** | ❌ art only | curled up, gentle breathing, pulsing zzz that grow 1→4 and shrink 5→8 so the 8→1 seam reads as a continuous pulse |
+| 7 | `stretch` | 8 | one-shot | **new** | ❌ art only | wake-up. Frame 1 continuous with the sleep pose, frame 8 with `idle`. Added to the baby (the ladder had it at young-baby+): shipping `sleep` without it means the baby snaps from curled-up to idle in one frame. |
+| 8 | `speak` | 8 | loop | **new, NOT generated** | ❌ art only | mouth open/closed cycle — built mechanically, see below |
+
+**`speak` is built, not generated.** The adult's first attempt at this row was
+an 8-cell AI grid and it failed the design gate: independent cells do not agree
+on body pose, tail side or shading, so the row read as whole-body flicker
+rather than a talking mouth. The shipped solution patches a small mouth-region
+box onto the accepted `idle` tile, resampling colours from the tile's own nose,
+outline and tooth pixels — every pixel outside that box is byte-identical
+across all 8 frames *by construction*, and a zero-tolerance test enforces it.
+The baby reuses that builder against its own accepted `idle`. No Comfy run, no
+credits, no flicker risk.
+
+**Every prompt must state its own pose.** The turnaround is a standing model
+sheet supplying character, colours and proportions — never posture. The baby
+sits and crawls; a row that does not say so will drift toward an upright adult.
+
+**Sequence:** `idle` → accept → `walk` → `struggle`/`parachute-wind`/`land` →
+`sleep` → `stretch` → `speak` (mechanical). Rows 6–8 have no runtime state yet
+(`roam.ts` knows six animation names today); they ship as WAVE-1 art, wired
+later.
+
 ### 6.1 Batches
 
 Ordered so that each batch unblocks the next (turnarounds first — everything
 downstream conditions on them).
 
-> **Sequencing override (owner, 2026-07-27):** B0 is split — only the **baby**
-> turnaround is produced first, and it doubles as the test subject for choosing
-> between the full-character and parts-based animation routes. B1–B7 are locked
-> until that choice is made. The live checklist is
-> [`asset-production-todo.md`](asset-production-todo.md); the batches below are
-> the target state, not the current work queue.
+> **Superseded by §6.0 (owner, 2026-07-27).** The batch table below was written
+> for an "add the missing rows" plan. The campaign is now "regenerate
+> everything, one figure at a time", so the batches survive only as a map of
+> *what* each figure eventually needs — not as the work queue. The live queue
+> is [`asset-production-todo.md`](asset-production-todo.md), and the baby's
+> complete list is §6.0.1. The baby turnaround (B0, done) also doubles as the
+> test subject for choosing between the full-character and parts-based
+> animation routes.
 
 | Batch | Content | Output | Blocks |
 |---|---|---|---|
@@ -510,3 +591,9 @@ Unchanged from the existing pipeline, restated so a build item can copy it:
 | D6 | Add `loop: boolean` to `SheetRow` | yes | otherwise loop/one-shot stays tribal knowledge |
 | D7 | Add an outfit↔base alignment test | yes | misalignment is a class of bug the eye catches late |
 | D8 | Adult mastery rows `read`/`meeting`/`sports`/`angry` at L28–31 | yes | alternative: stop new art at L27 and make L28–32 cosmetic-only |
+| D9 | Lodge + tree stages in the regeneration campaign? | **open** | parked until the five beaver figures are done (§6.0) |
+
+**Decided since (2026-07-27):** regenerate every existing character row, one
+figure at a time, baby first and complete before the next stage — §6.0.
+Turnarounds are standing model sheets for every figure; pose comes from each
+row's own prompt.
