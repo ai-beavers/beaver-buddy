@@ -23,6 +23,8 @@ Visual design gates per build item — screenshots + verdicts:
 ## Assets & pipelines
 
 - [`asset-gallery.md`](asset-gallery.md) — catalog of every figure/animation asset (registration required)
+- [`asset-storybook.md`](asset-storybook.md) — production plan L1–L32: unlock ladder, 360° turnarounds, outfits (proposal)
+- [`asset-production-todo.md`](asset-production-todo.md) — the sequential work queue with owner gates (start here)
 - [`comfyui-avatar-generation.md`](comfyui-avatar-generation.md) — ComfyUI parts pipeline into the studio
 - [`animation-authoring.md`](animation-authoring.md) — quickstart for ComfyUI + PixiJS puppet studio animation authoring
 - [`../assets/STYLE.md`](../assets/STYLE.md) — sprite style guide + provenance (binding)

@@ -1,0 +1,28 @@
+{
+  "tile": 96,
+  "fps": 0,
+  "sheetWidth": 768,
+  "sheetHeight": 96,
+  "rows": [
+    {
+      "name": "turnaround",
+      "frames": 8
+    }
+  ],
+  "views": [
+    "front",
+    "front-right",
+    "right",
+    "back-right",
+    "back",
+    "back-left",
+    "left",
+    "front-left"
+  ],
+  "mirrored": [
+    5,
+    6,
+    7
+  ],
+  "source": "assets-src/comfyui/baby-turnaround/attempt-03.png"
+}

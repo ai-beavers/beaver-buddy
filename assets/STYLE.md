@@ -585,6 +585,67 @@ see `docs/design-reviews/BL-14-toilet-verdict.md`. Ingested by
 (`npm run assets:adult-toilet`), growing the sheet to 768×1824. No human
 cleanup beyond the mechanical pipeline.
 
+**Baby turnaround reference sheet**
+(`assets-src/reference/turnaround/beaver-baby-turnaround.png` + `.json`,
+2026-07-27): a build-time MODEL SHEET, not runtime art — 8 views (front,
+front-right, right, back-right, back, back-left, left, front-left) on a 768×96
+sheet at 96 px tiles, `fps: 0`. It exists so later animation generations
+condition on a consistent all-round view of the character rather than on a
+single idle tile, which is the documented root cause of BL-7's body drift and
+BL-6/T3's rejected walk. It lives under `assets-src/reference/`, never
+`assets/sprites/` — nothing in `src/` loads it.
+
+Only the 5 right-facing views are generated; **back-left/left/front-left are
+horizontal mirrors** of back-right/right/front-right — free, pixel-exact by
+construction, consistent with the renderer's own mirroring convention, and
+immune to the class of bug where a generated left view drifts from the right
+one. A dedicated test asserts the mirrored tiles are byte-identical to the
+mirror of their sources.
+
+Generated on Comfy Cloud via `submit_workflow` with a deliberately minimal
+graph (`LoadImage → GeminiNanoBanana2 → SaveImage`; no `BiRefNetRMBG`, no
+`VHS_VideoCombine` — the ingest chroma-keys itself), model "Nano Banana 2
+(Gemini 3.1 Flash Image)", `thinking_level: HIGH`, `21:9`, `2K`,
+reference-conditioned on the committed `assets-src/reference/beaver-baby-idle.png`.
+The node's default `system_prompt` was left untouched (owner decision); all
+steering happens in the user prompt. **Note `GeminiNanoBanana2` is flagged
+deprecated** — Nano Banana 2 survives as a model option inside
+`GeminiImage2Node`, but that node lacks `thinking_level`, which is why the
+deprecated node was kept.
+
+Three attempts were needed, each failing a *different* way — the lesson being
+that a ban only covers what it names:
+1. A 21:9 canvas is 2.36:1 while five square cells want ~5:1, so the model
+   filled the spare height with an unrequested second row — and painted two of
+   those beavers green, of which only 0.4 % and 9.1 % of pixels survive a green
+   key (a green character keys out to a hole).
+2. Forbidding *divider* lines did not forbid a *ground* line: attempt 2 drew a
+   full-width baseline touching the image edge — the `cropToBbox` poison from
+   BL-8 in a form the earlier ban missed.
+3. An explicit no-ground/no-shadow/no-props/no-lines block plus a
+   character-colour whitelist produced the accepted sheet: one row, five
+   distinct angles, 0 % height deviation across views, darkest image row 39 %
+   (figure outlines only, vs. ~95 % for a drawn line).
+
+Because the run went through `submit_workflow` + `SaveImage` rather than
+`partner_generate`, the output arrived as `colorType 6` (RGBA) — the RGB→RGBA
+normalization step every `partner_generate` row above needed does not apply
+here. Hardening the prompt did drop the `#00FF00` hex from its header, so the
+background came back a muted `(30,195,55)`; harmless, since `chromaKeyGreen`
+tests green dominance relatively rather than matching pure green, but the hex
+belongs back in the template for the remaining figures. One 336 px detached
+fragment (0.12 % of that view's figure) was removed mechanically by
+`dropStrayFragments` — safe here because a turnaround figure is one connected
+silhouette, and deliberately NOT reused by the animation-row ingest, where
+rows like `sleep` have legitimately detached "zzz" wisps. Ingested by
+`scripts/gen-sprites/ingest-turnaround.mjs` (`npm run assets:turnaround`).
+Design gate: `docs/design-reviews/baby-turnaround-verdict.md`.
+
+**The figure stands upright on two legs** while the shipped baby sits and
+crawls on all fours (owner decision, 2026-07-27): the turnaround is a neutral
+model sheet supplying character, colours and proportions — never pose. Every
+later animation prompt must therefore state its own pose explicitly.
+
 **Tree growth stages** (`tree-stage-1.png`, `tree-stage-2.png`,
 `tree-stage-3.png`; BL-1/T1, 2026-07-22): generated as one lineage, not three
 independent prompts, via Comfy Cloud Nano Banana Pro (`vertexai/nano-banana-pro`

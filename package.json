@@ -24,6 +24,7 @@
     "assets:ingest": "node scripts/gen-sprites/ingest-images.mjs",
     "assets:young-baby": "node scripts/gen-sprites/ingest-images.mjs beaver-young-baby",
     "assets:older-teen": "node scripts/gen-sprites/ingest-images.mjs beaver-older-teen",
+    "assets:turnaround": "node scripts/gen-sprites/ingest-turnaround.mjs",
     "assets:parachute": "node scripts/gen-sprites/ingest-animation-frames.mjs baby",
     "assets:adult-anims": "node scripts/gen-sprites/ingest-animation-frames.mjs adult",
     "assets:adult-watering": "node scripts/gen-sprites/ingest-animation-frames.mjs adult-watering",

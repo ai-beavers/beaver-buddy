@@ -201,6 +201,36 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   triggers, render layer — WAVE-2, see `docs/comfyui-avatar-generation.md`
   open questions)
 
+### Beaver — baby turnaround (build-time reference, not runtime art)
+
+![baby turnaround sheet](../assets-src/reference/turnaround/beaver-baby-turnaround.png)
+
+- **Files:** `assets-src/reference/turnaround/beaver-baby-turnaround.png` +
+  `.json` — 768×96 sheet, 96×96 tiles, `fps: 0`
+- **Views:** `turnaround` (8) — front, front-right, right, back-right, back,
+  back-left, left, front-left. The last three are **byte-exact horizontal
+  mirrors** of back-right/right/front-right (test-enforced), not generations.
+- **Purpose:** a model sheet used as the reference image for later animation
+  generations, so they condition on a consistent all-round view of the
+  character instead of on a single idle tile. **Nothing in `src/` loads it** —
+  it lives under `assets-src/reference/`, not `assets/sprites/`, precisely so
+  it cannot be mistaken for a playable row.
+- **Provenance:** Comfy Cloud `GeminiNanoBanana2` ("Nano Banana 2 / Gemini 3.1
+  Flash Image") via `submit_workflow` + a minimal `LoadImage → Gemini →
+  SaveImage` graph, reference-conditioned on the committed
+  `assets-src/reference/beaver-baby-idle.png`, green chroma-key background,
+  `thinking_level: HIGH`. Third attempt; the first produced an unrequested
+  second row with two green-painted beavers, the second drew a full-width
+  ground line. Ingested via `scripts/gen-sprites/ingest-turnaround.mjs`
+  (`npm run assets:turnaround`). See STYLE.md for the full provenance,
+  `docs/asset-production-todo.md` for the attempt log and winning prompt, and
+  `docs/design-reviews/baby-turnaround-verdict.md` for the gate.
+- **Note:** the figure stands upright on two legs, while the shipped baby sits
+  and crawls. Deliberate — the turnaround supplies character/colour/proportion,
+  never pose, so every animation prompt must state its own pose.
+- **Status:** accepted (design gate PASS, 2026-07-27); remaining four figures
+  open
+
 ### Hatch lodge
 
 ![lodge sheet](../assets/sprites/lodge.png)
