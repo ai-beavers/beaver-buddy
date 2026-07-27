@@ -478,7 +478,7 @@ daily loop, nothing decorative.
 | # | Row | Frames | Type | Status | Runtime today | Notes |
 |---|---|---|---|---|---|---|
 | 1 | `idle` | 1 | pose | regenerate | ✅ active | sitting pose — the anchor every other row conditions on. Do this one first and accept it before anything else runs. |
-| 2 | `walk` | 2 | loop | regenerate | ✅ active | quadruped crawl, side view, right-facing. Step frames only — never the idle pose in a walk row. |
+| 2 | `walk` | **8** | loop | regenerate | ✅ active | quadruped crawl, side view, right-facing. **Upgraded from 2 frames** (owner, 2026-07-27): the sprite-sheet workflow emits 8 cells anyway, the sheet is already 8 tiles wide, and `SheetRow.frames` is per-row — so a full cycle costs nothing over two poses ping-ponging. Step frames only, never the idle pose in a walk row. |
 | 3 | `struggle` | 8 | loop | regenerate | ✅ active | grabbed, kicking |
 | 4 | `parachute-wind` | 8 | loop | regenerate | ✅ active | 128 px row — canopy extends upward, feet stay on the ground line |
 | 5 | `land` | 8 | one-shot | regenerate | ✅ active | touchdown → settles into `idle` |
@@ -504,6 +504,27 @@ sits and crawls; a row that does not say so will drift toward an upright adult.
 `sleep` → `stretch` → `speak` (mechanical). Rows 6–8 have no runtime state yet
 (`roam.ts` knows six animation names today); they ship as WAVE-1 art, wired
 later.
+
+**Generation route (owner, 2026-07-27):** animation rows use the saved
+`pixelart-builder` workflow — `LoadImage` → `GeminiNanoBanana2` →
+`BiRefNetRMBG` (learned matting, alpha out) → dynamic cell math → 8 cropped
+frames + the full sheet + an 8 fps GIF and WebP. Two consequences worth
+knowing: the **8 fps GIF falls out for free**, which is exactly the temporal
+evidence the design gate demands (a static contact sheet cannot show flicker —
+how the first adult `speak` row slipped through); and the frames arrive
+**already alpha-cut**, so the ingest runs `preKeyed: true` and does not
+chroma-key at all.
+
+Backgrounds: the **green** turnaround goes in as the reference image, the
+workflow generates on **white** and BiRefNet cuts it out. The
+white-eats-white-detail warning in `docs/dev-guardrails.md` applies to our own
+naive border flood-fill, not to a learned matting model.
+
+**Open cleanup:** `idle` was generated with a throwaway minimal graph before
+this route was chosen, so it is the one row that did not come through
+`pixelart-builder`. Accepted for now as the conditioning anchor; re-do it on
+the common route when convenient (and decide then whether it becomes an 8-frame
+breathing loop instead of a static pose).
 
 ### 6.1 Batches
 

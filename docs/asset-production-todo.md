@@ -203,6 +203,58 @@ untouched, a fresh recorded seed per attempt.
 
 ---
 
+## Hand-off — how generated assets enter the repo
+
+**Working split (owner, 2026-07-27): Rodgi generates and judges, the agent
+integrates.** Generation runs in Comfy Cloud with the `pixelart-builder`
+workflow; the agent no longer submits jobs. What lands on disk is what gets
+ingested.
+
+### Where to drop a finished animation row
+
+```
+assets-src/comfyui/<figure>-<row>/          e.g. baby-walk, baby-sleep
+    frame_01.png … frame_08.png             REQUIRED — the 8 cut frames
+    sheet.png                               optional, the raw 4×2 grid
+    animation.gif                           optional but wanted (design gate)
+```
+
+`frame_01.png` … `frame_08.png` is not a suggestion — `bakeAnimation` in
+`scripts/gen-sprites/ingest-animation-frames.mjs` reads exactly that naming,
+and with `preKeyed: true` it takes the workflow's already-alpha-cut frames
+straight through. Anything else needs code.
+
+### Where to drop a turnaround
+
+```
+assets-src/comfyui/<figure>-turnaround/attempt-NN.png    the raw 5-view row
+```
+
+Then the agent runs `npm run assets:turnaround` after adding the figure to
+`FIGURES` in `scripts/gen-sprites/ingest-turnaround.mjs`.
+
+### What makes a row usable — the checklist that produced the failures so far
+
+| Requirement | Why it exists |
+|---|---|
+| 8 frames, one continuous cycle, frame 8 flows into frame 1 | loops read as loops |
+| **Identical body size and head height in all 8 cells** | walk attempt 1 died here: the body went 15 % flatter and the head dropped 10 px between grid rows 1 and 2, which reads as the beaver *falling*, not walking |
+| Same lighting, same colours, same facing across all cells | independent-cell drift killed the adult's first `speak` row |
+| Right-facing only | the renderer mirrors; a left-facing frame flips the walk mid-cycle |
+| Nothing but the character — no ground line, shadow, props, dividers, text | a line touching a cell edge poisons `cropToBbox` |
+| Pose stated explicitly in the prompt | the turnaround is a standing model sheet; it supplies character, never posture |
+
+The foot line does **not** need to be consistent in the raw frames — the ingest
+crops each frame to its own bbox and bottom-anchors it, which flattened 166 px
+of raw drift to 0 px in the walk attempt. Body *size* is what must hold.
+
+### Attempt log — baby rows
+
+| Row | Attempt | Verdict | Why |
+|---|---|---|---|
+| `idle` | 1 | **accepted** | sitting pose held, 0 green on figure, no strays, outline matches the turnaround. Generated with a throwaway minimal graph, not `pixelart-builder` — flagged for a later redo |
+| `walk` | 1 | **rejected** (owner) | body 15 % flatter and head 10 px lower in grid row 2 than row 1 → reads as the beaver dropping. Foot line was fine (0 px after bake). Same two-halves artefact as adult `brainrot`/`wave` |
+
 ## Stage 3 — Option A test: a full-character animation from the turnaround
 
 - [ ] **T3.1 — Pick the test animation: `sleep`.** Reasons: it is the actual
