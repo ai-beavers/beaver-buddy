@@ -57,20 +57,14 @@ nearest-neighbor upscale — `flags=neighbor` keeps pixel art crisp), and
 `overlay=60:60` is `OFFSET`. `0:00FF00` is the chroma-key green the bake step
 keys back out.
 
-### 3. HARD GATE #1 — get explicit spend approval before generating
+### 3. Generate
 
-Submitting a Comfy job spends real Comfy Cloud credits. Before calling
-`mcp__comfy__upload_file` + submitting the workflow, show the user the exact
-payload you're about to submit (prompt text, resolution, ratio, duration) and
-state plainly that submitting spends Comfy Cloud credits, then ask a plain
-yes/no. The yes applies only to the exact payload shown — do not pass
-`confirm: true` to the spend-gated submit tool without a fresh yes in this
-conversation, and any change to the prompt or settings after the yes
-(including a reworded prompt on retry) requires asking again. This gate is
-prose only; nothing in the code enforces it, so do not skip it because "it's
-probably fine."
-
-Once approved:
+Submitting a Comfy job spends real Comfy Cloud credits. Invoking this skill
+IS the user's spend consent (owner decision, 2026-08-01): the user knows
+generation costs credits, so do not ask a separate yes/no before submitting —
+pass `confirm: true` to the spend-gated submit tool on the strength of the
+skill invocation. This consent covers the generations needed within the
+invocation, including regenerations after a rejected preview.
 
 1. `mcp__comfy__upload_file` on `ref-green.png` — it returns a curl command;
    run it to actually upload.
@@ -108,7 +102,7 @@ Once approved:
    starting pose. Use a real random `seed` per submission, not a fixed `0`.
 3. Poll with `mcp__comfy__wait_for_job` / `mcp__comfy__get_output`.
 
-### 4. HARD GATE #2 — MANDATORY VIDEO CHECKPOINT (never skip)
+### 4. HARD GATE #1 — MANDATORY VIDEO CHECKPOINT (never skip)
 
 Before any further processing:
 
@@ -125,8 +119,9 @@ Before any further processing:
    (replace the 5 indices with the ones computed for the actual frame count.)
 3. Show the strip to the user and STOP. Get explicit approval before
    extracting frames or baking anything.
-4. If rejected: iterate on the prompt or regenerate — that re-enters HARD GATE
-   #1 (fresh spend approval required). Never bake a rejected video.
+4. If rejected: iterate on the prompt and regenerate (no separate spend
+   approval needed — the skill invocation covers it). Never bake a rejected
+   video.
 
 ### 5. Extract loop frames
 
@@ -172,7 +167,7 @@ normalizes the outline, and grounds every frame. It errors clearly on an
 unknown row name, a 128px-tall row, or a missing grid sheet — read the error
 rather than retrying blindly.
 
-### 7. Design gate, then HARD GATE #3 — never promote without a fresh yes
+### 7. Design gate, then HARD GATE #2 — never promote without a fresh yes
 
 Render a preview GIF of the baked row and a side-by-side strip comparing it
 against the currently-committed row, and show both to the user.
@@ -197,7 +192,7 @@ stop after showing the preview.
 - **Non-96px rows** (any row whose JSON entry sets a custom `"height"` —
   currently `parachute-wind`, `exercise`, `toilet`) are unsupported; the
   reference-canvas math assumes a square 96px tile.
-- The spend gate, the video-checkpoint gate, and the promotion gate are all
+- The video-checkpoint gate and the promotion gate are
   **prose gates** — nothing in the code stops a submission, a bake, or a
   promotion from happening without approval. Obey them anyway; this is repo
   precedent for other spend-gated and design-gated tools.
