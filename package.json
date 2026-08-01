@@ -47,7 +47,7 @@
     "@types/node": "^24.0.0",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
-    "electron": "43.1.1",
+    "electron": "43.2.0",
     "electron-builder": "^26.15.3",
     "eslint": "^10.7.0",
     "pixi.js": "8.19.0",
