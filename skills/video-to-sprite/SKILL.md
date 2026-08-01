@@ -27,6 +27,11 @@ Get from the user: a description of the desired beaver behavior, and the
 target row name. Confirm the row exists in `assets/sprites/beaver-adult.json`
 and is not one of the 128px rows above.
 
+Every scratch file of the run — reference canvas, downloaded mp4, strips,
+preview GIFs — lives under `tmp/<rowName>-video/` (gitignored at the repo
+root). Never write the upload command or its bearer token into a file, there
+or anywhere: a public repo plus one careless `git add .` is how tokens leak.
+
 ### 2. Build the reference canvas (ffmpeg)
 
 The video model needs a first/last frame image at a fixed, known scale and
@@ -49,7 +54,7 @@ Example from the proven session: the `brainrot` row sits at y=1408.
 ffmpeg -y -f lavfi -i color=c=0x00FF00:s=1080x1080 \
   -i assets/sprites/beaver-adult.png \
   -filter_complex "[1:v]crop=96:96:0:<rowY>,scale=960:960:flags=neighbor[spr];[0:v][spr]overlay=60:60:format=auto" \
-  -frames:v 1 ref-green.png
+  -frames:v 1 tmp/<rowName>-video/ref-green.png
 ```
 
 `s=1080x1080` is `CANVAS`, `scale=960:960` is 96 * `SPRITE_SCALE` (10x
@@ -111,7 +116,7 @@ invocation, including regenerations after a rejected preview.
 
 Before any further processing:
 
-1. Download the resulting mp4.
+1. Download the resulting mp4 to `tmp/<rowName>-video/output.mp4`.
 2. Probe the frame count (see step 5), pick 5 evenly spaced indices across
    it (e.g. `0, N/4, N/2, 3N/4, N-1`, rounded), and render exactly those into
    one strip — the `select` expression and `tile` filter must agree on the
@@ -122,8 +127,11 @@ Before any further processing:
      -vsync vfr -frames:v 1 strip.png
    ```
    (replace the 5 indices with the ones computed for the actual frame count.)
-3. Show the strip to the user and STOP. Get explicit approval before
-   extracting frames or baking anything.
+3. Show the strip to the user AND open the video itself
+   (`open tmp/<rowName>-video/output.mp4`; suggest loop playback, Cmd+L in
+   QuickTime) — motion is judged from the playing video, the strip alone
+   is not enough. Then STOP. Get explicit approval before extracting
+   frames or baking anything.
 4. If rejected: iterate on the prompt and regenerate (no separate spend
    approval needed — the skill invocation covers it). Never bake a rejected
    video.
@@ -168,14 +176,33 @@ Writes `assets-src/baked/<rowName>-video/sheet.png` + `sheet.json` — never
 touches `assets/sprites/` directly. The script samples each video grid cell
 back onto the 96x96 art grid using the same `CANVAS` / `SPRITE_SCALE` /
 `OFFSET` constants from step 2, snaps colors to the committed row's palette,
-normalizes the outline, and grounds every frame. It errors clearly on an
+normalizes the outline, and grounds every frame. Frame 0's art always comes
+from the committed anchor tile, never the video — but the anchor is first
+stripped of legacy green edge fringe (`dropGreenFringe`) and run through the
+same palette/outline/ground finishing, so pre-existing chroma spill on the
+committed row (or a green-polluted palette harvested from it) can't re-ship. It errors clearly on an
 unknown row name, a 128px-tall row, or a missing grid sheet — read the error
 rather than retrying blindly.
 
 ### 7. Design gate, then HARD GATE #2 — never promote without a fresh yes
 
 Render a preview GIF of the baked row and a side-by-side strip comparing it
-against the currently-committed row, and show both to the user.
+against the currently-committed row, and show both to the user:
+
+```bash
+R=tmp/<rowName>-video   # <rowY> = the row y-offset computed in step 2
+ffmpeg -y -i assets-src/baked/<rowName>-video/sheet.png -vf "crop=768:96:0:<rowY>" $R/baked-row.png
+ffmpeg -y -i assets/sprites/beaver-adult.png -vf "crop=768:96:0:<rowY>" $R/committed-row.png
+ffmpeg -y -i $R/committed-row.png -i $R/baked-row.png \
+  -filter_complex "[0][1]vstack,scale=iw*3:ih*3:flags=neighbor" $R/compare.png
+ffmpeg -y -i $R/baked-row.png \
+  -vf "untile=8x1,setpts=N/8/TB,scale=iw*3:ih*3:flags=neighbor" $R/preview.gif
+```
+
+`compare.png` stacks committed (top) over baked (bottom) at 3x
+nearest-neighbor. `preview.gif` plays the 8 baked frames at 8 fps
+(`setpts=N/8/TB`); open it in a browser (`open -a Safari …`) — macOS
+Preview shows GIF frames as static pages instead of animating.
 
 Promotion — copying the baked `sheet.png`/`sheet.json` over
 `assets/sprites/beaver-adult.*` — MUST NOT happen automatically. Never copy
