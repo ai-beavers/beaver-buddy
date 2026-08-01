@@ -155,6 +155,8 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
       { name: 'wave', frames: 8 },
       { name: 'flush', frames: 8 },
       { name: 'toilet', frames: 8, height: 128 },
+      { name: 'toilet-read', frames: 8, height: 128 },
+      { name: 'shake-dry', frames: 8 },
     ]);
   });
 
@@ -188,14 +190,16 @@ describe('ingest-animation-frames committed sheet (adult)', () => {
   // cresting sweep-wave frame extend upward past the base tile instead of
   // shrinking the whole row's scale off that tallest silhouette; the width
   // term binds at scale 0.2791 (max content 96px wide, under the tile) so no
-  // frame clips horizontally.
-  it('is a 768x1824 sheet (8 cols at the 96px tile; row heights … + wave/flush/toilet)', () => {
+  // frame clips horizontally. buildAdultToiletReadSheet appends a 128px
+  // `toilet-read` row -> 1952; buildAdultShakeDrySheet appends a 96px
+  // `shake-dry` row -> 2048.
+  it('is a 768x2048 sheet (8 cols at the 96px tile; row heights … + toilet-read/shake-dry)', () => {
     const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as { tile: number; sheetWidth: number; sheetHeight: number };
     const decoded = decodePng(fs.readFileSync(pngPath));
     expect(decoded.width).toBe(768);
-    expect(decoded.height).toBe(1824);
+    expect(decoded.height).toBe(2048);
     expect(meta.sheetWidth).toBe(768);
-    expect(meta.sheetHeight).toBe(1824);
+    expect(meta.sheetHeight).toBe(2048);
   });
 
   it('has non-empty frames in every row, at each row cumulative y-offset', () => {

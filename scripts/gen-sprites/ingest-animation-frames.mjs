@@ -631,6 +631,41 @@ export function buildAdultToiletSheet(repoRoot) {
   return buildAdultRowSheet(repoRoot, ADULT_TOILET);
 }
 
+// Toilet+newspaper ONE-SHOT (WAVE-1 half of the full gag): toilet present →
+// sit → pull newspaper → read ×2–3 → put away → stand → reach for flush.
+// Sequenced at runtime with flush/wave/shake-dry (see
+// docs/toilet-newspaper-routine.md). Natural 4x2 order; rowHeight 128 for
+// the tall toilet tank + seated beaver (same tradeoff as ADULT_TOILET).
+export const ADULT_TOILET_READ = {
+  rowName: 'toilet-read',
+  sourceDir: 'adult-toilet-read',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 112,
+  rowHeight: 128,
+};
+
+export function buildAdultToiletReadSheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_TOILET_READ);
+}
+
+// Wet shake-dry ONE-SHOT: beaver alone (no toilet), shakes water off after
+// the wave carry-back, settles toward an idle-like stance for roam handoff.
+// Default 96px row — no tall props.
+export const ADULT_SHAKE_DRY = {
+  rowName: 'shake-dry',
+  sourceDir: 'adult-shake-dry',
+  frames: 8,
+  gridCols: 4,
+  gridRows: 2,
+  targetContentHeightPx: 96,
+};
+
+export function buildAdultShakeDrySheet(repoRoot) {
+  return buildAdultRowSheet(repoRoot, ADULT_SHAKE_DRY);
+}
+
 // CLI names for the single-grid adult rows, keyed the same way STAGES keys
 // the multi-animation stages — one ADULT_ROWS entry per row appended this
 // way (watering, drink, sleep, stretch, idle, walk, throw-stick,
@@ -653,6 +688,8 @@ const ADULT_ROWS = {
   'adult-wave': ADULT_WAVE,
   'adult-flush': ADULT_FLUSH,
   'adult-toilet': ADULT_TOILET,
+  'adult-toilet-read': ADULT_TOILET_READ,
+  'adult-shake-dry': ADULT_SHAKE_DRY,
 };
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
