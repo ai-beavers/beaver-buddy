@@ -49,7 +49,7 @@
     "@typescript-eslint/parser": "^8.64.0",
     "electron": "43.1.1",
     "electron-builder": "^26.15.3",
-    "eslint": "^10.7.0",
+    "eslint": "^10.8.0",
     "pixi.js": "8.19.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
