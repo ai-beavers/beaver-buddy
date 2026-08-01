@@ -225,6 +225,24 @@ export function groundTile(tile) {
   return { width, height, data: out };
 }
 
+// Rows ingested before this pipeline existed can carry dark chroma spill on
+// their silhouette edges: green-dominant pixels (often semi-transparent) too
+// dark for chromaKeyGreen's g > 90 gate. Zeroing them here keeps the spill
+// out of BOTH the spliced anchor tile and the palette derived from it —
+// a polluted palette lets snapToPalette re-introduce green into every
+// video-recovered frame.
+export function dropGreenFringe(tile) {
+  const { data } = tile;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    const [r, g, b] = [data[i], data[i + 1], data[i + 2]];
+    if (g > r && g > b && g - Math.max(r, b) > 20) {
+      data[i] = data[i + 1] = data[i + 2] = data[i + 3] = 0;
+    }
+  }
+  return tile;
+}
+
 // Copies a TILE x TILE tile out of `sheet` at column `col` (TILE units),
 // pixel row offset `rowY` — rows elsewhere in the sheet can be taller than
 // TILE (parachute-wind/exercise/toilet), so callers resolve rowY themselves
@@ -249,7 +267,8 @@ function rowYOffset(meta, rowIndex) {
 
 // Full chain from a Comfy Cloud video-frame grid to a row-replaced sheet:
 // read the grid -> per cell (frames 1..7; frame 0 is the committed anchor,
-// verbatim): recover the art grid (sampleArtGrid), key out the green
+// de-fringed + finished but never video-sampled): recover the art grid
+// (sampleArtGrid), key out the green
 // background, snap to the committed row's exact palette, force the
 // silhouette outline to the committed row's outline color, ground the
 // content to the tile bottom -> splice into a copy of the shipped sheet.
@@ -284,11 +303,15 @@ export function buildVideoRowSheet(repoRoot, { rowName, sourceDir }) {
   const grid = decodePng(fs.readFileSync(gridPath));
 
   const rowY = rowYOffset(shippedMeta, rowIndex);
-  const reference = extractShippedTile(shipped, 0, rowY);
+  const reference = dropGreenFringe(extractShippedTile(shipped, 0, rowY));
   const palette = paletteOf(reference);
   const outline = outlineColorOf(reference, 0, 0, TILE, TILE);
 
-  const tiles = [reference];
+  // The anchor's art is kept verbatim (it is what the video was generated
+  // from), but it still runs the same snap/outline/ground finishing as the
+  // video frames so legacy edge fringe and stray semi-transparency don't
+  // ship again.
+  const tiles = [groundTile(normalizeOutline(snapToPalette(reference, palette), outline))];
   for (let i = 1; i < FRAME_COUNT; i += 1) {
     const col = i % GRID_COLS;
     const gridRow = Math.floor(i / GRID_COLS);

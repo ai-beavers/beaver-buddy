@@ -67,7 +67,12 @@ skill invocation. This consent covers the generations needed within the
 invocation, including regenerations after a rejected preview.
 
 1. `mcp__comfy__upload_file` on `ref-green.png` — it returns a curl command;
-   run it to actually upload.
+   run it to actually upload. The embedded bearer token lives ~15 minutes:
+   run the command immediately in the same step, never save it to a script
+   or defer it. On HTTP 401, don't debug — call `upload_file` again for a
+   fresh command and rerun. The success JSON's `name` field may be a hashed
+   filename, not the name you sent — always use the returned `name` verbatim
+   in the `LoadImage` nodes below.
 2. Submit the `api_seedance2_0_flf2v` template in API format with a
    `ByteDance2FirstLastFrameNode`. The dotted names below (`model.prompt`,
    `model.resolution`, …) are **literal flat JSON keys** — Comfy's
