@@ -22,6 +22,10 @@ assets-src/*
 # Local skill iterations (Flightplan, ComfyUI, ...) stay untracked here.
 .agents/skills/
 
+# Skill-run scratch space (video-to-sprite reference canvases, downloaded
+# mp4s, preview strips/GIFs). Root-anchored so deeper tmp/ dirs are unaffected.
+/tmp/
+
 # Code-signing certificates never enter the repo; dev PFX files stay local,
 # CI certs live in GitHub Actions secrets (docs/code-signing.md).
 *.pfx
