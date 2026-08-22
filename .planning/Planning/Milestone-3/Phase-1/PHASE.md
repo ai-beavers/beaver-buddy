@@ -15,7 +15,7 @@
 
 ## Waves
 - [x] WAVE-1 — Evaluate Herdr as an event source. Delivered: `docs/research/herdr-evaluation.md`, `docs/research/herdr-integration-plan.md`. Outcome: Herdr works, but only as an *optional* source for agents running inside Herdr panes — which does not meet the product goal. See the owner decision below.
-- [ ] WAVE-2 — **Re-scoped:** research the hook mechanisms of the coding-agent CLIs themselves (starting with Claude Code) and implement a tracer-bullet detector: hook → normalized event → main process → visible beaver reaction. Delegated externally.
+- [ ] WAVE-2 — **Re-scoped, ready to dispatch:** research the hook mechanisms of the coding-agent CLIs themselves (starting with Claude Code) and implement a tracer-bullet detector: hook → normalized event → main process → visible beaver reaction. See `Waves/WAVE-2.md`; the executable brief is the prompt in `.planning/KICKOFF-AGENT-PROMPTS.md`. Delegated to an external coding agent.
 - [ ] WAVE-3 — Extend the detector to further agents behind the same seam (Codex, pi, Kimi Code, OpenCode — matching M4/P1's harness list).
 
 ## Owner decisions — 2026-08-22

@@ -1,5 +1,13 @@
 # WAVE-1 — Herdr Evaluation & Integration Plan
 
+> ✅ **COMPLETE — do not execute this brief again.** Delivered 2026-07-26, recovered
+> from fork PR #3 on 2026-08-22. Results: `docs/research/herdr-evaluation.md` and
+> `docs/research/herdr-integration-plan.md`.
+>
+> Its verdict led the owner to reject a Herdr dependency on 2026-08-22 — Beaver
+> Buddy builds its own hook-based detector instead. The active wave is **WAVE-2**;
+> see `Waves/WAVE-2.md` and `../PHASE.md`. Kept below for provenance.
+
 > Research wave only. Do not implement the Beaver Buddy integration in this wave.
 
 ## Goal
