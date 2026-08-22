@@ -6,7 +6,7 @@
 
 - **Branch:** `bl-figure/beaver-baby`, pushed to `origin`, 6 commits ahead of `origin/main` and 0 behind. `origin/main` = `5914070` (PR #60, 2026-08-01) — unchanged since then apart from Dependabot.
 - **M3/P1 WAVE-1 is complete.** The Herdr evaluation and integration plan now live at `docs/research/herdr-evaluation.md` and `docs/research/herdr-integration-plan.md`.
-- **M3 is blocked on the owner, not on work.** Three decisions gate WAVE-2 — and with it M3/P2 and M3/P3.
+- **The M3 owner gate was answered on 2026-08-22, and it changed direction:** Beaver Buddy builds its **own** hook-based detector using the logic Herdr uses, instead of depending on a running Herdr. M3 is unblocked; WAVE-2 is re-scoped and goes to an external coding agent.
 - Tests 683 passed / 36 skipped (59 files), lint clean.
 
 ## completed (this session)
@@ -26,30 +26,32 @@ Process lesson (recorded in NOTE.md): cloud agents inherit whatever remote confi
 
 ## remaining
 
-1. **Owner: answer the three M3/P1 gate questions** (below). Everything in M3 waits on this.
-2. Decide whether the Herdr research should reach `ai-beavers/beaver-buddy` as a PR — it currently exists there only on `bl-figure/beaver-baby`.
+1. **Brief the external coding agent for the re-scoped WAVE-2** (see next_action below).
+2. Decide whether the Herdr research should reach `ai-beavers/beaver-buddy` as a PR — it currently exists there only on `bl-figure/beaver-baby`. It stays valuable as a reference even though Herdr will not be integrated.
 3. Decide the fate of fork PR #3 (close it, now that the commit is recovered?).
 4. Three untracked files are still uncommitted and only backed up: `.kimi-code/mcp.json` (local MCP config — probably belongs in `.gitignore`), `BEAVER BUDDY ANIMATIONS WORKFLOW.json` (1.1 MB ComfyUI workflow), `design-assets/beaver-idle-frame.glsl`.
 5. Open independently of M3: M4/P1 WAVE-2 (durable daily aggregate storage), M5 runtime waves, M2/P3 WAVE-3 (paused), 4 Dependabot PRs (#38, #74, #75, #76).
 
-## decisions — the owner gate blocking M3
+## decisions — the M3 owner gate, answered 2026-08-22
 
-1. **Distribution:** Herdr as a separately installed and already-running prerequisite; Beaver Buddy neither installs nor bundles it. If the app must work *without* a separate Herdr installation, the plan needs revision and explicit dependency approval.
-2. **State language:** Herdr has no `question` state — question, approval request and decision prompt all collapse into `blocked`. Accept a single generic `needs-attention` instead of the `waiting-for-input`/`question` split M3/P1 originally specified?
-3. **Scope:** default Herdr session only, with agents required to run inside Herdr panes.
+1. **Distribution → build our own detector.** Beaver Buddy must detect agent activity **without** a separate Herdr installation. Herdr is not bundled, not vendored, not a dependency, not a prerequisite. We reuse **the logic Herdr uses** — hooks registered in the coding-agent CLIs. Same precedent as M4/P1, where TokScale's logic was adopted 1:1 without adopting TokScale. **Supersedes the 2026-07-21 decision "detection via Herdr, no custom detector".** Research and implementation are delegated to an external coding agent.
+2. **State language → Herdr's vocabulary 1:1:** `working`, `needs-attention`, `done`, `idle`, `unknown`. Question, approval request and decision prompt all collapse into `needs-attention`; no finer precision is claimed, prompt content is never inferred.
+3. **Scope → tracer bullet.** Claude Code first, end to end until the beaver visibly reacts, with the adapter seam built so every further agent is only a new hook implementation. Codex/pi/Kimi/OpenCode follow in WAVE-3, matching M4/P1's harness list.
 
-Approving all three makes WAVE-2A and WAVE-2B technically ready with **no new npm dependency** (Node built-in `net` over a local socket / named pipe). WAVE-2C stays gated on Windows beta verification.
+**Consequence:** the integration plan becomes a **reference, not a build instruction** — its WAVE-2A/2B/2C structure describes a Herdr socket adapter that will not be built. Its state vocabulary, privacy controls, animation/sound boundary and test matrix carry over unchanged.
 
 ## blockers
 
-- **What WAVE-1 could not verify:** no coding agent was tested against a live authenticated session — only the socket protocol, synthetically. Claude Code and Codex rest on Herdr's documentation alone. **Windows was never tested**, and it is the primary target platform.
-- Herdr checks `herdr.dev` for update manifests by default — collides with the no-runtime-network invariant; must be disabled via `[update].manifest_check = false` and verified.
-- Trust boundary: any same-user process with socket access can forge states. Herdr is a **local advisory source**, not an authenticated authority. Hardening belongs to M3/P3.
-- Herdr 0.7.5 is Apache-2.0 — no license obstacle.
+- None blocking. M3 is unblocked.
+- **Carried into WAVE-2:** WAVE-1 never tested Windows, and Windows is the primary target platform. No coding agent was verified against a live authenticated session either — but that matters less now, since the own hooks sit inside the agent CLI rather than observing from outside.
+- The hook mechanism differs per agent CLI — the tracer bullet must prove the seam before further agents are added.
+- No new npm dependency without explicit maintainer approval.
+- **Trust boundary improved:** Herdr would have been a *local advisory source* any same-user process could forge states into. A hook Beaver Buddy registers itself is not a foreign source, which removes part of the hardening burden originally assigned to M3/P3.
+- Herdr is Apache-2.0 — reproducing concepts is unrestricted; verbatim code adoption would trigger notice/NOTICE/change-marking duties (largely moot for Rust→TypeScript).
 
 ## next_action
 
-Owner answers the three gate questions above. Until then M3 cannot move; M4/P1 WAVE-2 and the M5 runtime waves are the available parallel work.
+Brief an external coding agent for the re-scoped M3/P1 WAVE-2: research the hook mechanisms of the coding-agent CLIs (Claude Code first), then build the tracer bullet — hook → normalized event → main process → visible beaver reaction. Starting material, constraints and license notes: `.planning/Planning/Milestone-3/Phase-1/PHASE.md`. State the target remote explicitly in that prompt (see the fork lesson above).
 
 ## suggested_skills
 

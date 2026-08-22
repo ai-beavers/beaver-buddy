@@ -7,8 +7,8 @@
 
 - **The M3/P1 Herdr research was never missing — it was delivered to the wrong repository.** Codex cloud agent, 2026-07-26, into fork `rodgi040/beaver-buddy` PR #3 (branch `codex/analyze-fp-resume-skill-documentation`, commit `2acdfaa`), fork-internal and therefore invisible to `ai-beavers/beaver-buddy` for four weeks. Cherry-picked onto `bl-figure/beaver-baby` as `546cdf9`. Fork PR #3 remains open.
 - **WAVE-1 is complete.** `docs/research/herdr-evaluation.md` (164 lines) + `docs/research/herdr-integration-plan.md` (217 lines). Herdr 0.7.5, protocol 17, Apache-2.0.
-- **WAVE-2 is blocked on three owner decisions:** distribution · state language · scope. See `Milestone-3/Phase-1/PHASE.md`. M3/P2 and M3/P3 sit behind that same gate.
-- **Key limitation:** Herdr has no `question` state — question, approval and decision prompts all become `blocked`, so the plan proposes `needs-attention` instead of the original `waiting-for-input`/`question` split. No agent was verified live; **Windows was never tested**.
+- **Owner gate answered 2026-08-22 — and it changed direction.** (1) **Distribution:** Beaver Buddy builds its **own** hook-based detector; Herdr is neither dependency nor prerequisite, only the source of the logic — the same move as M4/P1's "TokScale logic, not TokScale". This supersedes the 2026-07-21 decision "detection via Herdr, no custom detector". (2) **State language:** Herdr's vocabulary 1:1 — `working`, `needs-attention`, `done`, `idle`, `unknown`. (3) **Scope:** Claude Code as tracer bullet, seam open for further agents in WAVE-3. M3 is unblocked; WAVE-2 is re-scoped and delegated to an external coding agent.
+- **The integration plan is now a reference, not a build instruction.** Its Herdr-socket WAVE-2A/2B/2C structure will not be built; its state vocabulary, privacy controls, animation/sound boundary and test matrix carry over unchanged. Herdr has no `question` state — question, approval and decision prompts all collapse into `needs-attention`. **Windows was never tested in WAVE-1** and remains the primary target platform.
 - **Local state secured 2026-08-22:** full backup at `../_backup-2026-08-22/` (bundle of all refs + patch + untracked + `.flightplan/` mirror); `bl-figure/beaver-baby` pushed to `origin` (3 previously unpushed commits from 2026-07-27); the documentation diff open since 2026-07-26 committed as `ca56d65`; `origin/main` merged in as `0ba368f` (was 13 commits behind). Tests 683 passed / 36 skipped, lint clean.
 - **Upstream reality:** `origin/main` = `5914070` (2026-08-01). Since 2026-08-02 there has been no functional commit on main — only Dependabot. Vlady's PR #71 (video-to-sprite skill) and PR #60 (toilet+newspaper+recovery, assets **and** runtime) were the last substantive work.
 - The sections below preserve older session history. Where they conflict, this update and `STATE.md` take precedence.
@@ -118,4 +118,6 @@ agent brief: `Planning/Milestone-4/Phase-1/AGENT-BRIEF.md`.
 - None for the team. M5/P11 and P12 asset work requires Vlady with Claude Code/Comfy Cloud; the settings UI concept requires owner direction.
 
 ## next_action
-Run `/fp-resume`, then execute `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` on a fresh research branch/worktree from fetched `origin/main`.
+> ⚠️ Superseded — WAVE-1 is complete (see `authoritative_update_2026-08-22` at the top of this file). The current next action is: brief an external coding agent for the re-scoped WAVE-2 — hook research across the coding-agent CLIs plus a Claude Code tracer bullet. Starting material and constraints: `Milestone-3/Phase-1/PHASE.md`.
+
+~~Run `/fp-resume`, then execute `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` on a fresh research branch/worktree from fetched `origin/main`.~~

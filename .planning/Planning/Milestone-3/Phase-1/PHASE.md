@@ -1,68 +1,86 @@
-# Phase 1 — Event Detection via Herdr
+# Phase 1 — Event Detection via Agent Hooks
 
 > Part of Milestone 3. Done when: The app reliably detects the states "coding
-> agent done" and "agent waiting for input" — **via Herdr** (open-source terminal
-> overview tool for managing multiple coding agents in parallel) as the event
-> source, as a standalone module, tested and without coupling to the animation
+> agent done" and "agent needs attention" — through **Beaver Buddy's own hook-based
+> detector**, as a standalone module, tested and without coupling to the animation
 > layer.
 
-**Status:** WAVE-1 ✅ complete (delivered 2026-07-26, recovered 2026-08-22) — WAVE-2 **blocked on three owner decisions** (see Owner gate below).
+**Status:** WAVE-1 ✅ complete (Herdr evaluation, 2026-07-26 / recovered 2026-08-22). Owner gate **decided 2026-08-22**: Beaver Buddy builds its **own** detector using Herdr's hook logic — Herdr itself is neither a dependency nor a prerequisite. WAVE-2 is being re-scoped accordingly and delegated to an external coding agent.
 
-**Accountable:** Jurij · **Agent:** Claude Code
+**Accountable:** Jurij · **Agent:** external coding agent (research + implementation)
 **Cycle:** Cycle 1
-**Blocked by:** none for research — WAVE-2 blocked on owner gate
+**Blocked by:** none
 **Blocks:** M3/P2, M3/P3
 **Duration (rough):** ~1–1.5 weeks
 
 ## Waves
-- [x] WAVE-1 — Evaluate Herdr in an isolated cloud-agent environment, identify supported coding agents and observable states, then produce an evidence-backed integration plan; see `Waves/WAVE-1.md`. Deliverables: `docs/research/herdr-evaluation.md`, `docs/research/herdr-integration-plan.md`
-- [ ] WAVE-2 — After owner approval, implement a Herdr adapter behind a normalized agent-state interface, with tests and no animation-layer coupling. Split into WAVE-2A (contract + protocol), WAVE-2B (transport + reconciliation), WAVE-2C (main-process lifecycle + Windows QA)
+- [x] WAVE-1 — Evaluate Herdr as an event source. Delivered: `docs/research/herdr-evaluation.md`, `docs/research/herdr-integration-plan.md`. Outcome: Herdr works, but only as an *optional* source for agents running inside Herdr panes — which does not meet the product goal. See the owner decision below.
+- [ ] WAVE-2 — **Re-scoped:** research the hook mechanisms of the coding-agent CLIs themselves (starting with Claude Code) and implement a tracer-bullet detector: hook → normalized event → main process → visible beaver reaction. Delegated externally.
+- [ ] WAVE-3 — Extend the detector to further agents behind the same seam (Codex, pi, Kimi Code, OpenCode — matching M4/P1's harness list).
 
-## WAVE-1 result summary
+## Owner decisions — 2026-08-22
 
-Evaluated Herdr **0.7.5, protocol 17**, upstream revision `e536bd8`, **Apache-2.0**.
+The three gate questions from the integration plan were answered as follows:
 
-**Verdict:** Herdr is usable as an **optional external event source** when coding
-agents run inside Herdr panes. It is not a drop-in answer to the phase goal.
+1. **Distribution → build our own detector.** Beaver Buddy must detect agent
+   activity **without** requiring a separate Herdr installation. Herdr is not
+   bundled, not vendored, not a dependency and not a prerequisite. Instead we
+   reuse **the logic Herdr itself uses**: hooks registered in the coding-agent
+   CLIs. This mirrors the existing M4/P1 precedent, where TokScale's *logic* was
+   adopted 1:1 while TokScale itself was never added to the project.
+   This supersedes the 2026-07-21 decision "detection via Herdr, no custom
+   detector".
+2. **State language → adopt Herdr's vocabulary 1:1:** `working`,
+   `needs-attention`, `done`, `idle`, `unknown`. Question, approval request and
+   decision prompt all collapse into `needs-attention`; Beaver Buddy does not
+   claim finer precision and never infers prompt content.
+3. **Scope → one agent as a tracer bullet.** Claude Code first, end to end, until
+   the beaver visibly reacts. The adapter seam is built so that every further
+   agent is only a new hook implementation, not a new architecture. Remaining
+   agents follow in WAVE-3.
 
-**Three findings that change the phase contract:**
+## What WAVE-1 still contributes
 
-1. **`question` does not exist in Herdr.** Herdr exposes `working`, `blocked`,
-   `done`, `idle`, `unknown`. A question, an approval request and a decision
-   prompt all collapse into `blocked`. The plan therefore proposes
-   `blocked → needs-attention` instead of the separate `waiting-for-input` and
-   `question` states this phase originally specified. Beaver Buddy must not claim
-   more precision than the source provides, and must not infer prompt content.
-2. **No coding agent was verified against a live authenticated session.** Only the
-   socket protocol itself was exercised, synthetically. Claude Code and Codex rest
-   on Herdr's documentation alone. **Windows was not tested at all** — and Windows
-   is our primary target platform.
-3. **No npm dependency needed** (Node built-in `net` over a local Unix socket /
-   Windows named pipe), but Herdr performs update/manifest checks against
-   `herdr.dev` by default. That collides with our no-runtime-network invariant and
-   must be disabled via `[update].manifest_check = false` and verified.
+The integration plan is now a **reference, not a build instruction** — its
+WAVE-2A/2B/2C structure describes a Herdr socket adapter that will not be built.
+These parts carry over unchanged to an own detector:
 
-**Privacy:** snapshot records carry raw paths (`cwd`, `foreground_cwd`) — the
-adapter must extract an allowlist subset and discard raw envelopes immediately.
-The status events themselves are clean (agent label, status, Herdr resource IDs).
-Trust boundary: any same-user process with socket access can report forged states;
-Herdr counts as a **local advisory source**, not an authenticated authority.
-Hardening belongs to M3/P3.
+- the state vocabulary (decision 2 above)
+- the privacy controls: allowlist extraction, never log raw envelopes, terminal
+  content, prompts, paths, titles or tokens
+- the animation/sound boundary: normalized events map to configurable
+  identifiers downstream; detection code knows nothing about animations
+- the test matrix: concurrent instances, duplicate/out-of-order events,
+  restart, stale sessions, terminal closure, malformed input, bounded shutdown
 
-## Owner gate — WAVE-2 stays blocked until all three are decided
+**Trust boundary — improved by this decision.** Herdr would have been a *local
+advisory source*: any same-user process with socket access could forge states. A
+hook that Beaver Buddy registers itself in the agent CLI is not a foreign source,
+which removes part of the hardening burden originally assigned to M3/P3.
 
-1. **Distribution:** Herdr is a separately installed and already-running
-   prerequisite; Beaver Buddy neither installs nor bundles it. If the app must
-   work without a separate Herdr installation, the plan needs revision and
-   explicit dependency approval.
-2. **State language:** `blocked` becomes a generic `needs-attention`; no separate
-   `question` claim.
-3. **Scope:** default Herdr session only; agents must run inside Herdr panes.
+## Starting material for the external agent
 
-Once approved, WAVE-2A and WAVE-2B are technically ready with no new npm
-dependency. WAVE-2C stays gated on successful Windows beta verification.
+- `docs/research/herdr-evaluation.md` + `docs/research/herdr-integration-plan.md`
+- Herdr's own Codex hook, present on the owner's machine:
+  `~/.codex/herdr-agent-state.ps1` (`HERDR_INTEGRATION_ID=codex`) — the logic in
+  executable form for one agent type
+- Herdr source (Rust): `~/CODING/AGENT-HARNESS-MODIFIKATIONEN/herdr-modifikationen/herdr-fork/`
+- M4/P1's existing multi-harness recognition (`src/main/usage/`, incl.
+  `codex-parser.ts`) — reuse its canonical agent naming instead of establishing a
+  second, diverging agent list
+- **License:** Herdr is Apache-2.0. Reproducing concepts and mechanics is
+  unrestricted. Verbatim code adoption would trigger license-notice, NOTICE and
+  change-marking obligations — Rust to TypeScript makes this largely moot, but
+  the rule stands.
 
-## Delivery note — why this sat unnoticed for four weeks
+## Notes
+- Architecture rule: event detection and character animation are strictly separate modules.
+- Animation and sound selection are downstream configuration values.
+- No new npm dependency without explicit maintainer approval.
+- Herdr must not be launched, installed, bundled or added to `package.json`.
+- Source of the original decision: `Meetings/2026-07-21-planung/summary.md` (Recording Agent, Herdr 02:06:13).
+
+## Delivery note — why WAVE-1 sat unnoticed for four weeks
 
 The Codex cloud agent delivered on 2026-07-26 into the **fork**
 `rodgi040/beaver-buddy` (PR #3, branch
@@ -71,11 +89,3 @@ fork-internal PR that never pointed at `ai-beavers/beaver-buddy`. Nothing of it
 existed in the team repository, so this phase read as "not started" until
 2026-08-22, when the commit was cherry-picked onto `bl-figure/beaver-baby`.
 The fork PR remains open and unmerged.
-
-## Notes
-- Owner decision 2026-07-21: detection via Herdr, NO custom detection logic.
-- Architecture rule: event detection and character animation are strictly separate modules.
-- The normalized interface exposes only states supported by Herdr evidence — see the `needs-attention` finding above, which supersedes the original `waiting-for-input`/`question` split.
-- Animation and sound selection are downstream configuration values; they are not part of Herdr detection.
-- Installing Herdr in the cloud research environment is approved. Adding it to `package.json`, vendoring it, or shipping a binary remains forbidden without separate maintainer approval.
-- Source: `Meetings/2026-07-21-planung/summary.md` (Recording Agent, Herdr 02:06:13).

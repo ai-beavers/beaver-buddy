@@ -31,7 +31,7 @@ Rule: exactly **one accountable per phase**; agents work only for the phase owne
 - [ ] Phase 3 — Parachute drop · **PAUSED** (WAVE-1/2 ✅, WAVE-3 open → resume via Claude Code, spec `Milestone-2/Phase-3/Waves/WAVE-3.md`)
 
 ### M3 — Recording Agent & notifications · Z1 (**Jurij**, 2–3 w)
-- [ ] Phase 1 — Event detection via **Herdr** · WAVE-1 ✅ complete (evaluation + integration plan at `docs/research/`, delivered 2026-07-26 into fork PR #3, recovered 2026-08-22) · **WAVE-2 BLOCKED on three owner decisions: distribution · state language · scope** → see `Milestone-3/Phase-1/PHASE.md`
+- [ ] Phase 1 — Event detection via **own agent-CLI hooks** · WAVE-1 ✅ Herdr evaluation complete (`docs/research/`, recovered from fork PR #3 on 2026-08-22) · **Owner gate decided 2026-08-22: build our own detector using Herdr's hook logic — Herdr is not a dependency or prerequisite** · WAVE-2 re-scoped (hook research + Claude Code tracer bullet, delegated externally) · WAVE-3 further agents → see `Milestone-3/Phase-1/PHASE.md`
 - [ ] Phase 2 — Notification display (bubble/sign) · ← M3/P1
 - [ ] Phase 3 — Security gate & event↔animation hardening · ← M3/P1
 
