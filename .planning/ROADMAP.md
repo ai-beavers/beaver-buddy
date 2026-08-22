@@ -31,7 +31,7 @@ Rule: exactly **one accountable per phase**; agents work only for the phase owne
 - [ ] Phase 3 — Parachute drop · **PAUSED** (WAVE-1/2 ✅, WAVE-3 open → resume via Claude Code, spec `Milestone-2/Phase-3/Waves/WAVE-3.md`)
 
 ### M3 — Recording Agent & notifications · Z1 (**Jurij**, 2–3 w)
-- [ ] Phase 1 — Event detection via **Herdr** · WAVE-1 research/integration plan ready to start; WAVE-2 implementation gated on owner review · none for research
+- [ ] Phase 1 — Event detection via **Herdr** · WAVE-1 ✅ complete (evaluation + integration plan at `docs/research/`, delivered 2026-07-26 into fork PR #3, recovered 2026-08-22) · **WAVE-2 BLOCKED on three owner decisions: distribution · state language · scope** → see `Milestone-3/Phase-1/PHASE.md`
 - [ ] Phase 2 — Notification display (bubble/sign) · ← M3/P1
 - [ ] Phase 3 — Security gate & event↔animation hardening · ← M3/P1
 
@@ -43,7 +43,7 @@ Rule: exactly **one accountable per phase**; agents work only for the phase owne
 
 ### M5 — Animations (rest) · Z1 staggered (**Vlady**, ~1 w/animation)
 - [ ] P1–P8 — adult asset rows exist; runtime/phase acceptance remains to be reconciled — P1–P5 are **Z1 scope**
-- [ ] P9 Toilet — WAVE-1 assets ✅ (PRs #55/#58); WAVE-2 runtime open — **post-Z1**
+- [ ] P9 Toilet — WAVE-1 assets ✅ (PRs #55/#58) · WAVE-2 runtime **merged 2026-08-02 via PR #60** (`src/renderer/toilet-routine.ts` + tests, toilet+newspaper+recovery chain); phase acceptance still to be signed off — **post-Z1**
 - [ ] P10 Phone/Brain Rot — WAVE-1 assets ✅ (PR #54); WAVE-2 runtime open — **post-Z1**
 - [ ] P11 Meeting/Speech — asset and runtime waves open — **post-Z1**
 - [ ] P12 Stage art package: young baby, older teenager, adult (#7) — idle/walk placeholders exist; complete rows + character-map wiring open — **Z1**

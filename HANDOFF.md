@@ -1,49 +1,57 @@
-# Session Handoff — 2026-07-26
+# Session Handoff — 2026-08-22
 
 > This handoff is authoritative. Beaver Buddy stores live Flightplan state under `.planning/`, so `/fp-resume` must read `.planning/STATE.md`, `.planning/ROADMAP.md`, the active phase and wave after this file.
 
 ## current_state
 
-- **Active work:** M3/P1 WAVE-1 — Herdr evaluation and integration planning for Jurij's cloud agent.
-- **Scope:** research Herdr's real behavior, supported coding agents and observable states; install it only in the isolated cloud environment; produce evaluation and integration-plan documents. Do not implement the Beaver Buddy adapter in this wave.
-- **Architecture direction:** a deep main-process agent-status module exposes normalized, privacy-safe events. Herdr is an adapter behind that seam. Animation and sound are downstream mappings to configurable identifiers.
-- **Git:** fetched `origin/main` is `40d9420`; local `main` is `3417d19`, three commits behind. The current documentation synchronization is uncommitted. Use a fresh research branch/worktree from `origin/main` and do not carry this dirty documentation diff into research commits.
+- **Branch:** `bl-figure/beaver-baby`, pushed to `origin`, 6 commits ahead of `origin/main` and 0 behind. `origin/main` = `5914070` (PR #60, 2026-08-01) — unchanged since then apart from Dependabot.
+- **M3/P1 WAVE-1 is complete.** The Herdr evaluation and integration plan now live at `docs/research/herdr-evaluation.md` and `docs/research/herdr-integration-plan.md`.
+- **M3 is blocked on the owner, not on work.** Three decisions gate WAVE-2 — and with it M3/P2 and M3/P3.
+- Tests 683 passed / 36 skipped (59 files), lint clean.
 
-## completed
+## completed (this session)
 
-- Synchronized `PRD.md`, `README.md`, `.planning/STATE.md`, `ROADMAP.md`, `HANDOFF.md`, `NOTE.md` and affected M3/M4/M5 files with merged reality; matching local `.flightplan/` sources were updated.
-- Corrected PR #52/M4/P2, M4/P1 WAVE-1, Pi parser PR #57 and M5/P9/P10 asset-wave status.
-- Owner selected M3 Herdr as the next focus.
-- Expanded M3/P1 WAVE-1 as a research-only brief at `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` and updated Jurij's start prompt.
+- **Secured everything before touching anything.** Backup at `../_backup-2026-08-22/`: a `git bundle` of all refs (verified, complete history), the uncommitted worktree patch (690 lines), all untracked files, and the gitignored `.flightplan/` mirror (106 files).
+- **Pushed `bl-figure/beaver-baby` to `origin`** — 3 commits from 2026-07-27 (baby 360 turnaround sheet, `ingest-turnaround.mjs` + tests, design verdict) had never left this machine. No PR opened.
+- **Committed the documentation diff** that had been open in the working tree since 2026-07-26 (`ca56d65`, 20 files), including the previously untracked M3/P1 `WAVE-1.md` research brief.
+- **Merged `origin/main` into the branch** (`0ba368f`) after it had fallen 13 commits behind. One conflict in `assets/STYLE.md`, resolved additively — upstream's `toilet-read(8)`/`shake-dry(8)` entries kept ahead of this branch's baby turnaround section, nothing dropped. `package.json` and `docs/asset-gallery.md` auto-merged.
+- **Recovered the Herdr research** (`546cdf9`, cherry-pick of `2acdfaa`) from fork PR #3.
+- Updated `.planning/` (STATE, ROADMAP, M3/P1 PHASE, NOTE) against verified reality.
+
+## the finding that mattered
+
+The M3/P1 research was **not** missing — it was delivered on 2026-07-26 into the **fork** `rodgi040/beaver-buddy` as PR #3 (branch `codex/analyze-fp-resume-skill-documentation`, commit `2acdfaa`), fork-internal, never pointed at `ai-beavers/beaver-buddy`. Nothing of it existed in the team repo, so the phase read as "not started" for four weeks. The fork PR is still open and unmerged.
+
+Process lesson (recorded in NOTE.md): cloud agents inherit whatever remote configuration they find. The AGENTS.md rule "fork = read-only backup, never push" has to be repeated inside the agent start prompt itself.
 
 ## remaining
 
-1. In the cloud session, run `/fp-resume` and confirm M3/P1 WAVE-1 is active.
-2. Create a fresh dedicated research branch/worktree from fetched `origin/main`.
-3. Execute the Herdr source review, isolated installation and controlled experiments.
-4. Write `docs/research/herdr-evaluation.md` and `docs/research/herdr-integration-plan.md`.
-5. Stop for owner review. Only an approved WAVE-2 may implement the Beaver Buddy adapter.
+1. **Owner: answer the three M3/P1 gate questions** (below). Everything in M3 waits on this.
+2. Decide whether the Herdr research should reach `ai-beavers/beaver-buddy` as a PR — it currently exists there only on `bl-figure/beaver-baby`.
+3. Decide the fate of fork PR #3 (close it, now that the commit is recovered?).
+4. Three untracked files are still uncommitted and only backed up: `.kimi-code/mcp.json` (local MCP config — probably belongs in `.gitignore`), `BEAVER BUDDY ANIMATIONS WORKFLOW.json` (1.1 MB ComfyUI workflow), `design-assets/beaver-idle-frame.glsl`.
+5. Open independently of M3: M4/P1 WAVE-2 (durable daily aggregate storage), M5 runtime waves, M2/P3 WAVE-3 (paused), 4 Dependabot PRs (#38, #74, #75, #76).
 
-## decisions
+## decisions — the owner gate blocking M3
 
-- Owner direction (faithful English translation): "Proceed with Jurij's next tasks: analyze Herdr, then integrate it so the app recognizes when a coding-agent terminal is finished, needs new input, asks questions, and which coding agents are currently working or used."
-- Owner direction: first capture the work cleanly in Flightplan; the cloud agent installs and analyzes Herdr in its own environment, then creates the concrete integration plan.
-- Owner direction: later character animations or sounds must be selectable as configuration/variables from normalized agent events.
-- No custom detector is to be built silently. Herdr capability claims must come from official source/docs or reproducible experiments.
-- Installing Herdr in the isolated cloud environment is approved; adding a Beaver Buddy dependency, bundled executable or vendored code is not approved.
+1. **Distribution:** Herdr as a separately installed and already-running prerequisite; Beaver Buddy neither installs nor bundles it. If the app must work *without* a separate Herdr installation, the plan needs revision and explicit dependency approval.
+2. **State language:** Herdr has no `question` state — question, approval request and decision prompt all collapse into `blocked`. Accept a single generic `needs-attention` instead of the `waiting-for-input`/`question` split M3/P1 originally specified?
+3. **Scope:** default Herdr session only, with agents required to run inside Herdr panes.
+
+Approving all three makes WAVE-2A and WAVE-2B technically ready with **no new npm dependency** (Node built-in `net` over a local socket / named pipe). WAVE-2C stays gated on Windows beta verification.
 
 ## blockers
 
-- None for WAVE-1 research.
-- WAVE-2 is blocked until Herdr's integration mechanism, license, supported-agent matrix and state fidelity are evidenced and reviewed.
-- Any new project dependency, bundled executable, network service or privileged process requires explicit maintainer approval.
+- **What WAVE-1 could not verify:** no coding agent was tested against a live authenticated session — only the socket protocol, synthetically. Claude Code and Codex rest on Herdr's documentation alone. **Windows was never tested**, and it is the primary target platform.
+- Herdr checks `herdr.dev` for update manifests by default — collides with the no-runtime-network invariant; must be disabled via `[update].manifest_check = false` and verified.
+- Trust boundary: any same-user process with socket access can forge states. Herdr is a **local advisory source**, not an authenticated authority. Hardening belongs to M3/P3.
+- Herdr 0.7.5 is Apache-2.0 — no license obstacle.
 
 ## next_action
 
-Run `/fp-resume`, then execute `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` on a fresh research branch/worktree from fetched `origin/main`.
+Owner answers the three gate questions above. Until then M3 cannot move; M4/P1 WAVE-2 and the M5 runtime waves are the available parallel work.
 
 ## suggested_skills
 
 - `/fp-resume` — restore this handoff and the live `.planning/` artifacts.
-- `research` — use official Herdr source/docs and record precise evidence.
-- `/fp-plan` — only after the evaluation, to turn the evidence-backed integration proposal into WAVE-2.
+- `/fp-plan` — turn the approved gate answers into WAVE-2A/2B.

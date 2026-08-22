@@ -33,6 +33,11 @@
 <!-- /fp-note appends here, newest last -->
 - 2026-07-22 **[task]** Onboarding hint “growth needs connect”: XP sources are opt-in (`claudeEnabled`/`codexEnabled` default false), so onboarding/tray should explain that growth starts only after connecting a supported coding agent.
 
+- 2026-08-22 **[note]** **Cloud agents inherit the remote they find.** The Codex cloud agent delivered the M3/P1 Herdr research into the *fork* (`rodgi040/beaver-buddy` PR #3, fork-internal) instead of `ai-beavers`, where nobody saw it for four weeks. The AGENTS.md rule "fork = read-only backup, never push" only binds agents that read AGENTS.md — it must be repeated inside the agent start prompt itself. Fix `KICKOFF-AGENT-PROMPTS.md` accordingly.
+- 2026-08-22 **[task]** **Decide the three M3/P1 owner gates** — distribution (Herdr as separately installed prerequisite?), state language (`needs-attention` instead of `waiting-for-input`/`question`?), scope (default Herdr session only?). WAVE-2 and all of M3/P2+P3 are blocked until these are answered. Detail: `Milestone-3/Phase-1/PHASE.md`.
+- 2026-08-22 **[task]** **Herdr update check vs. no-runtime-network invariant:** Herdr polls `herdr.dev` for update manifests by default. Must be disabled (`[update].manifest_check = false`) and verified before any WAVE-2 integration ships.
+- 2026-08-22 **[note]** Rodgi has been running a Herdr fork locally since mid-August (`~/CODING/AGENT-HARNESS-MODIFIKATIONEN/herdr-modifikationen/`, scroll-bug root-cause open, plus a Cursor-CLI detection bug in the Herdr hook). That hands-on experience is directly relevant to the M3/P1 owner gates — especially the Windows-detection question WAVE-1 could not answer.
+
 ## Classified
 
 | Topic | Type | Status | Target/Source | Decision | Defined-on | Done-on/How |

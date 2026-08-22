@@ -4,6 +4,13 @@
 > As of: 2026-07-21. Prerequisite: repo clone at the state of PR #40
 > (`.planning/` must be present in the checkout).
 
+> ⚠️ **Lesson from 2026-07-26 (recorded 2026-08-22):** the Codex cloud agent ran the
+> M3/P1 Herdr research correctly but delivered it into the **fork**
+> (`rodgi040/beaver-buddy` PR #3, fork-internal), where nobody saw it for four weeks.
+> Cloud agents inherit whatever remote configuration they find in the clone. Every
+> prompt below therefore states the remote rule explicitly — keep it there, and check
+> the agent's target repository before it starts work.
+
 ## Prompt for Vlady (Claude Code) — M5 Animations
 
 ```
@@ -47,6 +54,10 @@ identify supported coding agents and observable states, and write the required
 evaluation and integration-plan documents. Do not implement Beaver Buddy integration
 yet and do not add Herdr as a project dependency. Work on a fresh dedicated
 branch/worktree from `origin/main`, never directly on main.
+**Remote rule — repeat this, do not assume the agent reads AGENTS.md:** push and
+open the PR ONLY against `ai-beavers/beaver-buddy` (`origin`). The fork
+`rodgi040/beaver-buddy` is a read-only backup — never push to it, never open a
+PR there. If `git remote -v` shows anything else, stop and report it.
 Never edit .planning/ files yourself; status updates go through Rodgi.
 ```
 

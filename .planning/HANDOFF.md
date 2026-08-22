@@ -3,6 +3,16 @@
 > Full resume context. Written by `/fp-pause`, read by `/fp-resume`. `STATE.md` is the short digest;
 > this file is the complete picture so the next session loses no context.
 
+## authoritative_update_2026-08-22 — M3/P1 WAVE-1 recovered, owner gate open
+
+- **The M3/P1 Herdr research was never missing — it was delivered to the wrong repository.** Codex cloud agent, 2026-07-26, into fork `rodgi040/beaver-buddy` PR #3 (branch `codex/analyze-fp-resume-skill-documentation`, commit `2acdfaa`), fork-internal and therefore invisible to `ai-beavers/beaver-buddy` for four weeks. Cherry-picked onto `bl-figure/beaver-baby` as `546cdf9`. Fork PR #3 remains open.
+- **WAVE-1 is complete.** `docs/research/herdr-evaluation.md` (164 lines) + `docs/research/herdr-integration-plan.md` (217 lines). Herdr 0.7.5, protocol 17, Apache-2.0.
+- **WAVE-2 is blocked on three owner decisions:** distribution · state language · scope. See `Milestone-3/Phase-1/PHASE.md`. M3/P2 and M3/P3 sit behind that same gate.
+- **Key limitation:** Herdr has no `question` state — question, approval and decision prompts all become `blocked`, so the plan proposes `needs-attention` instead of the original `waiting-for-input`/`question` split. No agent was verified live; **Windows was never tested**.
+- **Local state secured 2026-08-22:** full backup at `../_backup-2026-08-22/` (bundle of all refs + patch + untracked + `.flightplan/` mirror); `bl-figure/beaver-baby` pushed to `origin` (3 previously unpushed commits from 2026-07-27); the documentation diff open since 2026-07-26 committed as `ca56d65`; `origin/main` merged in as `0ba368f` (was 13 commits behind). Tests 683 passed / 36 skipped, lint clean.
+- **Upstream reality:** `origin/main` = `5914070` (2026-08-01). Since 2026-08-02 there has been no functional commit on main — only Dependabot. Vlady's PR #71 (video-to-sprite skill) and PR #60 (toilet+newspaper+recovery, assets **and** runtime) were the last substantive work.
+- The sections below preserve older session history. Where they conflict, this update and `STATE.md` take precedence.
+
 ## pause_2026-07-26 — M3/P1 Herdr
 
 - Owner selected M3/P1 as the next focus: identify active coding-agent instances and reliable `working`, `waiting-for-input`, `question`, `done` or fallback states through Herdr.
