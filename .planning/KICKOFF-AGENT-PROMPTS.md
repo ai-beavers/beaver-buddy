@@ -39,13 +39,14 @@ Read FIRST, in this order:
 Your role: You are Jurij's coding agent for MILESTONE 3 (Recording Agent &
 notifications) — the central Cycle-1 feature.
 
-Your first task: M3/Phase-1 (event detection via Herdr):
-Evaluate the open-source tool Herdr (terminal overview for parallel coding agents):
-how is it installed, how does it report agent status (done / waiting for input / running)?
-Design the state model + integration design (Herdr adapter as its own module,
-strictly separated from the animation layer). Result: evaluation doc + adapter design,
-then implementation with tests (Vitest, rules in CLAUDE.md).
-Blocked by: nothing — can start immediately. Align the detailed definition with Rodgi before you start.
+Run `/fp-resume`, then execute M3/Phase-1 WAVE-1 from
+`.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md`.
+This is research and integration planning only: inspect Herdr's official source,
+install it only in the isolated cloud environment, run controlled experiments,
+identify supported coding agents and observable states, and write the required
+evaluation and integration-plan documents. Do not implement Beaver Buddy integration
+yet and do not add Herdr as a project dependency. Work on a fresh dedicated
+branch/worktree from `origin/main`, never directly on main.
 Never edit .planning/ files yourself; status updates go through Rodgi.
 ```
 

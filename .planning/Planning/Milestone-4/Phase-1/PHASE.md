@@ -3,7 +3,7 @@
 > Part of Milestone 4. Done when: daily aggregated token sums (input/output, without
 > cache) per model are captured from the usage logs and stored locally (#24, #25).
 
-**Status:** in-progress — WAVE-1 delegated to cloud agent (2026-07-22, brief: [AGENT-BRIEF.md](AGENT-BRIEF.md)); first increment **merged via PR #42** (`feat/multi-harness-usage-logs`)
+**Status:** in-progress — WAVE-1 implemented via PR #42 plus the Pi parser fix in PR #57; WAVE-2 durable daily-aggregate storage remains open.
 
 **Accountable:** Rodgi · **Agent:** cloud agent (Claude Code/Codex) for WAVE-1, pi afterwards
 **Cycle:** Cycle 1
@@ -12,7 +12,7 @@
 **Duration (rough):** ~1 week
 
 ## Waves
-- [ ] WAVE-1 — Log reader following the TokScale model: find + parse local token logs, **only real input/output tokens** per model (cache creation + cache read strictly excluded), daily aggregation
+- [x] WAVE-1 — Log reader following the TokScale model: find + parse local token logs, **only real input/output tokens** per model (cache creation + cache read strictly excluded), daily aggregation — Claude Code, Codex, Pi Agent, Kimi Code and OpenCode are covered; Pi nested `message.usage` fixed via PR #57
 - [ ] WAVE-2 — Storage schema (local, append-safe, atomic-file), edge cases (#24), tests
 
 ## Notes

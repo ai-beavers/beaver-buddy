@@ -203,6 +203,45 @@ untouched, a fresh recorded seed per attempt.
 
 ---
 
+## The generation workflow (owner decision, 2026-07-27)
+
+**Animation rows are generated with `BEAVER BUDDY ANIMATIONS WORKFLOW`**
+(Comfy Cloud: `beaver-buddy-animations-workflow.json`, id
+`d5a8b538-b05b-4cd4-b65e-7385bde68fc5`; a copy of the graph is committed at the
+repo root as `BEAVER BUDDY ANIMATIONS WORKFLOW.json`). It supersedes
+`pixelart-builder` and the throwaway minimal graph used for the turnaround.
+
+Structure: two `LoadImage` nodes (character reference + a 2×2 layout guide)
+batched together, feeding **four parallel `GeminiImage2Node` branches**
+(`gemini-3-pro-image-preview`, i.e. Nano Banana Pro). Each branch emits a 2×2
+grid, then `Crop Images` (16 px inset) → `Create Composites` → `Create
+Animation`, producing 4 cut frames, a sheet, and an 8 fps video per animation.
+Four animations per run.
+
+Why it is better than what we used before — two lines in its prompt template do
+the heavy lifting:
+
+- *"Every element of the generated frame should fit inside the quadrant, with
+  the central point of the character aligned with the central point of each
+  quadrant."* This is the fix for the drift that killed `walk` attempt 1.
+- A `CRITICAL CHROMAKEY REQUIREMENTS` block that pins `#00FF00` exactly, forbids
+  green on the subject, and forbids black borders between frames — the three
+  failures we hit separately across turnaround attempts 1–3, all covered up
+  front.
+
+**Deviations to keep in mind:**
+
+- It produces **4 frames per row**, not 8. Fine for the sheet (`SheetRow.frames`
+  is per-row and the sheet is 8 tiles wide), and a 4-phase walk cycle
+  (contact / passing / opposite contact / passing) is a standard cycle — but it
+  supersedes the earlier "8 frames for all movement rows" decision.
+- Its stock prompts assume a **bipedal** character ("right leg forward, left leg
+  back"). The baby crawls on all fours and sits; every prompt must be rewritten
+  for the actual pose, and must add the size-consistency clause.
+- Output naming is `ComfyUI-<anim>-1..4`, not `frame_01..08`. Rename to
+  `frame_01.png`… on the way into `assets-src/comfyui/<figure>-<row>/`, or the
+  ingest will not find them.
+
 ## Hand-off — how generated assets enter the repo
 
 **Working split (owner, 2026-07-27): Rodgi generates and judges, the agent

@@ -2,7 +2,7 @@
 
 A pixel-art desktop beaver for macOS and Windows. It hatches from a lodge on first
 launch, then roams your desktop, drops the occasional quip, and **evolves as you
-burn AI tokens** — a Tamagotchi for people who live in Claude Code and Codex.
+burn AI tokens** — a Tamagotchi for people who build with coding agents.
 
 > Built by **[AI Beavers](https://github.com/ai-beavers)** — a global community of
 > builders. Contributors welcome (see [Contributing](#contributing) below).
@@ -12,7 +12,7 @@ burn AI tokens** — a Tamagotchi for people who live in Claude Code and Codex.
   &nbsp;&nbsp;
   <img src="assets/sprites/beaver-teen.png" alt="Teen beaver sprite sheet" width="200">
 </p>
-<p align="center"><em>baby → teen — the beaver evolves as you burn tokens</em></p>
+<p align="center"><em>baby and teenager preview — the beaver evolves through five life stages as you burn tokens</em></p>
 
 ## What it does
 
@@ -24,12 +24,12 @@ burn AI tokens** — a Tamagotchi for people who live in Claude Code and Codex.
   on events: app start, long coding session, daily token-spend tiers
   (weak / ok / crazy), idle, evolution. Frequency-capped so it stays charming.
   No LLM, no network — the lines are static strings.
-- **Grows on your token burn** — reads your **local** Claude Code / Codex usage logs
-  (`~/.claude`, `~/.codex`), turns them into XP, and evolves the beaver through life
-  stages: **baby → teen → adult**. Reading is read-only, offline, and never leaves
-  your machine — only derived token counts, never prompt contents. On Windows both
-  sources are tracked (Claude Code XDG + legacy, Codex union — see [Windows usage tracking](#windows-usage-tracking)
-  below).
+- **Grows on your token burn** — reads supported **local** Claude Code, Codex,
+  Pi Agent, Kimi Code and OpenCode usage logs, turns real input/output tokens
+  (cache excluded) into model-weighted XP, and evolves through five life stages:
+  **baby → young baby → teenager → older teenager → adult**. Reading is read-only,
+  offline, and never leaves your machine — only derived token counts, never prompt
+  contents. See [Windows usage tracking](#windows-usage-tracking) for discovery details.
 - **Optional MRR mode** — instead of tokens, drive XP from Stripe / RevenueCat
   (read-only keys stored in the platform's secure storage). Off by default.
   Available on Windows once a Stripe or RevenueCat key is saved.
@@ -125,6 +125,13 @@ paths are scanned and results are merged, deduplicated by relative session path
 `~/.codex` (legacy). This handles the common case where the Codex desktop app
 creates an empty `%APPDATA%\Codex` folder that would otherwise hide CLI sessions
 under `~/.codex`.
+
+**Additional local harnesses** are discovered from their documented session roots:
+Pi Agent via `PI_AGENT_DIR` (default `~/.pi/agent/sessions`), Kimi Code via
+`KIMI_DATA_DIR` (defaults `~/.kimi` and `~/.kimi-code`), and OpenCode via
+`OPENCODE_DATA_DIR` (default `~/.local/share/opencode`). Each override accepts
+comma- or semicolon-separated directories. Only enumerated session files and
+derived token counts are read.
 
 **MRR mode on Windows** uses `electron.safeStorage` (DPAPI-backed) to store Stripe
 and RevenueCat read-only keys locally. Once a key is saved, the tray's Growth menu

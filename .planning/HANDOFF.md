@@ -3,6 +3,24 @@
 > Full resume context. Written by `/fp-pause`, read by `/fp-resume`. `STATE.md` is the short digest;
 > this file is the complete picture so the next session loses no context.
 
+## pause_2026-07-26 — M3/P1 Herdr
+
+- Owner selected M3/P1 as the next focus: identify active coding-agent instances and reliable `working`, `waiting-for-input`, `question`, `done` or fallback states through Herdr.
+- Active task: research-only `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md`.
+- The cloud agent may install Herdr only in its isolated environment and must produce `docs/research/herdr-evaluation.md` plus `docs/research/herdr-integration-plan.md` before any Beaver Buddy implementation.
+- Herdr remains an adapter behind a normalized main-process seam. Animation and sound are downstream configurable mappings.
+- Use a fresh research branch/worktree from fetched `origin/main`; local `main` is three commits behind and the planning-sync diff is uncommitted.
+- Next action: run `/fp-resume`, execute WAVE-1, then stop for owner review.
+
+## authoritative_update_2026-07-26
+
+- Fetched upstream state: `origin/main` = `40d9420`; local clean `main` = `3417d19`, three commits behind.
+- PR #52 is merged: reset removal, model-weighted XP migration, five stages, unlimited levels, Beaver Status settings and stage-capabilities foundation.
+- M4/P1 WAVE-1 is complete through PR #42 plus the functional Pi parser fix in PR #57. WAVE-2 durable daily-aggregate storage remains open.
+- M5 adult asset rows P1–P10 are present. P9/P10 WAVE-1 assets are complete; their runtime waves remain open. P11 and the full P12 stage package remain open.
+- PR #59 is a later re-merge/housekeeping commit on the Pi-fix branch; the functional parser change landed in PR #57.
+- The sections below preserve older session history. When they conflict, this update and `STATE.md` take precedence.
+
 **Last updated:** 2026-07-22 (pi — PR #40 + #41 MERGED, fork→upstream migration complete, M4/P1 draft PR #42)
 
 ## current_state
@@ -87,8 +105,7 @@ agent brief: `Planning/Milestone-4/Phase-1/AGENT-BRIEF.md`.
 - "Parachute resume: later!" — 2026-07-21
 
 ## blockers
-- None for the team. (Fork archiving + Dependabot merges = owner actions, not blockers.)
+- None for the team. M5/P11 and P12 asset work requires Vlady with Claude Code/Comfy Cloud; the settings UI concept requires owner direction.
 
 ## next_action
-**Housekeeping PR** for the remaining local `main` commits (see remaining ①) → then
-**team dispatch** (KICKOFF-AGENT-PROMPTS.md to Vlady + Jurij).
+Run `/fp-resume`, then execute `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` on a fresh research branch/worktree from fetched `origin/main`.

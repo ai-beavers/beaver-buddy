@@ -478,7 +478,8 @@ daily loop, nothing decorative.
 | # | Row | Frames | Type | Status | Runtime today | Notes |
 |---|---|---|---|---|---|---|
 | 1 | `idle` | 1 | pose | regenerate | ✅ active | sitting pose — the anchor every other row conditions on. Do this one first and accept it before anything else runs. |
-| 2 | `walk` | **8** | loop | regenerate | ✅ active | quadruped crawl, side view, right-facing. **Upgraded from 2 frames** (owner, 2026-07-27): the sprite-sheet workflow emits 8 cells anyway, the sheet is already 8 tiles wide, and `SheetRow.frames` is per-row — so a full cycle costs nothing over two poses ping-ponging. Step frames only, never the idle pose in a walk row. |
+| 2 | `crawl` | 4 | loop | **new row** | ✅ active (as today's `walk`) | quadruped crawl on all fours, side view, right-facing. This is what the shipped `walk` row actually shows; it gets its own name now that the baby also gets an upright walk. |
+| 2b | `walk` | 4 | loop | **new** | ❌ art only | **upright walking on two legs** (owner, 2026-07-27). Keeps `walk` meaning the same thing on every figure — the adult walks upright too — so the vocabulary stays consistent across stages. Which of the two the baby uses for roaming is a `stage-capabilities.ts` flag, not an art question. |
 | 3 | `struggle` | 8 | loop | regenerate | ✅ active | grabbed, kicking |
 | 4 | `parachute-wind` | 8 | loop | regenerate | ✅ active | 128 px row — canopy extends upward, feet stay on the ground line |
 | 5 | `land` | 8 | one-shot | regenerate | ✅ active | touchdown → settles into `idle` |

@@ -1,76 +1,49 @@
-# Session Handoff — 2026-07-23
+# Session Handoff — 2026-07-26
+
+> This handoff is authoritative. Beaver Buddy stores live Flightplan state under `.planning/`, so `/fp-resume` must read `.planning/STATE.md`, `.planning/ROADMAP.md`, the active phase and wave after this file.
 
 ## current_state
 
-- **Branch:** `feat/xp-cap-and-settings`, 5 commits ahead of `feat/reset-removal-xp-migration` (PR #52)
-- **Working tree:** clean
-- **Milestone/Phase:** M4/P2 (XP/Level) — spec curve + 5 stages + model-weighted XP migration implemented
-- **App status:** Beaver Buddy runs at L122 adult with 1.76M XP (weighted, cache-excluded per model)
+- **Active work:** M3/P1 WAVE-1 — Herdr evaluation and integration planning for Jurij's cloud agent.
+- **Scope:** research Herdr's real behavior, supported coding agents and observable states; install it only in the isolated cloud environment; produce evaluation and integration-plan documents. Do not implement the Beaver Buddy adapter in this wave.
+- **Architecture direction:** a deep main-process agent-status module exposes normalized, privacy-safe events. Herdr is an adapter behind that seam. Animation and sound are downstream mappings to configurable identifiers.
+- **Git:** fetched `origin/main` is `40d9420`; local `main` is `3417d19`, three commits behind. The current documentation synchronization is uncommitted. Use a fresh research branch/worktree from `origin/main` and do not carry this dirty documentation diff into research commits.
 
-## completed (2026-07-23 session)
+## completed
 
-### Wave A — Reset-Feature entfernt
-- Branch `feat/reset-removal-xp-migration`: Reset-Button, IPC channel, handler, engine.resetProgress(), --reset-hatch flag, allowStageSnap option + all tests/docs removed
-- PR #52 opened against ai-beavers/beaver-buddy (contribution PR, English)
-- Hatch onboarding preserved; QA replay via onboarding-state.json deletion
-
-### Wave B — XP-Migration mit Modellgewichtung
-- model field through usage pipeline (UsageEntry.model, lifetimeByModel per model, no cache)
-- model-weights.json: 26 models, γ=2, REF=45, clamp 0.5–2.0, log-name mapping
-- 5-stage curve (baby/young-baby/teen/older-teen/adult), 32-level quadratic table, XP_PER_1K_TOKENS=5
-- XpState v2: per-model cursors (lastSeenByModel), schemaVersion: 2
-- Idempotent migration (migrate.ts, runs once at startup before attachTracker)
-- Renderer 5-stage wiring: stage union extended, stageHasInteraction correct for new stages, tray labels humanised
-- 647 tests green (37 net new), typecheck + lint clean
-
-### Wave C — XP-Cap entfernt
-- No hard cap at L32. Formula extends naturally: levelForXp uses table L1-L32, formula + correction for L33+
-- xpForLevel: table L1-L32, raw formula for L33+
-- Float drift fix: table avoids round()-drift for L1-L32, while-loop correction for L33+
-- Current user state: 1.76M XP → L122 adult
-
-### Wave D — Settings UI
-- Beaver Status section in settings.html: level, stage, XP progress bar (fraction of current level), per-model token cursors
-- XpStatusPayload: {xp, level, stage, currentLevelXp, nextLevelXp, lastSeenByModel}
-- SettingsWindowDeps.getXpState() wired from xpEngine
-- XpEngine.getLastSeenByModel() added
-
-### Wave E — Alterslogik-Fundament
-- stage-capabilities.ts: {canGrab, canType, roamPace} per stage
-- input-capture.ts: stageHasInteraction delegates to capabilities.canGrab
-- RoamPace values defined (0.7–1.25) for future use
-
-### Wave F1 — Animations-Crosscheck
-- M5 12 Phases all documented as stubs. Adult sheet has rows for P1-P8 (BL-1..9). P9-P11 + young-baby/older-teen/adult full rows still needed (M5/P12).
-- Meeting transcript (2026-07-21) covers M3-M6 roadmap, no detailed animation tasks.
-
-### Docs
-- CLAUDE.md: Agent hygiene rule (Electron kill only by path filter, never global)
-- STATE.md: updated to 2026-07-23
-- PLAN.md: full Wave A-F plan documented
-- TRACKING.md: progress entries for Waves A/B, C-F plan
+- Synchronized `PRD.md`, `README.md`, `.planning/STATE.md`, `ROADMAP.md`, `HANDOFF.md`, `NOTE.md` and affected M3/M4/M5 files with merged reality; matching local `.flightplan/` sources were updated.
+- Corrected PR #52/M4/P2, M4/P1 WAVE-1, Pi parser PR #57 and M5/P9/P10 asset-wave status.
+- Owner selected M3 Herdr as the next focus.
+- Expanded M3/P1 WAVE-1 as a research-only brief at `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` and updated Jurij's start prompt.
 
 ## remaining
 
-1. Owner test: settings window display, cap removal verification (tray label shows L122)
-2. Push `feat/xp-cap-and-settings` → update PR #52 or create separate PR
-3. Wave F2: UI layout concept for settings window (waiting for owner transcript)
-4. pi-agent token counter fix (own debug session)
-5. M5/P12 dispatch to Vlady: young-baby/older-teen/adult complete animation rows
+1. In the cloud session, run `/fp-resume` and confirm M3/P1 WAVE-1 is active.
+2. Create a fresh dedicated research branch/worktree from fetched `origin/main`.
+3. Execute the Herdr source review, isolated installation and controlled experiments.
+4. Write `docs/research/herdr-evaluation.md` and `docs/research/herdr-integration-plan.md`.
+5. Stop for owner review. Only an approved WAVE-2 may implement the Beaver Buddy adapter.
 
 ## decisions
 
-- XP cap permanently removed; formula extends past L32, L25+ stays adult. New stages will be added via M5/P12.
-- Settings window shows real-time xp/level/stage + per-model cursors. No extra channel needed — readStatus transports everything.
-- Stage behaviour gated via capabilities module, not hard-coded stage names.
-- Electron kill must filter by beaver-buddy CommandLine — never kill all electron instances.
+- Owner direction (faithful English translation): "Proceed with Jurij's next tasks: analyze Herdr, then integrate it so the app recognizes when a coding-agent terminal is finished, needs new input, asks questions, and which coding agents are currently working or used."
+- Owner direction: first capture the work cleanly in Flightplan; the cloud agent installs and analyzes Herdr in its own environment, then creates the concrete integration plan.
+- Owner direction: later character animations or sounds must be selectable as configuration/variables from normalized agent events.
+- No custom detector is to be built silently. Herdr capability claims must come from official source/docs or reproducible experiments.
+- Installing Herdr in the isolated cloud environment is approved; adding a Beaver Buddy dependency, bundled executable or vendored code is not approved.
 
 ## blockers
 
-- M5/P12: young-baby/older-teen sheets have only idle/walk rows — needs Vlady's Comfy Cloud agent. All other P1-P8 adult rows exist (BL-1..9 build-loop merge).
-- PR #52 awaiting review on ai-beavers/beaver-buddy.
-- Wave F2 waiting for owner's UI transcript.
+- None for WAVE-1 research.
+- WAVE-2 is blocked until Herdr's integration mechanism, license, supported-agent matrix and state fidelity are evidenced and reviewed.
+- Any new project dependency, bundled executable, network service or privileged process requires explicit maintainer approval.
 
 ## next_action
 
-Start the app with `npm start`, open Settings → "Beaver Status" to verify XP display. Push/pull decisions after owner test.
+Run `/fp-resume`, then execute `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` on a fresh research branch/worktree from fetched `origin/main`.
+
+## suggested_skills
+
+- `/fp-resume` — restore this handoff and the live `.planning/` artifacts.
+- `research` — use official Herdr source/docs and record precise evidence.
+- `/fp-plan` — only after the evaluation, to turn the evidence-backed integration proposal into WAVE-2.

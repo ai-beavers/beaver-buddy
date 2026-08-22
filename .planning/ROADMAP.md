@@ -31,20 +31,22 @@ Rule: exactly **one accountable per phase**; agents work only for the phase owne
 - [ ] Phase 3 — Parachute drop · **PAUSED** (WAVE-1/2 ✅, WAVE-3 open → resume via Claude Code, spec `Milestone-2/Phase-3/Waves/WAVE-3.md`)
 
 ### M3 — Recording Agent & notifications · Z1 (**Jurij**, 2–3 w)
-- [ ] Phase 1 — Event detection via **Herdr** (open-source agent overview; done / input needed) · none
+- [ ] Phase 1 — Event detection via **Herdr** · WAVE-1 research/integration plan ready to start; WAVE-2 implementation gated on owner review · none for research
 - [ ] Phase 2 — Notification display (bubble/sign) · ← M3/P1
 - [ ] Phase 3 — Security gate & event↔animation hardening · ← M3/P1
 
 ### M4 — Level, XP & profile system · Z1 (**Rodgi**, 3–4 w, ∥ M3)
-- [ ] Phase 1 — Token tracking & aggregation (daily, per model, no cache; #24/#25) · none
+- [ ] Phase 1 — Token tracking & aggregation (daily, per model, no cache; #24/#25) · WAVE-1 reader/aggregation ✅ via PR #42 + Pi fix PR #57; WAVE-2 durable daily storage open
 - [x] Phase 2 — XP/level model + level table 1–32 · ← M4/P1 (implemented 2026-07-23: quadratic curve, 5 stages, model-weighted XP, cap removed past L32)
 - [ ] Phase 3 — Persistence & profile (naming, achievements) · ← M4/P2
 - [ ] Phase 4 — Character-map JSON (level↔sprites↔animations) · ← M2/P1–P2 ✅
 
 ### M5 — Animations (rest) · Z1 staggered (**Vlady**, ~1 w/animation)
-- [ ] P1 Tree (#15) · P2 Coding (#8) · P3 Drinks (#9) · P4 Sleep (#10) · P5 Stretch (#11) — **Z1 scope**
-- [ ] P12 Stage art package: young baby, older teenager, adult (#7) — **Z1 (added later: 5 life stages)**
-- [ ] P6–P11 (Talk, Sport, Stick, Toilet, Phone, Meeting) — **post-Z1**
+- [ ] P1–P8 — adult asset rows exist; runtime/phase acceptance remains to be reconciled — P1–P5 are **Z1 scope**
+- [ ] P9 Toilet — WAVE-1 assets ✅ (PRs #55/#58); WAVE-2 runtime open — **post-Z1**
+- [ ] P10 Phone/Brain Rot — WAVE-1 assets ✅ (PR #54); WAVE-2 runtime open — **post-Z1**
+- [ ] P11 Meeting/Speech — asset and runtime waves open — **post-Z1**
+- [ ] P12 Stage art package: young baby, older teenager, adult (#7) — idle/walk placeholders exist; complete rows + character-map wiring open — **Z1**
 
 ### M6 — Contribution readiness & release · Z1 exit (**Rodgi**, ~2 w)
 - [ ] Phase 1 — Contributor/API/asset-builder docs · ← M3, M4

@@ -8,7 +8,7 @@
 
 **Accountable:** Rodgi · **Agent:** pi
 **Cycle:** Cycle 1
-**Blocked by:** M4/P2 (level model)
+**Blocked by:** M4/P2 ✅ (level model available)
 **Blocks:** —
 **Duration (rough):** ~1 week
 

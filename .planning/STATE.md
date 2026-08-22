@@ -2,11 +2,11 @@
 
 > Where the project stands now. Update after every meaningful action.
 
-**Now:** **PR #52 open** — XP-Migration mit Modellgewichtung (Wave A: Reset-Entfernung, Wave B: Spec-Kurve + 5 Stufen + Migration) · **Branch `feat/xp-cap-and-settings`** — Cap-Entfernung + Settings-UI + Alterslogik-Fundament (Waves C/D/E/F1 done, 649 Tests grün) · M5 build-loop Branch (BL-1..9) gemergt: adult hat 14 Animation-Rows; young-baby/older-teen nur idle/walk
-**Progress:** M1 ✅ · M2 P1/P2 ✅ (P3 paused) · M3 planned · M4 P1 in-progress, P2 in-progress (Wave B implementiert) · M5 adult-animations teilweise ✅ (BL-1..9, build-loop merge), P1–P12 Stubs offen · M6 planned · Cycle-1 exit criteria: app downloadable · 100 downloads · 7 contributors (currently 3)
-**Blockers:** none for the team · PR #52 waiting for review · M5/P12 young-baby/older-teen/adult volle Rows (Blocked by: Vlady / Comfy Cloud)
-**Last:** Session 2026-07-23: Wave A (Reset-Entfernung, PR #52) + Wave B (Model-Gewichte γ=2, 5-Stufen-Kurve 120k, State v2, Migration) · XP-Cap aufgehoben (quadratisch unendlich, L25+ adult) · Settings-UI: Beaver-Status-Section (XP, Level, Stage, Progress-Bar, per-Modell-Cursor) · stage-capabilities.ts (canGrab/canType/roamPace) · M5 Crosscheck: 12 Phasen vollständig, adult BL-1..9 done, P9–P11 + young-baby/older-teen/adult Rows fehlen · CLAUDE.md: Agent-Hygiene-Regel (Electron-Kill nur per Pfad-Filter)
-**Next:** ① Owner-Test der App (Settings + Cap-Entfernung) · ② Push `feat/xp-cap-and-settings` → PR #52 Update oder separater PR · ③ Wave F2: UI-Konzept (wartet auf Owner-Transkript) · ④ pi-agent Token-Counter Fix · ⑤ M5/P12 Dispatch an Vlady (young-baby/older-teen/adult komplette Rows)
+**Now:** M3/P1 WAVE-1 — Herdr evaluation and integration planning — is owner-approved and ready for Jurij's cloud agent. The wave must identify active coding agents and evidence-backed states before any Beaver Buddy integration is implemented.
+**Progress:** M1 ✅ · M2 P1/P2 ✅ (P3 paused) · M3 P1 WAVE-1 ready / WAVE-2 gated on review · M4 P1 WAVE-1 ✅ / WAVE-2 open, M4 P2 ✅ · M5 adult asset rows P1–P10 present · M6 planned · Cycle-1 exit criteria: downloadable app · 100 downloads · 7 contributors (currently 3)
+**Blockers:** none for Herdr research · integration may require separate approval if Herdr must become a project dependency, bundled executable, network service or privileged process · local `main` is three commits behind `origin/main` and the synchronized documentation diff is uncommitted
+**Last:** 2026-07-26 — synchronized product/planning docs against fetched upstream state; corrected M4/M5 status; selected M3 Herdr as the next focus; defined the research-only WAVE-1 and resume handoff.
+**Next:** In a cloud-agent session run `/fp-resume`, create a fresh research branch/worktree from fetched `origin/main`, and execute `.planning/Planning/Milestone-3/Phase-1/Waves/WAVE-1.md` without adding a Beaver Buddy dependency or implementation code.
 
 ## Recent decisions
 - **Remote layout: `origin` = ai-beavers (we are contributors, maintain role); fork `rodgi040/beaver-buddy` = read-only backup, never push** — recorded in AGENTS.md — 2026-07-22
@@ -24,8 +24,10 @@
 - All asset work = Claude Code (only Comfy-Cloud-MCP); pi = runtime/logic — 2026-07-20
 - No write access to ai-beavers → merges into fork `rodgi040/beaver-buddy`; upstream PRs = contribution PRs for org admin — 2026-07-19
 - Planning docs stay local (gitignored) — 2026-07-17
-- **XP-Cap entfernt (2026-07-23):** Level läuft über quadratische Formel unendlich weiter; L32 ist Kalibrieranker, kein Hard-Cap. L25+ bleibt adult (neue Stages via M5/P12). LEVEL_XP_THRESHOLDS-Tabelle deckt L1–L32; xpForLevel/levelForXp nutzen Formel für L33+.
-- **Stage Capabilities (2026-07-23):** `stage-capabilities.ts` definiert stufenspezifisches Verhalten (canGrab, canType, roamPace). Renderer-Gates delegieren an Capabilities statt Hard-Coded-Stage-Checks. Neue Animationen = Capability-Flip.
-- **Electron-Kill-Regel (2026-07-23):** Nur beaver-buddy-Instanz killen (per CommandLine-Filter), nicht alle Electron-Prozesse global — andere Apps (UltraWhisperFlow) laufen auf derselben Maschine.
+- **XP cap removed (2026-07-23):** Levels continue indefinitely through the quadratic formula; L32 is a calibration anchor, not a hard cap. L25+ remains adult. The exact table covers L1–L32; `xpForLevel`/`levelForXp` use the formula for L33+.
+- **Stage capabilities (2026-07-23):** `stage-capabilities.ts` defines stage-specific behavior (`canGrab`, `canType`, `roamPace`). Renderer gates delegate to capabilities instead of hard-coded stage checks.
+- **Electron process rule (2026-07-23):** Stop only the Beaver Buddy instance by CommandLine path filter, never all Electron processes globally.
+- **Direct upstream PRs (2026-07-23):** Work targets `ai-beavers/beaver-buddy` directly; the personal fork is a read-only backup.
+- **M5 asset batch (2026-07-23):** PRs #53–#58 merged the adult P1–P10 asset rows and their design evidence; phase runtime completion is tracked separately.
 
 <!-- Digest only. Plan lives in ROADMAP.md; task detail in PHASE.md / WAVE-X.md. -->

@@ -31,7 +31,7 @@
 - 2026-07-21 **[note]** DECIDED (Owner 2026-07-21): **XP and lifetime stay separate for now.** Main logic = XP from tokens → level. Lifetime (screen display time/total lifetime) is tracked separately and should later feed in as an additional XP source (conversion logic post-P2). Spec: `Planning/Milestone-4/Phase-2/XP-LEVEL-MODEL.md`
 
 <!-- /fp-note appends here, newest last -->
-- 2026-07-22 **[task]** Onboarding-Hinweis „Wachstum braucht Connect“: Debug-Befund (DEBUG-beaver-growth.md) — XP-Quellen sind Opt-in (claudeEnabled/codexEnabled default false) → Neue Nutzer sehen nie ein Wachsen und halten die App ggf. für kaputt. Im Onboarding/Tray klarstellen, dass der Biber erst nach Connect Claude Code/Codex wächst
+- 2026-07-22 **[task]** Onboarding hint “growth needs connect”: XP sources are opt-in (`claudeEnabled`/`codexEnabled` default false), so onboarding/tray should explain that growth starts only after connecting a supported coding agent.
 
 ## Classified
 
@@ -47,4 +47,10 @@
 | F1 beaver not clickable | bug | implemented | M2/P3 WAVE-2 | expected behavior; solved by C3/C4 | 2026-07-20 | 2026-07-20: WAVE-2 |
 | F2 bubble artifacts | bug | implemented | M2/P3 WAVE-2 | bubbleDirtyRect + forceFullClear | 2026-07-20 | 2026-07-20: WAVE-2 F2 chunk |
 | Onboarding hint "growth needs connect" | task | idea | M4/P2 + onboarding flow (M1) | From DEBUG-beaver-growth.md: explain opt-in sources, otherwise the app looks broken | 2026-07-22 | |
+| Remove reset-XP-and-hatch feature | task | implemented | `src/main/xp/engine.ts`, tray/settings UI, tests | Full removal incl. code paths | 2026-07-23 | PR #52 |
+| M4/P2 XP and level model | task | implemented | `src/main/xp/`, settings, renderer | Model weighting, five stages, unlimited levels, migration and status UI | 2026-07-23 | PR #52 |
+| pi-agent token counter incorrect | note | implemented | `src/main/usage/` | Nested `message.usage` and Pi field mapping fixed | 2026-07-23 | PR #57 |
+| M5/P9 Toilet assets | task | implemented | adult sprite sheet + design reviews | WAVE-1 assets complete; runtime remains open | 2026-07-23 | PR #55 + PR #58 |
+| M5/P10 Phone/Brain Rot assets | task | implemented | adult sprite sheet + design reviews | WAVE-1 assets complete; runtime remains open | 2026-07-23 | PR #54 |
+| Settings UI rework — layout planning | task | idea | settings.html, settings-window | Owner direction needed; plan before implementation | 2026-07-23 | |
 

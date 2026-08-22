@@ -4,17 +4,17 @@
 > implemented (1–16 ≈ Baby→Teen, fast progress at the start), with tests and documented
 > state logic of the stages.
 
-**Status:** not-started (stub — detailed definition at phase start with Rodgi)
+**Status:** complete (2026-07-23) — implemented and merged via PR #52, including the owner-approved curve, model-weighted XP migration, five life stages, unlimited levels beyond L32 and tests.
 
 **Accountable:** Rodgi · **Agent:** pi
 **Cycle:** Cycle 1
-**Blocked by:** M4/P1 (token data basis)
+**Blocked by:** M4/P1 WAVE-1 ✅ (token data basis available)
 **Blocks:** M4/P3 · M5 runtime triggers (level unlocks from ~level 8)
 **Duration (rough):** ~1–1.5 weeks
 
 ## Waves
-- [ ] WAVE-1 — XP formula (input+output; model weighting optional via benchmark research), progression curve, level table 1–32
-- [ ] WAVE-2 — Stage state logic (Baby/Teen/Adult mapping), level-up events, tests + docs
+- [x] WAVE-1 — XP formula using real input+output tokens with Intelligence Index model weighting (γ=2), quadratic progression curve and exact level table 1–32; formula continues beyond L32
+- [x] WAVE-2 — Five-stage state logic, level-up events, schema-v2 migration, settings status payload, tests and docs
 
 **Detail spec (owner-approved 2026-07-21):** [`XP-LEVEL-MODEL.md`](XP-LEVEL-MODEL.md) — curve, level table, stage mapping, lifetime separation, calibration plan.
 

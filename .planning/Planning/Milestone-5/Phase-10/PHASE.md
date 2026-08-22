@@ -2,14 +2,14 @@
 
 > Part of Milestone 5. Done when: brain-rot animation is baked, wired and accepted, tested, design-gate verdict filed under `docs/design-reviews/` and registered in `docs/asset-gallery.md`.
 
-**Status:** not-started (Stub — detailed definition happens at phase start with the owner, per the milestone convention "one animation per phase")
+**Status:** WAVE-1 complete (2026-07-23) — phone/brain-rot assets baked via PR #54; WAVE-2 runtime wiring remains open.
 
 ## Waves
-- [ ] WAVE-1 — Assets: gap analysis (what already exists in the sheet/parts?), produce missing frames via the Studio keyframe recipe and/or ComfyUI generation, bake into the app sheet format, Studio smoke test
+- [x] WAVE-1 — Assets: phone/brain-rot row baked and reviewed through BL-11; gallery provenance is present
 - [ ] WAVE-2 — Runtime: wiring/trigger, tests, design gate (#38), gallery entry
 
 ## Notes
-- Define scope at phase start.
+- Design-gate verdict: `docs/design-reviews/BL-11-brainrot-verdict.md`.
 - Cost/credits for ComfyUI generation are not a blocker (owner decision 2026-07-20).
 
 **Accountable:** Vlady (Assets via Claude Code; Runtime: Rodgi + pi)

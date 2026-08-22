@@ -6,7 +6,7 @@
 > source, as a standalone module, tested and without coupling to the animation
 > layer.
 
-**Status:** not-started (stub — detailed definition at phase start with Jurij)
+**Status:** WAVE-1 ready-to-start (owner-approved 2026-07-26) — research and integration planning only; no Beaver Buddy implementation before review.
 
 **Accountable:** Jurij · **Agent:** Claude Code
 **Cycle:** Cycle 1
@@ -15,12 +15,13 @@
 **Duration (rough):** ~1–1.5 weeks
 
 ## Waves
-- [ ] WAVE-1 — Evaluate Herdr (install/output/API: how does Herdr report agent
-  status?), integration design, state model (done / input needed / running)
-- [ ] WAVE-2 — Implement Herdr adapter + define event API/contract (events,
-  payloads, separation from the animation layer documented), tests
+- [ ] WAVE-1 — Evaluate Herdr in an isolated cloud-agent environment, identify supported coding agents and observable states, then produce an evidence-backed integration plan; see `Waves/WAVE-1.md`
+- [ ] WAVE-2 — After owner approval, implement a Herdr adapter behind a normalized agent-state interface, with tests and no animation-layer coupling
 
 ## Notes
 - Owner decision 2026-07-21: detection via Herdr, NO custom detection logic.
 - Architecture rule: event detection and character animation are strictly separate modules.
+- The normalized interface must identify active coding-agent instances and expose only states supported by Herdr evidence, including `working`, `waiting-for-input`, `question`, `done`, or `unknown` where distinguishable.
+- Animation and sound selection are downstream configuration values; they are not part of Herdr detection.
+- Installing Herdr in the cloud research environment is approved. Adding it to `package.json`, vendoring it, or shipping a binary remains forbidden without separate maintainer approval.
 - Source: `Meetings/2026-07-21-planung/summary.md` (Recording Agent, Herdr 02:06:13).

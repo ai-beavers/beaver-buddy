@@ -58,18 +58,19 @@ to read window geometry; icebox it.
 never jitters or teleports; movement pauses when Paused from tray.
 
 ### R4: The beaver — unique pixel asset set
-One unique beaver character in three life stages (baby / teen with visibly more
-muscle / adult, bigger again), fixed cool-toned palette, consistent grid across
-all stages and animations. A short style guide (`assets/STYLE.md`) pins palette,
+One unique beaver character in five life stages (baby / young baby / teenager /
+older teenager / adult), fixed cool-toned palette, consistent grid across all
+stages and animations. A short style guide (`assets/STYLE.md`) pins palette,
 grid, and outline rules so future frames stay coherent.
-**Acceptance:** all three stages + full animation set exist as sprite sheets;
+**Acceptance:** all five stages + the required animation set exist as sprite sheets;
 passes the R10 design gate; a stranger would call it distinctive, not generic.
 
 ### R5: Hatch onboarding
 First launch: a pixel-art beaver **lodge** appears in a screen corner, shakes
 Pokémon-hatch style with escalating intensity, bursts in a particle "explosion",
-and the baby beaver emerges and settles in the corner. Runs exactly once
-(re-triggerable via a hidden reset for QA).
+and the baby beaver emerges and settles in the corner. Runs exactly once;
+QA replays it by resetting the isolated synthetic app-state fixture, not through
+a shipped reset control.
 **Acceptance:** full sequence plays at 60fps-smooth without frame skips; state
 persists so relaunch skips straight to the pet.
 
@@ -84,20 +85,24 @@ slang OK, beaver "dam" as expression (not "damn").
 cooldown window; copy tone reviewed in R10 gate.
 
 ### R7: Token-burn tracking (growth system 1)
-Parse **local** Claude Code and Codex usage (ccusage-style log parsing from
-~/.claude and ~/.codex — no API keys, no network) into daily and lifetime token
-totals, refreshed on a timer.
-**Acceptance:** totals match ccusage output within ±5% on the same machine;
-missing/absent logs degrade gracefully to zero without errors.
+Parse supported **local** coding-agent logs — Claude Code, Codex, Pi Agent,
+Kimi Code and OpenCode — into daily and lifetime real input/output token totals,
+excluding cache creation/read tokens, refreshed on a timer without API keys or
+network access.
+**Acceptance:** Claude/Codex totals match the documented reference logic within
+±5% on the same machine; every supported parser has synthetic fixtures, and
+missing/absent or malformed logs degrade gracefully to zero without errors.
 
 ### R8: Level & evolution system
-XP accrues from tracked tokens. Levels 1–15 = baby, **16 = evolution to teen**,
-**32 = evolution to adult** (thresholds continue doubling for future stages).
+XP accrues from real input/output tokens with the owner-approved model weighting.
+Stages map to **baby L1–4, young baby L5–8, teenager L9–16, older teenager
+L17–24, adult L25+**. The exact quadratic table covers L1–32; L32 is a
+calibration anchor and the formula continues beyond it without a hard cap.
 Evolution plays a dedicated animation (shake → flash → new stage). Level + XP
-persist locally and are visible in the tray menu.
-**Acceptance:** simulated XP injection walks the beaver through both evolutions
-with animations; state survives relaunch; level curve is defined in one
-constants file.
+persist locally and are visible in Settings/tray status.
+**Acceptance:** simulated XP injection walks the beaver through every stage
+transition; schema migration is idempotent; state survives relaunch; the level
+curve and stage mapping each have one authoritative domain module.
 
 ### R9: MRR growth mode (growth system 2, phase 2)
 Optional settings: connect **Stripe** and/or **RevenueCat** with read-only keys;

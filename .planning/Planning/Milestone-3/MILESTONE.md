@@ -4,7 +4,7 @@
 > when a coding agent has finished its work or needs input, and shows that
 > visually — the actual benefit of the desktop pet for developers.
 
-**Status:** not-started
+**Status:** in-progress — P1 research scope approved on 2026-07-26; implementation waits for the evidence-based integration plan.
 
 **Accountable:** Jurij · **Agent:** Claude Code · **Duration (rough):** 2–3 weeks
 
@@ -22,7 +22,7 @@
   (e.g. holding up a sign) follow from M5.
 
 ## Phases
-- [ ] Phase 1 — Event detection via Herdr: evaluate + integrate Herdr (agent done / input needed), state model · **Blocked by:** none
+- [ ] Phase 1 — Event detection via Herdr: WAVE-1 research/evaluation ready; WAVE-2 integration gated on owner review · **Blocked by:** none for research
 - [ ] Phase 2 — Notification display: Bubble/Sign UX on events, non-invasive · **Blocked by:** M3/P1
 - [ ] Phase 3 — Security gate & hardening: prevent manual triggering, document + test the Event↔Animation contract · **Blocked by:** M3/P1
 

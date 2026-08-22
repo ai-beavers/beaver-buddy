@@ -35,10 +35,21 @@ slashes where appropriate.
 
 ## Tool 1: ComfyUI / Comfy Cloud
 
-Primary path is Comfy Cloud (no local ComfyUI install required). The parts
-workflow is the `PixelArt Parts Builder` template; see
+Primary path is Comfy Cloud (no local ComfyUI install required).
+
+**Use `BEAVER BUDDY ANIMATIONS WORKFLOW` for animation rows.** It is the
+current, owner-chosen workflow for generating character animations (Comfy
+Cloud: `beaver-buddy-animations-workflow.json`; graph committed at the repo
+root as `BEAVER BUDDY ANIMATIONS WORKFLOW.json`). One run produces four
+animations, each as a 2×2 grid cut into 4 frames plus a sheet and an 8 fps
+video, on a `#00FF00` chroma-key background. Full description, its prompt
+template, and the two clauses that make it work are in
+[`asset-production-todo.md`](asset-production-todo.md).
+
+The older `PixelArt Parts Builder` / `pixelart-builder` workflows are
+superseded for this purpose; see
 [`docs/comfyui-avatar-generation.md`](comfyui-avatar-generation.md) for the
-workflow inventory and parameters.
+historical inventory and parameters.
 
 ### Comfy Cloud MCP setup
 
