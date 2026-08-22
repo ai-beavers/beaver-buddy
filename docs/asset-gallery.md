@@ -86,8 +86,9 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
 
 ![adult beaver sheet](../assets/sprites/beaver-adult.png)
 
-- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×1824 sheet,
-  96×96 tiles (`exercise`, `parachute-wind`, and `toilet` are 128px-tall rows),
+- **Files:** `assets/sprites/beaver-adult.png` + `.json` — 768×2048 sheet,
+  96×96 tiles (`exercise`, `parachute-wind`, `toilet`, and `toilet-read` are
+  128px-tall rows),
   fps hint 8
 - **Animations:** `idle` (1), `walk` (2), `struggle` (8), `parachute-wind`
   (8), `land` (8), `type` (8), `watering` (8), `drink` (8), `sleep` (8),
@@ -100,7 +101,10 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   `brainrot` (8, LOOP, glazed phone-scroll, thumb flick), `wave` (8, LOOP,
   friendly wave-goodbye), `flush` (8, ONE-SHOT, stylized toilet-flush gag),
   `toilet` (8, ONE-SHOT, 128px-tall, full toilet routine — sits on a stylized
-  toilet, flushes, then a tile-scale wave sweeps toilet + beaver away)
+  toilet, flushes, then a tile-scale wave sweeps toilet + beaver away),
+  `toilet-read` (8, ONE-SHOT, 128px-tall, sit + newspaper read beat — chained
+  at runtime with flush/wave/shake-dry), `shake-dry` (8, ONE-SHOT, wet shake
+  after wave carry-back)
 - **Provenance:** `idle`/`walk` are the **side-profile walk cycle + matching
   idle** shipped through 2026-07-21, RESTORED by owner revert (2026-07-23).
   BL-6/T3 had briefly promoted these rows to reference-conditioned Comfy Cloud
@@ -176,7 +180,14 @@ ComfyUI generation pipeline: [`comfyui-avatar-generation.md`](comfyui-avatar-gen
   (`npm run assets:adult-toilet`) — the FULL toilet routine (sit → flush →
   tile-scale sweep) at `rowHeight: 128`; the full-screen wall-of-water version
   of the sweep is deferred to a WAVE-2 runtime effect — see STYLE.md
-  provenance and `docs/design-reviews/BL-14-toilet-verdict.md`.
+  provenance and `docs/design-reviews/BL-14-toilet-verdict.md`. `toilet-read`
+  and `shake-dry` are appended via
+  `scripts/gen-sprites/ingest-animation-frames.mjs adult-toilet-read` /
+  `adult-shake-dry` (`npm run assets:adult-toilet-read` /
+  `assets:adult-shake-dry`) — newspaper-read + wet-shake beats for the longer
+  toilet+newspaper+recovery choreography; see
+  `docs/toilet-newspaper-routine.md` and
+  `docs/design-reviews/toilet-newspaper-verdict.md`.
 - **Status:** final
 
 ### Tree — growth stages

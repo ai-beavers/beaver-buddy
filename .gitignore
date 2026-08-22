@@ -22,6 +22,10 @@ assets-src/*
 # Local skill iterations (Flightplan, ComfyUI, ...) stay untracked here.
 .agents/skills/
 
+# Skill-run scratch space (video-to-sprite reference canvases, downloaded
+# mp4s, preview strips/GIFs). Root-anchored so deeper tmp/ dirs are unaffected.
+/tmp/
+
 # Code-signing certificates never enter the repo; dev PFX files stay local,
 # CI certs live in GitHub Actions secrets (docs/code-signing.md).
 *.pfx
@@ -31,6 +35,10 @@ assets-src/*
 # CLAUDE.md/AGENTS.md). Anchored to the repo root so the pattern can never
 # swallow repo files of the same name at deeper paths.
 /.flightplan/
+
+# AGENTS.md — local agent instructions, never shipped (per repo-owner rule).
+# CLAUDE.md is the committed entry point for all agents.
+/AGENTS.md
 
 # Agent tooling stays maintainer-local: Flightplan fp-* skills/commands/agents
 # are workflow scaffolding, not project content. The vendored PixiJS skills

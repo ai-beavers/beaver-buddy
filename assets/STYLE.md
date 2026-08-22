@@ -585,6 +585,26 @@ see `docs/design-reviews/BL-14-toilet-verdict.md`. Ingested by
 (`npm run assets:adult-toilet`), growing the sheet to 768×1824. No human
 cleanup beyond the mechanical pipeline.
 
+`toilet-read(8)` (2026-07-23/24): ONE-SHOT half of the longer
+toilet+newspaper+recovery gag (`docs/toilet-newspaper-routine.md`). Narrative:
+toilet present → sit → pull newspaper → read ×2–3 → put away → stand → reach
+for flush. The short shipped `toilet` row (BL-14) stays untouched; this row is
+chained at runtime with `flush` / `wave` / `shake-dry`. Natural 4×2 order, no
+`frameOrder`. Reference-conditioned `partner_generate` (`vertexai/nano-banana-pro`)
+on green `#00FF00`, RGB→RGBA normalize, then
+`rowHeight: 128` / `targetContentHeightPx: 112` (same tall-toilet tradeoff as
+`toilet`). Evidence under `docs/design-reviews/toilet-newspaper-*`. Ingested by
+`scripts/gen-sprites/ingest-animation-frames.mjs adult-toilet-read`
+(`npm run assets:adult-toilet-read`), growing the sheet to 768×1952.
+
+`shake-dry(8)` (2026-07-23/24): ONE-SHOT wet-shake recovery after the wave
+carry-back — beaver alone (no toilet), shakes water droplets off, settles to
+an idle-like standing pose for roam handoff. Default 96px row
+(`targetContentHeightPx: 96`). Same generation path as `toilet-read`. Ingested
+by `scripts/gen-sprites/ingest-animation-frames.mjs adult-shake-dry`
+(`npm run assets:adult-shake-dry`), growing the sheet to 768×2048. No human
+cleanup beyond the mechanical pipeline.
+
 **Baby turnaround reference sheet**
 (`assets-src/reference/turnaround/beaver-baby-turnaround.png` + `.json`,
 2026-07-27): a build-time MODEL SHEET, not runtime art — 8 views (front,
