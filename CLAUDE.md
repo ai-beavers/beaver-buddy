@@ -243,8 +243,9 @@ fixed or documented as known limitations.
 ## Planning & docs — `.planning/` (committed) + `.flightplan/` (local master)
 
 The **team-facing planning docs are committed under `.planning/`** — agents and
-contributors read them there (see `AGENTS.md` → "Project planning docs"):
-`KICKOFF.md` (start), `STATE.md`, `ROADMAP.md` (milestones/phases/dependencies),
+contributors read them there:
+[`KICKOFF.md`](.planning/KICKOFF.md) (start), [`STATE.md`](.planning/STATE.md),
+[`ROADMAP.md`](.planning/ROADMAP.md) (milestones/phases/dependencies),
 `Planning/Milestone-N/…`, `Meetings/`, `Reference/` (item specs #1–#64), `Archive/`.
 
 The **Flightplan master lives under `.flightplan/` — local and gitignored** on the
